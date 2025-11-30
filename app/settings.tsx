@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, Lock, Download, Shield, FileText, ExternalLink, Trash2, Building2 } from 'lucide-react-native';
+import { ChevronLeft, Lock, Download, Shield, FileText, ExternalLink, Trash2, Building2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser as useUserContext } from '@/contexts/UserContext';
 import { useUser, useAuth } from '@clerk/clerk-expo';
@@ -39,6 +39,7 @@ export default function SettingsScreen() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [error, setError] = useState('');
   const [codeSharing, setCodeSharing] = useState(profile.codeSharing ?? true);
+  const [isPasswordSectionExpanded, setIsPasswordSectionExpanded] = useState(false);
 
   useEffect(() => {
     setCodeSharing(profile.codeSharing ?? true);
@@ -201,93 +202,106 @@ export default function SettingsScreen() {
       >
         <Text style={[styles.pageTitle, { color: colors.text }]}>Settings</Text>
 
-        {/* Password Change Section */}
+        {/* Password Change Section - Collapsible */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Lock size={24} color={colors.primary} strokeWidth={2} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Change Password
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={[styles.collapsibleHeader, { backgroundColor: colors.backgroundSecondary }]}
+            onPress={() => setIsPasswordSectionExpanded(!isPasswordSectionExpanded)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.sectionHeaderNoMargin}>
+              <Lock size={24} color={colors.primary} strokeWidth={2} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Change Password
+              </Text>
+            </View>
+            {isPasswordSectionExpanded ? (
+              <ChevronUp size={24} color={colors.textSecondary} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={24} color={colors.textSecondary} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
 
-          <View style={[styles.card, { backgroundColor: colors.backgroundSecondary }]}>
-            {error ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
+          {isPasswordSectionExpanded && (
+            <View style={[styles.card, styles.collapsibleContent, { backgroundColor: colors.backgroundSecondary }]}>
+              {error ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Current Password</Text>
+                <TextInput
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="Enter your current password"
+                  placeholderTextColor={colors.textSecondary}
+                  secureTextEntry
+                  style={[
+                    styles.input,
+                    { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }
+                  ]}
+                  autoCapitalize="none"
+                />
               </View>
-            ) : null}
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Current Password</Text>
-              <TextInput
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                placeholder="Enter your current password"
-                placeholderTextColor={colors.textSecondary}
-                secureTextEntry
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>New Password</Text>
+                <TextInput
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="Enter your new password"
+                  placeholderTextColor={colors.textSecondary}
+                  secureTextEntry
+                  style={[
+                    styles.input,
+                    { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }
+                  ]}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Confirm New Password</Text>
+                <TextInput
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm your new password"
+                  placeholderTextColor={colors.textSecondary}
+                  secureTextEntry
+                  style={[
+                    styles.input,
+                    { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }
+                  ]}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                Password must be at least 8 characters long
+              </Text>
+
+              <TouchableOpacity
                 style={[
-                  styles.input,
-                  { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }
+                  styles.changePasswordButton,
+                  { backgroundColor: colors.primary },
+                  isChangingPassword && styles.disabledButton
                 ]}
-                autoCapitalize="none"
-              />
+                onPress={handleChangePassword}
+                disabled={isChangingPassword}
+                activeOpacity={0.7}
+              >
+                {isChangingPassword ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={[styles.changePasswordButtonText, { color: colors.white }]}>
+                    Change Password
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>New Password</Text>
-              <TextInput
-                value={newPassword}
-                onChangeText={setNewPassword}
-                placeholder="Enter your new password"
-                placeholderTextColor={colors.textSecondary}
-                secureTextEntry
-                style={[
-                  styles.input,
-                  { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }
-                ]}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Confirm New Password</Text>
-              <TextInput
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Confirm your new password"
-                placeholderTextColor={colors.textSecondary}
-                secureTextEntry
-                style={[
-                  styles.input,
-                  { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }
-                ]}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-              Password must be at least 8 characters long
-            </Text>
-
-            <TouchableOpacity
-              style={[
-                styles.changePasswordButton,
-                { backgroundColor: colors.primary },
-                isChangingPassword && styles.disabledButton
-              ]}
-              onPress={handleChangePassword}
-              disabled={isChangingPassword}
-              activeOpacity={0.7}
-            >
-              {isChangingPassword ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={[styles.changePasswordButtonText, { color: colors.white }]}>
-                  Change Password
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
 
         {/* Claim Business Section */}
@@ -445,6 +459,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     marginBottom: 16,
+  },
+  sectionHeaderNoMargin: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 0,
+  },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 0,
+  },
+  collapsibleContent: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: 0,
   },
   sectionTitle: {
     fontSize: 20,
