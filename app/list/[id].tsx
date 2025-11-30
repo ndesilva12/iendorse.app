@@ -1,5 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Share2, ExternalLink } from 'lucide-react-native';
+import Head from 'expo-router/head';
+import { ArrowLeft, Share2, ExternalLink, Home, LogIn } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -24,13 +25,16 @@ import { getList } from '@/services/firebase/listService';
 import { UserList, ListEntry } from '@/types/library';
 import * as Clipboard from 'expo-clipboard';
 import EndorsedBadge from '@/components/EndorsedBadge';
+import MenuButton from '@/components/MenuButton';
 
 export default function SharedListScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { isDarkMode } = useUser();
+  const { isDarkMode, clerkUser } = useUser();
   const colors = isDarkMode ? darkColors : lightColors;
   const { brands, values } = useData();
+
+  const isSignedIn = !!clerkUser;
 
   const [list, setList] = useState<UserList | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +47,9 @@ export default function SharedListScreen() {
       },
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.dx > 100) {
-          router.back();
+          if (isSignedIn) {
+            router.push('/(tabs)/home');
+          }
         }
       },
     })
@@ -77,7 +83,7 @@ export default function SharedListScreen() {
   const handleShare = async () => {
     if (!list) return;
 
-    const shareMessage = `Check out "${list.name}" on Endorse Money!\n\n` +
+    const shareMessage = `Check out "${list.name}" on iEndorse!\n\n` +
       (list.creatorName ? `Created by: ${list.creatorName}\n` : '') +
       (list.description ? `${list.description}\n\n` : '') +
       `${list.entries.length} ${list.entries.length === 1 ? 'item' : 'items'}`;
@@ -107,37 +113,97 @@ export default function SharedListScreen() {
     }
   };
 
-  const handleGoToHomepage = () => {
-    const homepageUrl = 'https://iendorse.app';
-    if (Platform.OS === 'web') {
-      window.open(homepageUrl, '_blank');
-    } else {
-      Linking.openURL(homepageUrl);
-    }
+  const handleGoHome = () => {
+    router.push('/(tabs)/home');
+  };
+
+  const handleSignIn = () => {
+    router.push('/(auth)/sign-in');
+  };
+
+  const handleSignUp = () => {
+    router.push('/(auth)/sign-up');
   };
 
   const renderListEntry = (entry: ListEntry) => {
     if (entry.type === 'brand') {
-      const brand = brands.find(b => b.id === entry.brandId);
-      if (!brand) return null;
+      // Try to find brand by brandId first, then by name
+      let brand = brands.find(b => b.id === entry.brandId);
+      if (!brand && entry.brandName) {
+        brand = brands.find(b => b.name.toLowerCase() === entry.brandName?.toLowerCase());
+      }
+
+      // Even if brand not found in database, we can still render with the entry data
+      const brandName = brand?.name || entry.brandName || entry.name || 'Unknown Brand';
+      const brandWebsite = brand?.website || entry.website || '';
+      const logoUrl = entry.logoUrl || (brandWebsite ? getLogoUrl(brandWebsite, { size: 128 }) : '');
 
       return (
         <TouchableOpacity
           key={entry.id}
           style={[styles.entryCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-          onPress={() => router.push(`/brand/${brand.id}`)}
+          onPress={() => {
+            if (brand) {
+              router.push(`/brand/${brand.id}`);
+            } else if (entry.brandId) {
+              router.push(`/brand/${entry.brandId}`);
+            }
+          }}
           activeOpacity={0.7}
         >
           <View style={styles.entryImageContainer}>
-            <Image
-              source={{ uri: getLogoUrl(brand.website, { size: 128 }) }}
-              style={styles.entryImage}
-              contentFit="contain"
-            />
+            {logoUrl ? (
+              <Image
+                source={{ uri: logoUrl }}
+                style={styles.entryImage}
+                contentFit="contain"
+              />
+            ) : (
+              <View style={[styles.entryImagePlaceholder, { backgroundColor: colors.primary }]}>
+                <Text style={styles.entryImagePlaceholderText}>{brandName.charAt(0)}</Text>
+              </View>
+            )}
           </View>
           <View style={styles.entryInfo}>
-            <Text style={[styles.entryName, { color: colors.text }]}>{brand.name}</Text>
+            <Text style={[styles.entryName, { color: colors.text }]}>{brandName}</Text>
             <Text style={[styles.entryType, { color: colors.textSecondary }]}>Brand</Text>
+          </View>
+          <ExternalLink size={20} color={colors.textSecondary} strokeWidth={2} />
+        </TouchableOpacity>
+      );
+    }
+
+    if (entry.type === 'business') {
+      const businessName = entry.businessName || entry.name || 'Unknown Business';
+      const logoUrl = entry.logoUrl || (entry.website ? getLogoUrl(entry.website, { size: 128 }) : '');
+
+      return (
+        <TouchableOpacity
+          key={entry.id}
+          style={[styles.entryCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+          onPress={() => {
+            if (entry.businessId) {
+              router.push(`/business/${entry.businessId}`);
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={styles.entryImageContainer}>
+            {logoUrl ? (
+              <Image
+                source={{ uri: logoUrl }}
+                style={styles.entryImage}
+                contentFit="contain"
+              />
+            ) : (
+              <View style={[styles.entryImagePlaceholder, { backgroundColor: colors.primary }]}>
+                <Text style={styles.entryImagePlaceholderText}>{businessName.charAt(0)}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.entryInfo}>
+            <Text style={[styles.entryName, { color: colors.text }]}>{businessName}</Text>
+            <Text style={[styles.entryType, { color: colors.textSecondary }]}>Business</Text>
           </View>
           <ExternalLink size={20} color={colors.textSecondary} strokeWidth={2} />
         </TouchableOpacity>
@@ -171,6 +237,8 @@ export default function SharedListScreen() {
           onPress={() => {
             if (Platform.OS === 'web') {
               window.open(entry.url, '_blank');
+            } else {
+              Linking.openURL(entry.url || '');
             }
           }}
           activeOpacity={0.7}
@@ -202,16 +270,71 @@ export default function SharedListScreen() {
     return null;
   };
 
+  // App header component - same style as tab screens
+  const renderAppHeader = () => (
+    <View style={[styles.appHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View style={styles.appHeaderContent}>
+        <TouchableOpacity onPress={handleGoHome} activeOpacity={0.7}>
+          <Image
+            source={require('@/assets/images/endorsemulti1.png')}
+            style={styles.headerLogo}
+            contentFit="contain"
+          />
+        </TouchableOpacity>
+        {isSignedIn ? (
+          <MenuButton />
+        ) : (
+          <View style={styles.authButtons}>
+            <TouchableOpacity
+              style={[styles.signInButton, { borderColor: colors.primary }]}
+              onPress={handleSignIn}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.signInButtonText, { color: colors.primary }]}>Sign In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.signUpButton, { backgroundColor: colors.primary }]}
+              onPress={handleSignUp}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.signUpButtonText, { color: colors.white }]}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
+  // Sign up banner for non-authenticated users
+  const renderSignUpBanner = () => {
+    if (isSignedIn) return null;
+
+    return (
+      <View style={[styles.signUpBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+        <View style={styles.signUpBannerContent}>
+          <Text style={[styles.signUpBannerTitle, { color: colors.text }]}>
+            Create your own endorsement list
+          </Text>
+          <Text style={[styles.signUpBannerText, { color: colors.textSecondary }]}>
+            Join iEndorse to build and share your personalized list of brands and businesses you support.
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.signUpBannerButton, { backgroundColor: colors.primary }]}
+          onPress={handleSignUp}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.signUpBannerButtonText, { color: colors.white }]}>Get Started</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: 'Loading...',
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.text,
-          }}
-        />
+        <Stack.Screen options={{ headerShown: false }} />
+        {renderAppHeader()}
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading list...</Text>
@@ -223,22 +346,8 @@ export default function SharedListScreen() {
   if (error || !list) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: 'Error',
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.text,
-            headerLeft: () => (
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={styles.backButton}
-                activeOpacity={0.7}
-              >
-                <ArrowLeft size={24} color={colors.text} strokeWidth={2} />
-              </TouchableOpacity>
-            ),
-          }}
-        />
+        <Stack.Screen options={{ headerShown: false }} />
+        {renderAppHeader()}
         <View style={styles.centerContainer}>
           <Text style={[styles.errorTitle, { color: colors.text }]}>List Not Found</Text>
           <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
@@ -246,52 +355,45 @@ export default function SharedListScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.homeButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/(tabs)/home')}
+            onPress={handleGoHome}
             activeOpacity={0.7}
           >
+            <Home size={18} color={colors.white} strokeWidth={2} />
             <Text style={[styles.homeButtonText, { color: colors.white }]}>Go to Home</Text>
           </TouchableOpacity>
         </View>
+        {renderSignUpBanner()}
       </View>
     );
   }
 
+  // Generate OG meta tags for social sharing
+  const ogTitle = `${list.name} - iEndorse`;
+  const ogDescription = list.description ||
+    (list.creatorName ? `Endorsement list by ${list.creatorName}` : 'Discover endorsed brands and businesses');
+  const ogUrl = `https://iendorse.app/list/${id}`;
+  const ogImage = 'https://iendorse.app/og-list.png';
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
-        options={{
-          title: list.name,
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.backButton}
-              activeOpacity={0.7}
-            >
-              <ArrowLeft size={24} color={colors.text} strokeWidth={2} />
-            </TouchableOpacity>
-          ),
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                onPress={handleCopyLink}
-                style={styles.headerButton}
-                activeOpacity={0.7}
-              >
-                <ExternalLink size={22} color={colors.text} strokeWidth={2} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleShare}
-                style={styles.headerButton}
-                activeOpacity={0.7}
-              >
-                <Share2 size={22} color={colors.text} strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-          ),
-        }}
-      />
+      {Platform.OS === 'web' && (
+        <Head>
+          <title>{ogTitle}</title>
+          <meta name="description" content={ogDescription} />
+          <meta property="og:type" content="website" />
+          <meta property="og:url" content={ogUrl} />
+          <meta property="og:title" content={ogTitle} />
+          <meta property="og:description" content={ogDescription} />
+          <meta property="og:image" content={ogImage} />
+          <meta property="twitter:card" content="summary_large_image" />
+          <meta property="twitter:url" content={ogUrl} />
+          <meta property="twitter:title" content={ogTitle} />
+          <meta property="twitter:description" content={ogDescription} />
+          <meta property="twitter:image" content={ogImage} />
+        </Head>
+      )}
+      <Stack.Screen options={{ headerShown: false }} />
+      {renderAppHeader()}
 
       <ScrollView
         style={styles.scrollView}
@@ -299,21 +401,26 @@ export default function SharedListScreen() {
         showsVerticalScrollIndicator={false}
         {...panResponder.panHandlers}
       >
-        {/* Branding Header */}
-        <TouchableOpacity
-          style={styles.brandingHeader}
-          onPress={handleGoToHomepage}
-          activeOpacity={0.8}
-        >
-          <Image
-            source={require('@/assets/images/endorseofficialicon.png')}
-            style={styles.brandingLogo}
-            contentFit="contain"
-          />
-          <Text style={[styles.brandingTagline, { color: colors.textSecondary }]}>
-            Shop by your values
-          </Text>
-        </TouchableOpacity>
+        {/* List Header */}
+        <View style={styles.listHeader}>
+          <Text style={[styles.listTitle, { color: colors.text }]}>{list.name}</Text>
+          <View style={styles.listActions}>
+            <TouchableOpacity
+              onPress={handleCopyLink}
+              style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
+              activeOpacity={0.7}
+            >
+              <ExternalLink size={18} color={colors.text} strokeWidth={2} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleShare}
+              style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
+              activeOpacity={0.7}
+            >
+              <Share2 size={18} color={colors.text} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {list.creatorName && (
           <View style={[styles.creatorCard, { backgroundColor: colors.backgroundSecondary }]}>
@@ -354,6 +461,12 @@ export default function SharedListScreen() {
             {list.entries.map(entry => renderListEntry(entry))}
           </View>
         )}
+
+        {/* Sign up banner at bottom for non-authenticated users */}
+        {renderSignUpBanner()}
+
+        {/* Bottom spacing */}
+        <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   );
@@ -383,21 +496,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
-  brandingHeader: {
+  // App header styles
+  appHeader: {
+    borderBottomWidth: 1,
+    paddingTop: Platform.OS === 'web' ? 0 : 48,
+  },
+  appHeaderContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 24,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 8,
+    ...Platform.select({
+      web: {
+        maxWidth: 768,
+        width: '100%',
+        alignSelf: 'center',
+      },
+    }),
+  },
+  headerLogo: {
+    width: 140,
+    height: 42,
+  },
+  authButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  signInButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  signInButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  signUpButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  signUpButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // List header
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 12,
+  },
+  listTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    flex: 1,
+  },
+  listActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 10,
+    borderRadius: 10,
+  },
+  // Sign up banner
+  signUpBanner: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 24,
+  },
+  signUpBannerContent: {
     marginBottom: 16,
   },
-  brandingLogo: {
-    width: 180,
-    height: 60,
+  signUpBannerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
     marginBottom: 8,
   },
-  brandingTagline: {
+  signUpBannerText: {
     fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.3,
+    lineHeight: 20,
+  },
+  signUpBannerButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  signUpBannerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   loadingText: {
     marginTop: 16,
@@ -415,6 +608,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   homeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -422,18 +618,6 @@ const styles = StyleSheet.create({
   homeButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginRight: 8,
-  },
-  headerButton: {
-    padding: 8,
   },
   creatorCard: {
     padding: 18,
@@ -537,7 +721,7 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 12,
     backgroundColor: '#fff',
-    padding: 10,
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -556,6 +740,17 @@ const styles = StyleSheet.create({
   entryImage: {
     width: '100%',
     height: '100%',
+  },
+  entryImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  entryImagePlaceholderText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   entryInfo: {
     flex: 1,

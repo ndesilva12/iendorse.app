@@ -277,8 +277,8 @@ export default function BusinessSetupScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
-            <Building2 size={32} color={colors.primary} strokeWidth={2} />
+          <View style={[styles.iconContainer, { backgroundColor: colors.primary }]}>
+            <Building2 size={32} color="#FFFFFF" strokeWidth={2} />
           </View>
           <Text style={[styles.title, { color: colors.text }]}>
             Claim Your Business

@@ -126,7 +126,7 @@ export default function TabLayout() {
                 paddingBottom: isTabletOrLarger ? 0 : (Platform.OS === 'web' ? 0 : 4),
                 paddingTop: isTabletOrLarger ? 0 : 12,
                 borderTopWidth: isTabletOrLarger ? 0 : 1,
-                borderBottomWidth: isTabletOrLarger ? 1 : 0,
+                borderBottomWidth: 0,
                 borderTopColor: colors.border,
                 borderBottomColor: colors.border,
                 backgroundColor: colors.background,
