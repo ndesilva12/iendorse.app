@@ -706,12 +706,43 @@ export default function UnifiedLibrary({
   }, [addSearchQuery, brands, allBusinesses, endorsementList]);
 
   // Convert endorsement entries to map entries (only entries with location data)
+  // Applies the same filters as the list view
   const mapEntries = useMemo((): MapEntry[] => {
     if (!endorsementList?.entries) return [];
 
+    // Helper to get entry category (same logic as in render)
+    const getEntryCategory = (entry: ListEntry): string => {
+      let rawCategory: string | undefined;
+      if (entry.type === 'brand') rawCategory = (entry as any).brandCategory;
+      else if (entry.type === 'business') rawCategory = (entry as any).businessCategory;
+      else if (entry.type === 'place') rawCategory = (entry as any).placeCategory;
+      return mapToCustomCategory(rawCategory);
+    };
+
+    // Helper to check if entry is local (has location data)
+    const isLocalEntry = (entry: ListEntry): boolean => {
+      if (entry.type === 'place') return true;
+      if (entry.type === 'business' && (entry as any).location) return true;
+      return false;
+    };
+
+    // Apply local filter first
+    let filteredList = endorsementList.entries;
+    if (localFilter === 'local') {
+      filteredList = filteredList.filter(entry => entry && isLocalEntry(entry));
+    }
+
+    // Then apply category filter
+    if (categoryFilter !== 'all') {
+      filteredList = filteredList.filter(entry => {
+        const categoryId = getEntryCategory(entry);
+        return categoryId === categoryFilter;
+      });
+    }
+
     const entries: MapEntry[] = [];
 
-    endorsementList.entries.forEach((entry) => {
+    filteredList.forEach((entry) => {
       if (entry.type === 'place') {
         const placeEntry = entry as any;
         if (placeEntry.location?.lat && placeEntry.location?.lng) {
@@ -783,7 +814,7 @@ export default function UnifiedLibrary({
     });
 
     return entries;
-  }, [endorsementList?.entries, allBusinesses, brands, geocodedBrandLocations]);
+  }, [endorsementList?.entries, allBusinesses, brands, geocodedBrandLocations, categoryFilter, localFilter]);
 
   // Reset geocoding flag when modal closes
   useEffect(() => {
@@ -4358,8 +4389,6 @@ export default function UnifiedLibrary({
                 backgroundColor: colors.background,
                 width: isLargeScreen ? width * 0.8 : width * 0.95,
                 height: isLargeScreen ? height * 0.8 : height * 0.95,
-                maxWidth: isLargeScreen ? 900 : undefined,
-                maxHeight: isLargeScreen ? 700 : undefined,
               }
             ]}
             onPress={(e) => e.stopPropagation()}
