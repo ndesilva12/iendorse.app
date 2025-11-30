@@ -13,6 +13,7 @@ import {
   deleteDoc,
   getDoc,
   getDocs,
+  setDoc,
   query,
   where,
   orderBy,
@@ -373,10 +374,6 @@ export const convertClaimToBusinessAccount = async (
     const userRef = doc(db, 'users', claim.userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
-      throw new Error('User not found');
-    }
-
     const businessInfo = {
       name: placeDetails.name,
       category: placeDetails.category,
@@ -391,11 +388,30 @@ export const convertClaimToBusinessAccount = async (
       customerDiscountPercent: 5,
     };
 
-    await updateDoc(userRef, {
-      userType: 'business',
-      businessInfo: businessInfo,
-      'userDetails.role': claim.businessRole || 'owner',
-    });
+    if (!userDoc.exists()) {
+      // Create the user document if it doesn't exist yet
+      // This handles cases where user submitted a claim before completing onboarding
+      console.log('[BusinessClaimService] Creating user document for business claim');
+      await setDoc(userRef, {
+        id: claim.userId,
+        accountType: 'business',
+        businessInfo: businessInfo,
+        causes: [],
+        searchHistory: [],
+        userDetails: {
+          name: claim.userName,
+          role: claim.businessRole || 'owner',
+        },
+        createdAt: Timestamp.now(),
+      });
+    } else {
+      // Update existing user document
+      await updateDoc(userRef, {
+        accountType: 'business',
+        businessInfo: businessInfo,
+        'userDetails.role': claim.businessRole || 'owner',
+      });
+    }
 
     // Update the claim to mark it as converted
     const claimRef = doc(db, 'businessClaims', claimId);
