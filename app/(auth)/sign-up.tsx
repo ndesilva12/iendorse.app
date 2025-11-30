@@ -1,18 +1,19 @@
 import * as React from 'react';
 import { Text, TextInput, TouchableOpacity, View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image, ActivityIndicator, Alert, Modal } from 'react-native';
-import { useSignUp } from '@clerk/clerk-expo';
+import { useSignUp, useAuth } from '@clerk/clerk-expo';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { darkColors, lightColors } from '@/constants/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUser } from '@/contexts/UserContext';
-import { User, Building2 } from 'lucide-react-native';
+import { User, Building2, LogOut } from 'lucide-react-native';
 import { AccountType } from '@/types';
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { isSignedIn, isLoaded: authLoaded, signOut } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams<{ ref?: string; source?: string }>();
-  const { isDarkMode, setAccountType, isLoading: isProfileLoading, clerkUser: contextClerkUser } = useUser();
+  const { isDarkMode, setAccountType, isLoading: isProfileLoading, clerkUser: contextClerkUser, clearAllStoredData } = useUser();
   const colors = isDarkMode ? darkColors : lightColors;
 
   // Capture referral source from URL params (supports ?ref=location1 or ?source=location1)
@@ -38,6 +39,8 @@ export default function SignUpScreen() {
     }
   }, [showConsentModal]);
 
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
+
   const resetForm = React.useCallback(() => {
     setEmailAddress('');
     setPassword('');
@@ -49,7 +52,69 @@ export default function SignUpScreen() {
     setIsSubmitting(false);
   }, []);
 
+  // Handle force sign out
+  const handleForceSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      console.log('[Sign Up] Force signing out...');
+      await clearAllStoredData();
+      await signOut();
+      console.log('[Sign Up] Sign out complete');
+      if (Platform.OS === 'web') {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('[Sign Up] Sign out error:', error);
+      if (Platform.OS === 'web') {
+        window.location.reload();
+      }
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
+  // If already signed in, show option to sign out
+  if (authLoaded && isSignedIn) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+        <View style={styles.alreadySignedInContainer}>
+          <Image
+            source={require('@/assets/images/endorsemobile.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={[styles.alreadySignedInTitle, { color: colors.text }]}>
+            You're already signed in
+          </Text>
+          <Text style={[styles.alreadySignedInSubtitle, { color: colors.textSecondary }]}>
+            Sign out first to create a new account
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: colors.primary, marginTop: 24 }]}
+            onPress={() => router.replace('/')}
+          >
+            <Text style={styles.buttonText}>Continue to App</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.signOutButton, { backgroundColor: colors.danger }]}
+            onPress={handleForceSignOut}
+            disabled={isSigningOut}
+          >
+            {isSigningOut ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <LogOut size={20} color="#fff" strokeWidth={2} />
+                <Text style={styles.buttonText}>Sign Out</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const onSignUpPress = async () => {
     console.log('[Sign Up] Button pressed, isLoaded:', isLoaded, 'isSubmitting:', isSubmitting);
@@ -826,5 +891,34 @@ const styles = StyleSheet.create({
   modalButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Already signed in styles
+  alreadySignedInContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  alreadySignedInTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  alreadySignedInSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    width: '100%',
+    maxWidth: 300,
   },
 });
