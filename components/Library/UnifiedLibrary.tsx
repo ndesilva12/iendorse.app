@@ -325,6 +325,7 @@ export default function UnifiedLibrary({
   const [showMapModal, setShowMapModal] = useState(false);
   const [geocodedBrandLocations, setGeocodedBrandLocations] = useState<Record<string, { lat: number; lng: number }>>({});
   const [isGeocodingBrands, setIsGeocodingBrands] = useState(false);
+  const geocodingStartedRef = useRef(false); // Track if geocoding has started for current modal session
 
   // Detect larger screens for responsive text display
   const { width, height } = useWindowDimensions();
@@ -784,9 +785,20 @@ export default function UnifiedLibrary({
     return entries;
   }, [endorsementList?.entries, allBusinesses, brands, geocodedBrandLocations]);
 
-  // Geocode brands without coordinates when map modal opens
+  // Reset geocoding flag when modal closes
   useEffect(() => {
-    if (!showMapModal || !endorsementList?.entries) return;
+    if (!showMapModal) {
+      geocodingStartedRef.current = false;
+    }
+  }, [showMapModal]);
+
+  // Geocode brands without coordinates when map modal opens (runs only once per modal session)
+  useEffect(() => {
+    if (!showMapModal || !endorsementList?.entries || !brands) return;
+
+    // Only run geocoding once per modal session
+    if (geocodingStartedRef.current) return;
+    geocodingStartedRef.current = true;
 
     const geocodeBrands = async () => {
       const brandsToGeocode: Array<{ brandId: string; location: string }> = [];
@@ -797,12 +809,11 @@ export default function UnifiedLibrary({
           const brandEntry = entry as any;
           const fullBrand = brands?.find(b => b.id === brandEntry.brandId);
 
-          // If brand has location string but no coordinates and not already geocoded
+          // If brand has location string but no coordinates
           if (
             fullBrand?.location &&
             !fullBrand.latitude &&
-            !fullBrand.longitude &&
-            !geocodedBrandLocations[brandEntry.brandId]
+            !fullBrand.longitude
           ) {
             brandsToGeocode.push({
               brandId: brandEntry.brandId,
@@ -829,12 +840,15 @@ export default function UnifiedLibrary({
         })
       );
 
-      setGeocodedBrandLocations(prev => ({ ...prev, ...newGeocodedLocations }));
+      // Update state once with all results
+      if (Object.keys(newGeocodedLocations).length > 0) {
+        setGeocodedBrandLocations(prev => ({ ...prev, ...newGeocodedLocations }));
+      }
       setIsGeocodingBrands(false);
     };
 
     geocodeBrands();
-  }, [showMapModal, endorsementList?.entries, brands, geocodedBrandLocations]);
+  }, [showMapModal, endorsementList?.entries, brands]); // Removed geocodedBrandLocations from deps
 
   // Handle adding a brand, business, or place to endorsement list
   const handleAddToEndorsement = useCallback(async (item: any, type: 'brand' | 'business' | 'place') => {
