@@ -812,9 +812,7 @@ export default function OnboardingScreen() {
             </TouchableOpacity>
 
             {/* Icon */}
-            <View style={[styles.welcomeIconContainer, { backgroundColor: colors.primary + '20' }]}>
-              <Sparkles size={40} color={colors.primary} strokeWidth={1.5} />
-            </View>
+            <Sparkles size={48} color={colors.primary} strokeWidth={1.5} style={styles.welcomeIcon} />
 
             {/* Title */}
             <Text style={[styles.welcomeTitle, { color: colors.text }]}>
@@ -1217,12 +1215,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  welcomeIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  welcomeIcon: {
     marginBottom: 20,
   },
   welcomeTitle: {
