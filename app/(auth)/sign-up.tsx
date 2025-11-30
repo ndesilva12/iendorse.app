@@ -410,46 +410,6 @@ export default function SignUpScreen() {
             </Text>
           </View>
 
-          {/* Account Type Toggle */}
-          <View style={styles.accountTypeContainer}>
-            <TouchableOpacity
-              style={[
-                styles.accountTypeOption,
-                {
-                  backgroundColor: selectedAccountType === 'individual' ? colors.primary : colors.backgroundSecondary,
-                  borderColor: selectedAccountType === 'individual' ? colors.primary : colors.border,
-                  borderWidth: selectedAccountType === 'individual' ? 2 : 1,
-                }
-              ]}
-              onPress={() => setSelectedAccountType('individual')}
-              activeOpacity={0.7}
-            >
-              <User size={20} color={selectedAccountType === 'individual' ? '#FFFFFF' : colors.textSecondary} strokeWidth={2} />
-              <Text style={[
-                styles.accountTypeText,
-                { color: selectedAccountType === 'individual' ? '#FFFFFF' : colors.textSecondary }
-              ]}>Individual</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.accountTypeOption,
-                {
-                  backgroundColor: selectedAccountType === 'business' ? colors.primary : colors.backgroundSecondary,
-                  borderColor: selectedAccountType === 'business' ? colors.primary : colors.border,
-                  borderWidth: selectedAccountType === 'business' ? 2 : 1,
-                }
-              ]}
-              onPress={() => setSelectedAccountType('business')}
-              activeOpacity={0.7}
-            >
-              <Building2 size={20} color={selectedAccountType === 'business' ? '#FFFFFF' : colors.textSecondary} strokeWidth={2} />
-              <Text style={[
-                styles.accountTypeText,
-                { color: selectedAccountType === 'business' ? '#FFFFFF' : colors.textSecondary }
-              ]}>Business</Text>
-            </TouchableOpacity>
-          </View>
-
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <View style={styles.inputContainer}>
             <Text style={[styles.label, { color: colors.text }]}>Full Name</Text>
@@ -496,6 +456,47 @@ export default function SignUpScreen() {
               style={[styles.input, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
             />
           </View>
+
+          {/* Account Type Toggle */}
+          <View style={styles.accountTypeContainer}>
+            <TouchableOpacity
+              style={[
+                styles.accountTypeOption,
+                {
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: selectedAccountType === 'individual' ? colors.primary : colors.border,
+                  borderWidth: selectedAccountType === 'individual' ? 2 : 1,
+                }
+              ]}
+              onPress={() => setSelectedAccountType('individual')}
+              activeOpacity={0.7}
+            >
+              <User size={20} color={selectedAccountType === 'individual' ? colors.primary : colors.textSecondary} strokeWidth={2} />
+              <Text style={[
+                styles.accountTypeText,
+                { color: selectedAccountType === 'individual' ? colors.primary : colors.textSecondary }
+              ]}>Individual</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.accountTypeOption,
+                {
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: selectedAccountType === 'business' ? colors.primary : colors.border,
+                  borderWidth: selectedAccountType === 'business' ? 2 : 1,
+                }
+              ]}
+              onPress={() => setSelectedAccountType('business')}
+              activeOpacity={0.7}
+            >
+              <Building2 size={20} color={selectedAccountType === 'business' ? colors.primary : colors.textSecondary} strokeWidth={2} />
+              <Text style={[
+                styles.accountTypeText,
+                { color: selectedAccountType === 'business' ? colors.primary : colors.textSecondary }
+              ]}>Business</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity onPress={onSignUpPress} style={[styles.button, { backgroundColor: colors.primary }]} disabled={isSubmitting || !isLoaded}>
             {isSubmitting ? (
               <ActivityIndicator color="#fff" />
