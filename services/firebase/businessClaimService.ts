@@ -359,20 +359,31 @@ export const convertClaimToBusinessAccount = async (
     photoUrl?: string;
   }
 ): Promise<void> => {
+  console.log('[BusinessClaimService] Starting conversion for claim:', claimId);
+  console.log('[BusinessClaimService] Place details received:', JSON.stringify(placeDetails, null, 2));
+
   try {
     // Get the claim
     const claim = await getClaimById(claimId);
+    console.log('[BusinessClaimService] Fetched claim:', claim ? JSON.stringify(claim, null, 2) : 'null');
+
     if (!claim) {
       throw new Error('Claim not found');
     }
 
     if (claim.status !== 'approved') {
-      throw new Error('Claim must be approved before conversion');
+      throw new Error(`Claim must be approved before conversion. Current status: ${claim.status}`);
     }
+
+    console.log('[BusinessClaimService] Claim userId:', claim.userId);
 
     // Update the user's profile with business info
     const userRef = doc(db, 'users', claim.userId);
     const userDoc = await getDoc(userRef);
+    console.log('[BusinessClaimService] User document exists:', userDoc.exists());
+    if (userDoc.exists()) {
+      console.log('[BusinessClaimService] Current user data:', JSON.stringify(userDoc.data(), null, 2));
+    }
 
     const businessInfo = {
       name: placeDetails.name,
@@ -387,12 +398,13 @@ export const convertClaimToBusinessAccount = async (
       acceptsStandDiscounts: false,
       customerDiscountPercent: 5,
     };
+    console.log('[BusinessClaimService] BusinessInfo to save:', JSON.stringify(businessInfo, null, 2));
 
     if (!userDoc.exists()) {
       // Create the user document if it doesn't exist yet
       // This handles cases where user submitted a claim before completing onboarding
-      console.log('[BusinessClaimService] Creating user document for business claim');
-      await setDoc(userRef, {
+      console.log('[BusinessClaimService] Creating NEW user document for business claim');
+      const newUserDoc = {
         id: claim.userId,
         accountType: 'business',
         businessInfo: businessInfo,
@@ -402,15 +414,33 @@ export const convertClaimToBusinessAccount = async (
           name: claim.userName,
           role: claim.businessRole || 'owner',
         },
+        email: claim.userEmail,
+        fullName: claim.userName,
+        isPublicProfile: true,
         createdAt: Timestamp.now(),
-      });
+      };
+      console.log('[BusinessClaimService] New user document:', JSON.stringify(newUserDoc, null, 2));
+      await setDoc(userRef, newUserDoc);
+      console.log('[BusinessClaimService] ✅ New user document created successfully');
     } else {
       // Update existing user document
-      await updateDoc(userRef, {
+      console.log('[BusinessClaimService] Updating EXISTING user document');
+      const updateData = {
         accountType: 'business',
         businessInfo: businessInfo,
         'userDetails.role': claim.businessRole || 'owner',
-      });
+      };
+      console.log('[BusinessClaimService] Update data:', JSON.stringify(updateData, null, 2));
+      await updateDoc(userRef, updateData);
+      console.log('[BusinessClaimService] ✅ User document updated successfully');
+    }
+
+    // Verify the update
+    const verifyDoc = await getDoc(userRef);
+    if (verifyDoc.exists()) {
+      const data = verifyDoc.data();
+      console.log('[BusinessClaimService] ✅ Verification - accountType:', data.accountType);
+      console.log('[BusinessClaimService] ✅ Verification - businessInfo.name:', data.businessInfo?.name);
     }
 
     // Update the claim to mark it as converted
@@ -419,9 +449,9 @@ export const convertClaimToBusinessAccount = async (
       convertedToBusinessAt: Timestamp.now(),
     });
 
-    console.log('[BusinessClaimService] Claim converted to business account:', claimId);
+    console.log('[BusinessClaimService] ✅ Claim converted to business account successfully:', claimId);
   } catch (error) {
-    console.error('[BusinessClaimService] Error converting claim to business:', error);
+    console.error('[BusinessClaimService] ❌ Error converting claim to business:', error);
     throw error;
   }
 };

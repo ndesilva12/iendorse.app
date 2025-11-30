@@ -93,8 +93,14 @@ export default function BusinessClaimsAdmin() {
       );
 
       // Automatically convert the account to business
+      let conversionSuccess = false;
+      let conversionError: any = null;
       try {
+        console.log('[BusinessClaimsAdmin] Getting place details for:', selectedClaim.placeId);
         const placeDetails = await getPlaceDetails(selectedClaim.placeId);
+        console.log('[BusinessClaimsAdmin] Place details:', JSON.stringify(placeDetails, null, 2));
+
+        console.log('[BusinessClaimsAdmin] Converting claim to business account...');
         await convertClaimToBusinessAccount(selectedClaim.id, {
           name: selectedClaim.placeName,
           address: selectedClaim.placeAddress,
@@ -104,35 +110,65 @@ export default function BusinessClaimsAdmin() {
           location: placeDetails?.location,
           photoUrl: placeDetails?.photoReferences?.[0] || '',
         });
+        conversionSuccess = true;
         console.log('[BusinessClaimsAdmin] Account automatically converted to business');
-      } catch (conversionError) {
-        console.error('[BusinessClaimsAdmin] Error auto-converting account:', conversionError);
-        // Continue anyway - manual conversion is still available
+      } catch (err) {
+        conversionError = err;
+        console.error('[BusinessClaimsAdmin] Error auto-converting account:', err);
       }
 
-      // Send approval email with business account confirmation
-      if (selectedClaim.userEmail) {
-        const subject = encodeURIComponent('Your iEndorse Business Account is Ready!');
-        const body = encodeURIComponent(
-          `Hi ${selectedClaim.userName},\n\n` +
-          `Great news! Your claim for "${selectedClaim.placeName}" has been approved and your business account is now active!\n\n` +
-          `You can now:\n` +
-          `- Manage your business profile\n` +
-          `- Set up customer discounts in the Money tab\n` +
-          `- Endorse other businesses in the List tab\n` +
-          `- Track endorsements and engagement\n\n` +
-          (reviewNotes ? `Notes from our team:\n${reviewNotes}\n\n` : '') +
-          `Log in to iEndorse to get started.\n\n` +
-          `Best regards,\nThe iEndorse Team`
-        );
-        Linking.openURL(`mailto:${selectedClaim.userEmail}?subject=${subject}&body=${body}`);
-      }
+      // Show result message
+      const successMessage = conversionSuccess
+        ? 'Claim approved and account converted to business successfully!'
+        : `Claim approved but account conversion failed: ${conversionError?.message || 'Unknown error'}. You can try manual conversion.`;
 
       if (Platform.OS === 'web') {
-        window.alert('Claim approved and account converted to business');
+        window.alert(successMessage);
       } else {
-        Alert.alert('Success', 'Claim approved and account converted to business');
+        Alert.alert(conversionSuccess ? 'Success' : 'Partial Success', successMessage);
       }
+
+      // Ask if user wants to send email (don't auto-open)
+      if (selectedClaim.userEmail && Platform.OS === 'web') {
+        const sendEmail = window.confirm('Would you like to send an approval notification email?');
+        if (sendEmail) {
+          const subject = encodeURIComponent('Your iEndorse Business Account is Ready!');
+          const body = encodeURIComponent(
+            `Hi ${selectedClaim.userName},\n\n` +
+            `Great news! Your claim for "${selectedClaim.placeName}" has been approved and your business account is now active!\n\n` +
+            `You can now:\n` +
+            `- Manage your business profile\n` +
+            `- Set up customer discounts in the Money tab\n` +
+            `- Endorse other businesses in the List tab\n` +
+            `- Track endorsements and engagement\n\n` +
+            (reviewNotes ? `Notes from our team:\n${reviewNotes}\n\n` : '') +
+            `Log in to iEndorse to get started.\n\n` +
+            `Best regards,\nThe iEndorse Team`
+          );
+          window.open(`mailto:${selectedClaim.userEmail}?subject=${subject}&body=${body}`, '_blank');
+        }
+      } else if (selectedClaim.userEmail) {
+        // Native - use Alert
+        Alert.alert(
+          'Send Email?',
+          'Would you like to send an approval notification email?',
+          [
+            { text: 'No', style: 'cancel' },
+            {
+              text: 'Yes',
+              onPress: () => {
+                const subject = encodeURIComponent('Your iEndorse Business Account is Ready!');
+                const body = encodeURIComponent(
+                  `Hi ${selectedClaim.userName},\n\n` +
+                  `Great news! Your claim for "${selectedClaim.placeName}" has been approved!`
+                );
+                Linking.openURL(`mailto:${selectedClaim.userEmail}?subject=${subject}&body=${body}`);
+              }
+            }
+          ]
+        );
+      }
+
       setSelectedClaim(null);
       setReviewNotes('');
       loadClaims();
@@ -168,23 +204,46 @@ export default function BusinessClaimsAdmin() {
         reviewNotes
       );
 
-      // Send rejection email
-      if (selectedClaim.userEmail) {
-        const subject = encodeURIComponent('Update on Your iEndorse Business Claim');
-        const body = encodeURIComponent(
-          `Hi ${selectedClaim.userName},\n\n` +
-          `We've reviewed your claim for "${selectedClaim.placeName}" and unfortunately we were unable to verify your ownership at this time.\n\n` +
-          `Reason:\n${reviewNotes}\n\n` +
-          `If you believe this is an error, please reply to this email with additional verification information.\n\n` +
-          `Best regards,\nThe iEndorse Team`
-        );
-        Linking.openURL(`mailto:${selectedClaim.userEmail}?subject=${subject}&body=${body}`);
-      }
-
       if (Platform.OS === 'web') {
         window.alert('Claim rejected');
+        // Ask if user wants to send email
+        if (selectedClaim.userEmail) {
+          const sendEmail = window.confirm('Would you like to send a rejection notification email?');
+          if (sendEmail) {
+            const subject = encodeURIComponent('Update on Your iEndorse Business Claim');
+            const body = encodeURIComponent(
+              `Hi ${selectedClaim.userName},\n\n` +
+              `We've reviewed your claim for "${selectedClaim.placeName}" and unfortunately we were unable to verify your ownership at this time.\n\n` +
+              `Reason:\n${reviewNotes}\n\n` +
+              `If you believe this is an error, please reply to this email with additional verification information.\n\n` +
+              `Best regards,\nThe iEndorse Team`
+            );
+            window.open(`mailto:${selectedClaim.userEmail}?subject=${subject}&body=${body}`, '_blank');
+          }
+        }
       } else {
         Alert.alert('Success', 'Claim rejected');
+        // Native - use Alert for email
+        if (selectedClaim.userEmail) {
+          Alert.alert(
+            'Send Email?',
+            'Would you like to send a rejection notification email?',
+            [
+              { text: 'No', style: 'cancel' },
+              {
+                text: 'Yes',
+                onPress: () => {
+                  const subject = encodeURIComponent('Update on Your iEndorse Business Claim');
+                  const body = encodeURIComponent(
+                    `Hi ${selectedClaim.userName},\n\n` +
+                    `We've reviewed your claim for "${selectedClaim.placeName}" and unfortunately we were unable to verify your ownership at this time.`
+                  );
+                  Linking.openURL(`mailto:${selectedClaim.userEmail}?subject=${subject}&body=${body}`);
+                }
+              }
+            ]
+          );
+        }
       }
       setSelectedClaim(null);
       setReviewNotes('');
@@ -214,6 +273,7 @@ export default function BusinessClaimsAdmin() {
       // Get place details to populate the business account
       const placeDetails = await getPlaceDetails(selectedClaim.placeId);
 
+      console.log('[BusinessClaimsAdmin] Manual conversion - getting place details...');
       await convertClaimToBusinessAccount(selectedClaim.id, {
         name: selectedClaim.placeName,
         address: selectedClaim.placeAddress,
@@ -223,25 +283,32 @@ export default function BusinessClaimsAdmin() {
         location: placeDetails?.location,
         photoUrl: placeDetails?.photoReferences?.[0] || '',
       });
+      console.log('[BusinessClaimsAdmin] Manual conversion successful');
 
-      // Send conversion notification email
-      if (selectedClaim.userEmail) {
-        const subject = encodeURIComponent('Your iEndorse Business Account is Ready!');
-        const body = encodeURIComponent(
-          `Hi ${selectedClaim.userName},\n\n` +
-          `Great news! Your business account for "${selectedClaim.placeName}" has been set up.\n\n` +
-          `You can now:\n` +
-          `- Manage your business profile\n` +
-          `- Set up customer discounts\n` +
-          `- Track endorsements\n` +
-          `- And more!\n\n` +
-          `Log in to iEndorse to get started.\n\n` +
-          `Best regards,\nThe iEndorse Team`
-        );
-        Linking.openURL(`mailto:${selectedClaim.userEmail}?subject=${subject}&body=${body}`);
+      if (Platform.OS === 'web') {
+        window.alert('Claim converted to business account. User can now manage their business on iEndorse.');
+        // Ask if user wants to send email
+        if (selectedClaim.userEmail) {
+          const sendEmail = window.confirm('Would you like to send a notification email?');
+          if (sendEmail) {
+            const subject = encodeURIComponent('Your iEndorse Business Account is Ready!');
+            const body = encodeURIComponent(
+              `Hi ${selectedClaim.userName},\n\n` +
+              `Great news! Your business account for "${selectedClaim.placeName}" has been set up.\n\n` +
+              `You can now:\n` +
+              `- Manage your business profile\n` +
+              `- Set up customer discounts\n` +
+              `- Track endorsements\n` +
+              `- And more!\n\n` +
+              `Log in to iEndorse to get started.\n\n` +
+              `Best regards,\nThe iEndorse Team`
+            );
+            window.open(`mailto:${selectedClaim.userEmail}?subject=${subject}&body=${body}`, '_blank');
+          }
+        }
+      } else {
+        Alert.alert('Success', 'Claim converted to business account. User can now manage their business on iEndorse.');
       }
-
-      Alert.alert('Success', 'Claim converted to business account. User can now manage their business on iEndorse.');
       setSelectedClaim(null);
       loadClaims();
     } catch (error: any) {
