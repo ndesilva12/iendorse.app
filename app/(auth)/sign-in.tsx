@@ -5,14 +5,14 @@ import React from 'react';
 import { darkColors, lightColors } from '@/constants/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUser } from '@/contexts/UserContext';
-import { Users, Target, ListChecks, Search, Gift, QrCode, Sparkles, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Users, Target, ListChecks, Search, Gift, QrCode, Sparkles, ChevronDown, ChevronUp, LogOut } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
-  const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const { isSignedIn, isLoaded: authLoaded, signOut } = useAuth();
   const router = useRouter();
-  const { isDarkMode } = useUser();
+  const { isDarkMode, clearAllStoredData } = useUser();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [emailAddress, setEmailAddress] = React.useState('');
@@ -24,13 +24,73 @@ export default function SignInScreen() {
   const [newPassword, setNewPassword] = React.useState('');
   const [resetStep, setResetStep] = React.useState<'email' | 'code' | 'password'>('email');
   const [showLearnMore, setShowLearnMore] = React.useState(false);
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
-  React.useEffect(() => {
-    if (authLoaded && isSignedIn) {
-      console.log('[Sign In] Already signed in, redirecting to home');
-      router.replace('/');
+  // Handle force sign out
+  const handleForceSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      console.log('[Sign In] Force signing out...');
+      await clearAllStoredData();
+      await signOut();
+      console.log('[Sign In] Sign out complete');
+      // Force reload the page on web to clear any cached state
+      if (Platform.OS === 'web') {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('[Sign In] Sign out error:', error);
+      // Try to reload anyway on web
+      if (Platform.OS === 'web') {
+        window.location.reload();
+      }
+    } finally {
+      setIsSigningOut(false);
     }
-  }, [authLoaded, isSignedIn, router]);
+  };
+
+  // If already signed in, show option to sign out or continue
+  if (authLoaded && isSignedIn) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+        <View style={styles.alreadySignedInContainer}>
+          <Image
+            source={require('@/assets/images/endorsemobile.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={[styles.alreadySignedInTitle, { color: colors.text }]}>
+            You're already signed in
+          </Text>
+          <Text style={[styles.alreadySignedInSubtitle, { color: colors.textSecondary }]}>
+            Would you like to continue or sign out?
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: colors.primary, marginTop: 24 }]}
+            onPress={() => router.replace('/')}
+          >
+            <Text style={styles.buttonText}>Continue to App</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.signOutButton, { backgroundColor: colors.danger }]}
+            onPress={handleForceSignOut}
+            disabled={isSigningOut}
+          >
+            {isSigningOut ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <LogOut size={20} color="#fff" strokeWidth={2} />
+                <Text style={styles.buttonText}>Sign Out</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const onSignInPress = async () => {
     if (!isLoaded || isSubmitting) return;
@@ -679,5 +739,34 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     lineHeight: 24,
+  },
+  // Already signed in styles
+  alreadySignedInContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  alreadySignedInTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  alreadySignedInSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    width: '100%',
+    maxWidth: 300,
   },
 });
