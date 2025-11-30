@@ -81,6 +81,7 @@ export default function ItemOptionsModal({
           <View style={styles.optionsContainer}>
             {options.map((option, index) => {
               const Icon = option.icon;
+              const iconColor = option.isDanger ? colors.danger : colors.primary;
               const textColor = option.isDanger ? colors.danger : colors.text;
 
               return (
@@ -94,7 +95,7 @@ export default function ItemOptionsModal({
                   ]}
                   onPress={() => handleOptionPress(option)}
                 >
-                  <Icon size={20} color={textColor} strokeWidth={2} />
+                  <Icon size={20} color={iconColor} strokeWidth={2} />
                   <Text style={[styles.optionText, { color: textColor }]}>
                     {option.label}
                   </Text>

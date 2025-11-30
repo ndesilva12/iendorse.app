@@ -901,13 +901,41 @@ export default function BusinessDetailScreen() {
                 <Text style={[styles.discountHeaderText, { color: colors.text }]}>Endorse Discount</Text>
               </View>
               <View style={[styles.discountCard, { backgroundColor: colors.background, borderColor: colors.primary }]}>
-                {/* Main discount percentage */}
+                {/* Base/Tier 1 discount percentage */}
                 <View style={styles.discountRow}>
-                  <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>Discount:</Text>
+                  <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>
+                    {business.businessInfo.tier2Discount ? 'Base Discount:' : 'Discount:'}
+                  </Text>
                   <Text style={[styles.discountValue, { color: colors.primary }]}>
                     {(business.businessInfo.customerDiscountPercent || 0).toFixed(0)}% off
                   </Text>
                 </View>
+
+                {/* Tier 2 discount if set */}
+                {business.businessInfo.tier2Discount && business.businessInfo.tier2Discount > 0 && (
+                  <>
+                    <View style={[styles.discountDivider, { backgroundColor: colors.border }]} />
+                    <View style={styles.discountRow}>
+                      <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>Tier 2:</Text>
+                      <Text style={[styles.discountValue, { color: colors.primary }]}>
+                        {business.businessInfo.tier2Discount.toFixed(0)}% off
+                      </Text>
+                    </View>
+                  </>
+                )}
+
+                {/* Tier 3 discount if set */}
+                {business.businessInfo.tier3Discount && business.businessInfo.tier3Discount > 0 && (
+                  <>
+                    <View style={[styles.discountDivider, { backgroundColor: colors.border }]} />
+                    <View style={styles.discountRow}>
+                      <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>Tier 3:</Text>
+                      <Text style={[styles.discountValue, { color: colors.primary }]}>
+                        {business.businessInfo.tier3Discount.toFixed(0)}% off
+                      </Text>
+                    </View>
+                  </>
+                )}
 
                 {/* Custom discount if set */}
                 {business.businessInfo.customDiscount && (
