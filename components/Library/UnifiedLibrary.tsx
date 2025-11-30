@@ -70,6 +70,7 @@ import ItemOptionsModal from '@/components/ItemOptionsModal';
 import FollowingFollowersList from '@/components/FollowingFollowersList';
 import LocalBusinessView from '@/components/Library/LocalBusinessView';
 import EndorsementMapView, { MapEntry } from '@/components/EndorsementMapView';
+import { geocodeLocation } from '@/services/geocodingService';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { reorderListEntries } from '@/services/firebase/listService';
@@ -322,9 +323,11 @@ export default function UnifiedLibrary({
 
   // Map modal state
   const [showMapModal, setShowMapModal] = useState(false);
+  const [geocodedBrandLocations, setGeocodedBrandLocations] = useState<Record<string, { lat: number; lng: number }>>({});
+  const [isGeocodingBrands, setIsGeocodingBrands] = useState(false);
 
   // Detect larger screens for responsive text display
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isLargeScreen = width >= 768;
 
   // Use props if provided, otherwise use context (MUST be before defaultSection calculation)
@@ -754,17 +757,23 @@ export default function UnifiedLibrary({
         const brandEntry = entry as any;
         // Try to find full brand data to get location
         const fullBrand = brands?.find(b => b.id === brandEntry.brandId);
+
+        // Check for coordinates: first from brand data, then from geocoded cache
+        let coords: { lat: number; lng: number } | null = null;
         if (fullBrand?.latitude && fullBrand?.longitude) {
+          coords = { lat: fullBrand.latitude, lng: fullBrand.longitude };
+        } else if (brandEntry.brandId && geocodedBrandLocations[brandEntry.brandId]) {
+          coords = geocodedBrandLocations[brandEntry.brandId];
+        }
+
+        if (coords) {
           entries.push({
             id: brandEntry.brandId,
-            name: brandEntry.brandName || fullBrand.name,
-            category: brandEntry.brandCategory || fullBrand.category,
-            address: fullBrand.location,
+            name: brandEntry.brandName || fullBrand?.name,
+            category: brandEntry.brandCategory || fullBrand?.category,
+            address: fullBrand?.location,
             logoUrl: brandEntry.logoUrl,
-            location: {
-              lat: fullBrand.latitude,
-              lng: fullBrand.longitude,
-            },
+            location: coords,
             type: 'brand',
             originalEntry: entry,
           });
@@ -773,7 +782,58 @@ export default function UnifiedLibrary({
     });
 
     return entries;
-  }, [endorsementList?.entries, allBusinesses, brands]);
+  }, [endorsementList?.entries, allBusinesses, brands, geocodedBrandLocations]);
+
+  // Geocode brands without coordinates when map modal opens
+  useEffect(() => {
+    if (!showMapModal || !endorsementList?.entries) return;
+
+    const geocodeBrands = async () => {
+      const brandsToGeocode: Array<{ brandId: string; location: string }> = [];
+
+      // Find brands that need geocoding
+      endorsementList.entries.forEach((entry) => {
+        if (entry.type === 'brand') {
+          const brandEntry = entry as any;
+          const fullBrand = brands?.find(b => b.id === brandEntry.brandId);
+
+          // If brand has location string but no coordinates and not already geocoded
+          if (
+            fullBrand?.location &&
+            !fullBrand.latitude &&
+            !fullBrand.longitude &&
+            !geocodedBrandLocations[brandEntry.brandId]
+          ) {
+            brandsToGeocode.push({
+              brandId: brandEntry.brandId,
+              location: fullBrand.location,
+            });
+          }
+        }
+      });
+
+      if (brandsToGeocode.length === 0) return;
+
+      setIsGeocodingBrands(true);
+
+      // Geocode brands in parallel (with limit)
+      const newGeocodedLocations: Record<string, { lat: number; lng: number }> = {};
+
+      await Promise.all(
+        brandsToGeocode.map(async ({ brandId, location }) => {
+          const coords = await geocodeLocation(location);
+          if (coords) {
+            newGeocodedLocations[brandId] = coords;
+          }
+        })
+      );
+
+      setGeocodedBrandLocations(prev => ({ ...prev, ...newGeocodedLocations }));
+      setIsGeocodingBrands(false);
+    };
+
+    geocodeBrands();
+  }, [showMapModal, endorsementList?.entries, brands, geocodedBrandLocations]);
 
   // Handle adding a brand, business, or place to endorsement list
   const handleAddToEndorsement = useCallback(async (item: any, type: 'brand' | 'business' | 'place') => {
@@ -4277,7 +4337,16 @@ export default function UnifiedLibrary({
           onPress={() => setShowMapModal(false)}
         >
           <Pressable
-            style={[styles.mapModalContainer, { backgroundColor: colors.background }]}
+            style={[
+              styles.mapModalContainer,
+              {
+                backgroundColor: colors.background,
+                width: isLargeScreen ? width * 0.8 : width * 0.95,
+                height: isLargeScreen ? height * 0.8 : height * 0.95,
+                maxWidth: isLargeScreen ? 900 : undefined,
+                maxHeight: isLargeScreen ? 700 : undefined,
+              }
+            ]}
             onPress={(e) => e.stopPropagation()}
           >
             {/* Header with close button */}
@@ -4296,6 +4365,14 @@ export default function UnifiedLibrary({
 
             {/* Map Content */}
             <View style={styles.mapModalContent}>
+              {isGeocodingBrands && (
+                <View style={styles.geocodingIndicator}>
+                  <ActivityIndicator size="small" color="#00aaff" />
+                  <Text style={[styles.geocodingText, { color: colors.textSecondary }]}>
+                    Loading brand locations...
+                  </Text>
+                </View>
+              )}
               {mapEntries.length > 0 ? (
                 <EndorsementMapView
                   entries={mapEntries}
@@ -4321,7 +4398,7 @@ export default function UnifiedLibrary({
                     }
                   }}
                 />
-              ) : (
+              ) : !isGeocodingBrands ? (
                 <View style={styles.mapModalEmpty}>
                   <MapPin size={48} color={colors.textSecondary} strokeWidth={1.5} />
                   <Text style={[styles.mapModalEmptyText, { color: colors.text }]}>
@@ -4331,7 +4408,7 @@ export default function UnifiedLibrary({
                     Add places or local businesses to see them on the map
                   </Text>
                 </View>
-              )}
+              ) : null}
             </View>
           </Pressable>
         </TouchableOpacity>
@@ -5333,10 +5410,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   mapModalContainer: {
-    width: '100%',
-    maxWidth: 600,
-    height: '80%',
-    maxHeight: 600,
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -5345,22 +5418,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 16 : 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
+    minHeight: 56,
   },
   mapModalTitle: {
     fontSize: 17,
     fontWeight: '700',
+    flex: 1,
+    marginRight: 12,
   },
   mapModalCloseButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   mapModalContent: {
     flex: 1,
+  },
+  geocodingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0, 170, 255, 0.1)',
+    gap: 8,
+  },
+  geocodingText: {
+    fontSize: 13,
   },
   mapModalEmpty: {
     flex: 1,
