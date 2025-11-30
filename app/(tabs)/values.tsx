@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { ChevronDown, ChevronUp, Heart, Building2, Users, Globe, Shield, User as UserIcon, Tag, Trophy, Target, MapPin, MoreVertical, UserPlus, UserMinus, Share2 } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Heart, Building2, Users, Globe, Shield, User as UserIcon, Tag, Trophy, Target, MapPin, Plus, UserPlus, UserMinus, Share2 } from 'lucide-react-native';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import * as Location from 'expo-location';
 import MenuButton from '@/components/MenuButton';
@@ -703,8 +703,8 @@ export default function BrowseScreen() {
               }}
               activeOpacity={0.7}
             >
-              <View style={{ transform: [{ rotate: '90deg' }] }}>
-                <MoreVertical size={18} color={colors.textSecondary} strokeWidth={2} />
+              <View style={styles.plusIconCircle}>
+                <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
               </View>
             </TouchableOpacity>
           </View>
@@ -1189,6 +1189,14 @@ const styles = StyleSheet.create({
   },
   actionMenuButton: {
     padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  plusIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
   },
