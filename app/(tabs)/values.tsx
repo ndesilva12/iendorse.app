@@ -703,7 +703,7 @@ export default function BrowseScreen() {
               }}
               activeOpacity={0.7}
             >
-              <View style={styles.plusIconCircle}>
+              <View style={[styles.plusIconCircle, { backgroundColor: colors.primary }]}>
                 <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
               </View>
             </TouchableOpacity>
@@ -1196,7 +1196,6 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -893,31 +893,98 @@ export default function BusinessDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Endorse Discount Section */}
-          {business.businessInfo.acceptsStandDiscounts && (
-            <View style={[styles.standDiscountSection, { backgroundColor: colors.backgroundSecondary }]}>
-              <View style={styles.discountHeader}>
-                <Percent size={20} color={colors.primary} strokeWidth={2} />
-                <Text style={[styles.discountHeaderText, { color: colors.text }]}>Endorse Discount</Text>
-              </View>
+          {/* Endorse Discount Section - Always visible */}
+          <View style={[styles.standDiscountSection, { backgroundColor: colors.backgroundSecondary }]}>
+            <View style={styles.discountHeader}>
+              <Percent size={20} color={colors.primary} strokeWidth={2} />
+              <Text style={[styles.discountHeaderText, { color: colors.text }]}>Endorse Discount</Text>
+            </View>
+
+            {business.businessInfo.acceptsStandDiscounts ? (
               <View style={[styles.discountCard, { backgroundColor: colors.background, borderColor: colors.primary }]}>
-                {/* Main discount percentage */}
-                <View style={styles.discountRow}>
-                  <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>Discount:</Text>
-                  <Text style={[styles.discountValue, { color: colors.primary }]}>
-                    {(business.businessInfo.customerDiscountPercent || 0).toFixed(0)}% off
-                  </Text>
-                </View>
+                {/* Discount Tiers - Uniform display: Tier name | Percentage | Type | Days */}
+                {(() => {
+                  const tiers = [];
+
+                  // Tier 1 (base discount)
+                  const tier1Percent = business.businessInfo.customerDiscountPercent || business.businessInfo.endorsementDiscountPercent || 0;
+                  if (tier1Percent > 0) {
+                    const tier1Type = business.businessInfo.endorsementType || 'any';
+                    const tier1Days = business.businessInfo.endorsementMinDays || 0;
+                    tiers.push({
+                      name: 'Tier 1',
+                      percent: tier1Percent,
+                      type: tier1Type,
+                      days: tier1Days,
+                    });
+                  }
+
+                  // Tier 2
+                  if (business.businessInfo.tier2Discount && business.businessInfo.tier2Discount > 0) {
+                    tiers.push({
+                      name: 'Tier 2',
+                      percent: business.businessInfo.tier2Discount,
+                      type: business.businessInfo.tier2Type || 'any',
+                      days: business.businessInfo.tier2MinDays || 0,
+                    });
+                  }
+
+                  // Tier 3
+                  if (business.businessInfo.tier3Discount && business.businessInfo.tier3Discount > 0) {
+                    tiers.push({
+                      name: 'Tier 3',
+                      percent: business.businessInfo.tier3Discount,
+                      type: business.businessInfo.tier3Type || 'any',
+                      days: business.businessInfo.tier3MinDays || 0,
+                    });
+                  }
+
+                  const formatType = (type: string) => {
+                    if (type === 'top5') return 'Top 5';
+                    if (type === 'top10') return 'Top 10';
+                    return 'Any Position';
+                  };
+
+                  if (tiers.length === 0) {
+                    return (
+                      <Text style={[styles.noDiscountText, { color: colors.textSecondary }]}>
+                        Discount details not configured
+                      </Text>
+                    );
+                  }
+
+                  return tiers.map((tier, index) => (
+                    <View key={tier.name}>
+                      {index > 0 && <View style={[styles.discountDivider, { backgroundColor: colors.border }]} />}
+                      <View style={styles.tierRow}>
+                        <Text style={[styles.tierName, { color: colors.text }]}>{tier.name}</Text>
+                        <View style={styles.tierDetails}>
+                          <Text style={[styles.tierPercent, { color: colors.primary }]}>{tier.percent.toFixed(0)}% off</Text>
+                          <Text style={[styles.tierMeta, { color: colors.textSecondary }]}>
+                            {formatType(tier.type)}{tier.days > 0 ? ` · ${tier.days}+ days` : ''}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  ));
+                })()}
 
                 {/* Custom discount if set */}
                 {business.businessInfo.customDiscount && (
                   <>
                     <View style={[styles.discountDivider, { backgroundColor: colors.border }]} />
-                    <View style={styles.discountRow}>
-                      <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>Special:</Text>
-                      <Text style={[styles.discountValue, { color: colors.primary }]}>
-                        {business.businessInfo.customDiscount}
-                      </Text>
+                    <View style={styles.tierRow}>
+                      <Text style={[styles.tierName, { color: colors.text }]}>Special</Text>
+                      <View style={styles.tierDetails}>
+                        <Text style={[styles.tierPercent, { color: colors.primary }]}>{business.businessInfo.customDiscount}</Text>
+                        {(business.businessInfo.customDiscountType || business.businessInfo.customDiscountMinDays) && (
+                          <Text style={[styles.tierMeta, { color: colors.textSecondary }]}>
+                            {business.businessInfo.customDiscountType === 'top5' ? 'Top 5' :
+                             business.businessInfo.customDiscountType === 'top10' ? 'Top 10' : ''}
+                            {business.businessInfo.customDiscountMinDays > 0 && (business.businessInfo.customDiscountType ? ' · ' : '') + `${business.businessInfo.customDiscountMinDays}+ days`}
+                          </Text>
+                        )}
+                      </View>
                     </View>
                   </>
                 )}
@@ -974,8 +1041,14 @@ export default function BusinessDetailScreen() {
                   </>
                 )}
               </View>
-            </View>
-          )}
+            ) : (
+              <View style={[styles.discountCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={[styles.noDiscountText, { color: colors.textSecondary }]}>
+                  This business has not enabled discounts yet. Check back later or endorse them to show your support!
+                </Text>
+              </View>
+            )}
+          </View>
 
           <View style={[styles.alignmentCard, { backgroundColor: colors.backgroundSecondary }]}>
             <View style={styles.alignmentLabelRow}>
@@ -1799,6 +1872,33 @@ const styles = StyleSheet.create({
   requirementText: {
     fontSize: 14,
     fontWeight: '500' as const,
+  },
+  tierRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+  },
+  tierName: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  tierDetails: {
+    alignItems: 'flex-end',
+  },
+  tierPercent: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+  },
+  tierMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  noDiscountText: {
+    fontSize: 14,
+    textAlign: 'center' as const,
+    paddingVertical: 8,
+    lineHeight: 20,
   },
   scoreCircle: {
     width: 48,

@@ -254,14 +254,14 @@ export default function ValueCodeSettings() {
               style={[
                 styles.dropdownItem,
                 { borderBottomColor: colors.border },
-                currentType === type && { backgroundColor: colors.primary + '15' }
+                currentType === type && { backgroundColor: colors.primary }
               ]}
               onPress={() => onChange(type)}
               activeOpacity={0.7}
             >
               <Text style={[
                 styles.dropdownItemText,
-                { color: currentType === type ? colors.primary : colors.text }
+                { color: currentType === type ? '#FFFFFF' : colors.text }
               ]}>
                 {getTypeLabel(type)}
               </Text>

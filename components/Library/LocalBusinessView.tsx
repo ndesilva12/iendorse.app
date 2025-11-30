@@ -56,8 +56,14 @@ const shortenAddress = (fullAddress: string | undefined): string => {
 };
 
 // Helper function to get discount display text
+// Only show discount if the business has acceptsStandDiscounts enabled
 const getDiscountDisplay = (business: any): string | null => {
   const info = business.businessInfo;
+
+  // Only show discount if business is actually accepting discounts
+  if (!info.acceptsStandDiscounts) {
+    return null;
+  }
 
   if (info.customDiscount && info.customDiscount.trim()) {
     return 'Custom Discount';
