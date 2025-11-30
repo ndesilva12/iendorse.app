@@ -1,12 +1,11 @@
-import { Tabs, useSegments, useRouter } from "expo-router";
-import { BookOpen, DollarSign, Heart, Compass, User, Home } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { Tabs, useRouter } from "expo-router";
+import { BookOpen, DollarSign, Compass, User, Home } from "lucide-react-native";
+import React from "react";
 import { Platform, useWindowDimensions, StyleSheet, StatusBar, View, Text, ActivityIndicator } from "react-native";
 import { lightColors, darkColors } from "@/constants/colors";
 import { useUser } from "@/contexts/UserContext";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsStandalone } from "@/hooks/useIsStandalone";
-import { getClaimsByUser } from "@/services/firebase/businessClaimService";
 
 export default function TabLayout() {
   const router = useRouter();
@@ -15,44 +14,12 @@ export default function TabLayout() {
   const colors = isDarkMode ? darkColors : lightColors;
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [isCheckingBusinessClaims, setIsCheckingBusinessClaims] = useState(true);
-  const [hasBusinessClaim, setHasBusinessClaim] = useState(false);
-
-  // Check if business user has submitted a claim
-  useEffect(() => {
-    const checkBusinessClaims = async () => {
-      // Only check for business accounts
-      if (profile?.accountType !== 'business' || !clerkUser?.id) {
-        setIsCheckingBusinessClaims(false);
-        return;
-      }
-
-      try {
-        const claims = await getClaimsByUser(clerkUser.id);
-        setHasBusinessClaim(claims.length > 0);
-
-        // If no claims, redirect to business-setup
-        if (claims.length === 0) {
-          console.log('[TabLayout] Business user has no claims, redirecting to business-setup');
-          router.replace('/business-setup');
-        }
-      } catch (error) {
-        console.error('[TabLayout] Error checking business claims:', error);
-      } finally {
-        setIsCheckingBusinessClaims(false);
-      }
-    };
-
-    if (!isProfileLoading && clerkUser?.id) {
-      checkBusinessClaims();
-    }
-  }, [profile?.accountType, clerkUser?.id, isProfileLoading]);
 
   const isTabletOrLarger = Platform.OS === 'web' && width >= 768;
   const tabBarHeight = isTabletOrLarger ? 64 : 64;
 
-  // Show loading while checking business claims
-  if (isProfileLoading || (profile?.accountType === 'business' && isCheckingBusinessClaims)) {
+  // Show loading while profile is loading
+  if (isProfileLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
