@@ -79,7 +79,7 @@ export default function SignUpScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
         <View style={styles.alreadySignedInContainer}>
           <Image
-            source={require('@/assets/images/endorsemobile.png')}
+            source={require('@/assets/images/endorsemulti1.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -410,7 +410,7 @@ export default function SignUpScreen() {
           >
             <View style={styles.logoContainer}>
               <Image
-                source={require('@/assets/images/endorsemobile.png')}
+                source={require('@/assets/images/endorsemulti1.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -455,7 +455,7 @@ export default function SignUpScreen() {
         >
           <View style={styles.logoContainer}>
             <Image
-              source={require('@/assets/images/endorsemobile.png')}
+              source={require('@/assets/images/endorsemulti1.png')}
               style={styles.logo}
               resizeMode="contain"
             />
