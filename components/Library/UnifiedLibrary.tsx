@@ -1746,8 +1746,11 @@ export default function UnifiedLibrary({
           // Use actual business logoUrl first, then entry data, fallback to generated logo from website
           const businessWebsite = fullBusiness?.businessInfo?.website || (entry as any).website || '';
           const logoUrl = fullBusiness?.businessInfo?.logoUrl || (entry as any).logoUrl || (entry as any).logo || (businessWebsite ? getLogoUrl(businessWebsite) : getLogoUrl(''));
-          // Get discount percentage if available
-          const discountPercent = fullBusiness?.businessInfo?.endorsementDiscountPercent || fullBusiness?.businessInfo?.customerDiscountPercent;
+          // Get discount percentage if available - only show if business accepts discounts
+          const acceptsDiscounts = fullBusiness?.businessInfo?.acceptsStandDiscounts === true;
+          const discountPercent = acceptsDiscounts
+            ? (fullBusiness?.businessInfo?.endorsementDiscountPercent || fullBusiness?.businessInfo?.customerDiscountPercent)
+            : undefined;
 
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {

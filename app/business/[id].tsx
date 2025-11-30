@@ -901,13 +901,51 @@ export default function BusinessDetailScreen() {
                 <Text style={[styles.discountHeaderText, { color: colors.text }]}>Endorse Discount</Text>
               </View>
               <View style={[styles.discountCard, { backgroundColor: colors.background, borderColor: colors.primary }]}>
-                {/* Main discount percentage */}
+                {/* Base/Tier 1 discount percentage */}
                 <View style={styles.discountRow}>
-                  <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>Discount:</Text>
+                  <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>
+                    {business.businessInfo.endorsementType === 'top5' ? 'Top 5' :
+                     business.businessInfo.endorsementType === 'top10' ? 'Top 10' : 'Base Discount'}:
+                  </Text>
                   <Text style={[styles.discountValue, { color: colors.primary }]}>
                     {(business.businessInfo.customerDiscountPercent || 0).toFixed(0)}% off
+                    {business.businessInfo.endorsementMinDays > 0 && ` (${business.businessInfo.endorsementMinDays}+ days)`}
                   </Text>
                 </View>
+
+                {/* Tier 2 discount if set */}
+                {business.businessInfo.tier2Discount && business.businessInfo.tier2Discount > 0 && (
+                  <>
+                    <View style={[styles.discountDivider, { backgroundColor: colors.border }]} />
+                    <View style={styles.discountRow}>
+                      <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>
+                        {business.businessInfo.tier2Type === 'top5' ? 'Top 5' :
+                         business.businessInfo.tier2Type === 'top10' ? 'Top 10' : 'Tier 2'}:
+                      </Text>
+                      <Text style={[styles.discountValue, { color: colors.primary }]}>
+                        {business.businessInfo.tier2Discount.toFixed(0)}% off
+                        {business.businessInfo.tier2MinDays > 0 && ` (${business.businessInfo.tier2MinDays}+ days)`}
+                      </Text>
+                    </View>
+                  </>
+                )}
+
+                {/* Tier 3 discount if set */}
+                {business.businessInfo.tier3Discount && business.businessInfo.tier3Discount > 0 && (
+                  <>
+                    <View style={[styles.discountDivider, { backgroundColor: colors.border }]} />
+                    <View style={styles.discountRow}>
+                      <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>
+                        {business.businessInfo.tier3Type === 'top5' ? 'Top 5' :
+                         business.businessInfo.tier3Type === 'top10' ? 'Top 10' : 'Tier 3'}:
+                      </Text>
+                      <Text style={[styles.discountValue, { color: colors.primary }]}>
+                        {business.businessInfo.tier3Discount.toFixed(0)}% off
+                        {business.businessInfo.tier3MinDays > 0 && ` (${business.businessInfo.tier3MinDays}+ days)`}
+                      </Text>
+                    </View>
+                  </>
+                )}
 
                 {/* Custom discount if set */}
                 {business.businessInfo.customDiscount && (
@@ -917,6 +955,9 @@ export default function BusinessDetailScreen() {
                       <Text style={[styles.discountLabel, { color: colors.textSecondary }]}>Special:</Text>
                       <Text style={[styles.discountValue, { color: colors.primary }]}>
                         {business.businessInfo.customDiscount}
+                        {business.businessInfo.customDiscountType && business.businessInfo.customDiscountType !== 'any' &&
+                          ` (${business.businessInfo.customDiscountType === 'top5' ? 'Top 5' : 'Top 10'})`}
+                        {business.businessInfo.customDiscountMinDays > 0 && ` (${business.businessInfo.customDiscountMinDays}+ days)`}
                       </Text>
                     </View>
                   </>
