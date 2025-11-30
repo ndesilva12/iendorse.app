@@ -1283,12 +1283,19 @@ export default function UnifiedLibrary({
     }
 
     try {
-      // Find the entry in the endorsement list
-      const itemId = entry.brandId || entry.businessId || entry.valueId || (entry as any).placeId;
-      const endorsedEntry = endorsementList.entries.filter(e => e).find(e => {
-        const endorsedId = e.brandId || e.businessId || e.valueId || (e as any).placeId;
-        return endorsedId === itemId;
-      });
+      // First, check if the entry's ID directly matches an entry in the endorsement list
+      // This handles the case where we're removing an entry that came from the endorsement list directly
+      let endorsedEntry = endorsementList.entries.find(e => e && e.id === entry.id);
+
+      // If not found by ID, fall back to finding by brandId/businessId/valueId/placeId
+      // This handles the case where we're removing from a pseudo entry or different source
+      if (!endorsedEntry) {
+        const itemId = entry.brandId || entry.businessId || entry.valueId || (entry as any).placeId;
+        endorsedEntry = endorsementList.entries.filter(e => e).find(e => {
+          const endorsedId = e.brandId || e.businessId || e.valueId || (e as any).placeId;
+          return endorsedId === itemId;
+        });
+      }
 
       if (!endorsedEntry) {
         Alert.alert('Error', 'Item not found in endorsement list');

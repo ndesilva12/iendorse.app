@@ -109,25 +109,16 @@ export default function OnboardingScreen() {
 
   // Redirect users who have already completed onboarding
   // This handles the case where a user's claim was approved while they were offline
+  // OR an existing business user who already has values selected
   useEffect(() => {
     if (!isLoading && profile?.causes?.length > 0) {
-      // User has completed values selection
-      const isBusinessUser = params.accountType === 'business' || profile?.accountType === 'business';
-
-      if (isBusinessUser && profile?.businessInfo?.name) {
-        // Business user with approved business - they're done!
-        console.log('[Onboarding] User already has causes and businessInfo, redirecting to home');
-        router.replace('/(tabs)/home');
-        return;
-      } else if (!isBusinessUser) {
-        // Individual user with causes - they're done!
-        console.log('[Onboarding] Individual user already has causes, redirecting to home');
-        router.replace('/(tabs)/home');
-        return;
-      }
-      // Business user without businessInfo - they need to complete claim flow
+      // User has completed values selection - they should go to home
+      // Business users don't NEED businessInfo to use the app
+      console.log('[Onboarding] User already has causes, redirecting to home');
+      router.replace('/(tabs)/home');
+      return;
     }
-  }, [isLoading, profile?.causes?.length, profile?.businessInfo?.name, profile?.accountType, params.accountType]);
+  }, [isLoading, profile?.causes?.length]);
 
   // Handler to exit onboarding and sign out
   const handleExitOnboarding = async () => {
@@ -925,26 +916,27 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     width: '100%',
     marginBottom: 16,
   },
   exitButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 8,
-    gap: 6,
+    gap: 4,
   },
   exitButtonText: {
-    fontSize: 14,
-    fontWeight: '500' as const,
+    fontSize: 13,
+    fontWeight: '600' as const,
   },
   exitButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 0,
   },
   exitIconButton: {
     width: 36,
@@ -954,9 +946,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoContainer: {
-    width: 200,
-    height: 80,
-    alignItems: 'center',
+    flex: 1,
+    maxWidth: 160,
+    height: 60,
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   logo: {

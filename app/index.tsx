@@ -44,21 +44,18 @@ export default function Index() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  if (hasCompletedOnboarding) {
-    console.log('[Index] ✅ User has completed onboarding, redirecting to home');
+  // If user has completed onboarding OR has causes, go to home
+  // This ensures users with causes don't get stuck in onboarding loops
+  if (hasCompletedOnboarding || profile.causes.length > 0) {
+    console.log('[Index] ✅ User has completed onboarding or has causes, redirecting to home');
     return <Redirect href="/(tabs)/home" />;
   }
 
   console.log('[Index] 🔍 Checking onboarding flow... isNewUser =', isNewUser);
 
   if (isNewUser === true) {
-    // Check if business user has set business info
-    if (profile.accountType === 'business' && !profile.businessInfo) {
-      console.log('[Index] 🏢 NEW BUSINESS USER - No business info, redirecting to business-setup');
-      return <Redirect href="/business-setup" />;
-    }
-
     // Account type is now set during sign-up, redirect directly to onboarding
+    // Business claim is handled within onboarding flow, not separately
     console.log('[Index] 🆕 NEW USER - Redirecting to onboarding');
     return <Redirect href="/onboarding" />;
   }
