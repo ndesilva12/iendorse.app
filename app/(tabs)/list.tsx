@@ -98,6 +98,7 @@ import { followEntity, unfollowEntity, isFollowing, getFollowingCount, getFollow
 import BusinessMapView from '@/components/BusinessMapView';
 import { UserList, ListEntry, ValueListMode } from '@/types/library';
 import { getUserLists, createList, deleteList, addEntryToList, removeEntryFromList, updateListMetadata, reorderListEntries, getEndorsementList, ensureEndorsementList } from '@/services/firebase/listService';
+import { useReferralCode } from '@/hooks/useReferralCode';
 import { submitBrandRequest } from '@/services/firebase/brandRequestService';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -135,6 +136,7 @@ export default function HomeScreen() {
   const { profile, isDarkMode, clerkUser, markIntroAsSeen, isLoading: isProfileLoading } = useUser();
   const library = useLibrary();
   const colors = isDarkMode ? darkColors : lightColors;
+  const { referralCode } = useReferralCode();
   const [mainView, setMainView] = useState<MainView>('myLibrary');
   const [forYouSubsection, setForYouSubsection] = useState<ForYouSubsection>('aligned');
   const [userPersonalList, setUserPersonalList] = useState<UserList | null>(null);
@@ -4791,6 +4793,7 @@ export default function HomeScreen() {
         title={shareData?.title || ''}
         description={shareData?.description}
         isDarkMode={isDarkMode}
+        referralCode={referralCode}
       />
     </View>
   );

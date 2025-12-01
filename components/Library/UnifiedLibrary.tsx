@@ -78,6 +78,8 @@ import { getTopBrands, getTopBusinesses } from '@/services/firebase/topRankingsS
 import { getCumulativeDays } from '@/services/firebase/endorsementHistoryService';
 import { searchPlaces, getPlaceDetails, PlaceSearchResult, getPlacePhotoUrl, formatCategory } from '@/services/firebase/placesService';
 import { submitBrandRequest } from '@/services/firebase/brandRequestService';
+import { useReferralCode } from '@/hooks/useReferralCode';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 import {
   DndContext,
   closestCenter,
@@ -276,6 +278,7 @@ export default function UnifiedLibrary({
   const { profile, clerkUser } = useUser();
   const router = useRouter();
   const { brands } = useData();
+  const { referralCode } = useReferralCode();
 
   // Use context's expandedListId for persistent state across navigation
   const openedListId = library.state.expandedListId;
@@ -1131,7 +1134,9 @@ export default function UnifiedLibrary({
 
   const performShareList = async (list: UserList) => {
     try {
-      const message = `Check out my list "${list.name}" on Endorse Money!\n${list.description || ''}`;
+      const baseUrl = getListShareUrl(list);
+      const shareUrl = appendReferralTracking(baseUrl, referralCode);
+      const message = `Check out my list "${list.name}" on iEndorse!\n${list.description ? list.description + '\n' : ''}${shareUrl}`;
       await Share.share({
         message,
         title: list.name,
@@ -1189,13 +1194,17 @@ export default function UnifiedLibrary({
       switch (entry.type) {
         case 'brand':
           const brandName = (entry as any).brandName || (entry as any).name || 'Brand';
+          const brandId = (entry as any).brandId || entry.id;
+          const brandUrl = appendReferralTracking(`https://iendorse.app/brand/${brandId}`, referralCode);
           title = brandName;
-          message = `Check out ${brandName} on Endorse Money!`;
+          message = `Check out ${brandName} on iEndorse!\n${brandUrl}`;
           break;
         case 'business':
           const businessName = (entry as any).businessName || (entry as any).name || 'Business';
+          const businessId = (entry as any).businessId || entry.id;
+          const businessUrl = appendReferralTracking(`https://iendorse.app/business/${businessId}`, referralCode);
           title = businessName;
-          message = `Check out ${businessName} on Endorse Money!`;
+          message = `Check out ${businessName} on iEndorse!\n${businessUrl}`;
           break;
         case 'value':
           const valueName = (entry as any).valueName || (entry as any).name || 'Value';
@@ -4418,6 +4427,7 @@ export default function UnifiedLibrary({
             : undefined
         }
         isDarkMode={isDarkMode}
+        referralCode={referralCode}
       />
 
       <ConfirmModal
