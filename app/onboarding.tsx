@@ -1,5 +1,5 @@
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Heart, Shield, Users, Building2, Globe, User, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, Trophy, Search, MapPin, ChevronRight, AlertCircle, Check, LogOut, X, Sparkles } from 'lucide-react-native';
+import { Heart, Shield, Users, Building2, Globe, User, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, Trophy, Search, MapPin, ChevronRight, AlertCircle, Check, LogOut, X, Sparkles, Share, Download } from 'lucide-react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -860,7 +860,7 @@ export default function OnboardingScreen() {
 
             {/* Title */}
             <Text style={[styles.welcomeTitle, { color: colors.text }]}>
-              Welcome to Endorse!
+              Welcome to iEndorse!
             </Text>
 
             {/* Message */}
@@ -869,6 +869,20 @@ export default function OnboardingScreen() {
                 ? 'Set discounts in the Money tab and endorse other businesses in the List tab.'
                 : 'Endorse businesses you support and look for discounts.'}
             </Text>
+
+            {/* Add to Home Screen instruction */}
+            {Platform.OS === 'web' && (
+              <View style={[styles.installHint, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <View style={styles.installHintRow}>
+                  <View style={[styles.shareIconBox, { backgroundColor: colors.primary }]}>
+                    <Share size={18} color="#FFFFFF" strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.installHintText, { color: colors.textSecondary }]}>
+                    Tap <Text style={{ fontWeight: '700', color: colors.text }}>Share</Text> then <Text style={{ fontWeight: '700', color: colors.text }}>"Add to Home Screen"</Text> to save the app
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Button */}
             <TouchableOpacity
@@ -1298,5 +1312,31 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '600' as const,
+  },
+  // Install hint styles
+  installHint: {
+    width: '100%',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  installHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  shareIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  installHintText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
