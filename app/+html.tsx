@@ -8,7 +8,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover, user-scalable=no" />
-        <meta name="theme-color" content="rgb(3, 68, 102)" />
+        <meta name="theme-color" content="#111827" />
 
         {/* Basic SEO Meta Tags */}
         <title>iEndorse - Build Your Endorsement List</title>
