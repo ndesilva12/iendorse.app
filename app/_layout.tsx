@@ -97,6 +97,22 @@ function RootLayoutNav() {
   const { isDarkMode, clerkUser, profile } = useUser();
   const colors = isDarkMode ? darkColors : lightColors;
 
+  // One-time celebrity batch import (checks flag to prevent re-running)
+  useEffect(() => {
+    const runCelebrityImport = async () => {
+      try {
+        const { runCelebrityBatch1Import } = await import('@/services/firebase/celebrityService');
+        const result = await runCelebrityBatch1Import();
+        if (!result.alreadyImported && result.success) {
+          console.log(`[RootLayout] Celebrity batch imported: ${result.results?.successful} created, ${result.results?.failed} failed`);
+        }
+      } catch (error) {
+        console.error('[RootLayout] Celebrity import error:', error);
+      }
+    };
+    runCelebrityImport();
+  }, []);
+
   // Construct userName for endorsement list creation
   const fullNameFromFirebase = profile?.userDetails?.name;
   const fullNameFromClerk = clerkUser?.unsafeMetadata?.fullName as string;
