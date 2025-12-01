@@ -108,6 +108,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Referrals collection - OPEN ACCESS
+    // Track user referrals and invites (Clerk handles authentication)
+    match /referrals/{referralId} {
+      allow read, write: if true;
+    }
+
     // Deny all other collections
     match /{document=**} {
       allow read, write: if false;

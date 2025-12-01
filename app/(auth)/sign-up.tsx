@@ -7,6 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUser } from '@/contexts/UserContext';
 import { User, Building2, LogOut } from 'lucide-react-native';
 import { AccountType } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { findUserByReferralCode, recordReferral } from '@/services/firebase/referralService';
+
+const REFERRAL_CODE_KEY = '@iendorse:referral_code';
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -30,7 +34,24 @@ export default function SignUpScreen() {
   const [showConsentModal, setShowConsentModal] = React.useState(false);
   const [consentChecked, setConsentChecked] = React.useState(false);
   const [selectedAccountType, setSelectedAccountType] = React.useState<AccountType>('individual');
+  const [storedReferralCode, setStoredReferralCode] = React.useState<string | null>(null);
   const consentScrollRef = React.useRef<ScrollView>(null);
+
+  // Check for stored referral code from invite link
+  React.useEffect(() => {
+    const checkReferralCode = async () => {
+      try {
+        const code = await AsyncStorage.getItem(REFERRAL_CODE_KEY);
+        if (code) {
+          console.log('[Sign Up] Found stored referral code:', code);
+          setStoredReferralCode(code);
+        }
+      } catch (error) {
+        console.error('[Sign Up] Error checking referral code:', error);
+      }
+    };
+    checkReferralCode();
+  }, []);
 
   // Scroll consent modal to top when shown
   React.useEffect(() => {
@@ -208,6 +229,16 @@ export default function SignUpScreen() {
         } catch (e) {
           console.error('[Sign Up] Failed to set account type:', e);
         }
+        // Process referral if a code was used
+        if (storedReferralCode && result.createdUserId) {
+          try {
+            const referrer = await findUserByReferralCode(storedReferralCode);
+            if (referrer) {
+              await recordReferral(referrer.userId, referrer.userName, result.createdUserId, fullName.trim(), emailAddress, storedReferralCode);
+              await AsyncStorage.removeItem(REFERRAL_CODE_KEY);
+            }
+          } catch (e) { console.error('[Sign Up] Referral error:', e); }
+        }
         // Pass account type as query param to ensure onboarding knows the user type
         console.log('[Sign Up] Redirecting to onboarding with accountType:', selectedAccountType);
         router.replace(`/onboarding?accountType=${selectedAccountType}`);
@@ -228,6 +259,16 @@ export default function SignUpScreen() {
           await setAccountType(selectedAccountType);
         } catch (e) {
           console.error('[Sign Up] Failed to set account type:', e);
+        }
+        // Process referral if a code was used
+        if (storedReferralCode && result.createdUserId) {
+          try {
+            const referrer = await findUserByReferralCode(storedReferralCode);
+            if (referrer) {
+              await recordReferral(referrer.userId, referrer.userName, result.createdUserId, fullName.trim(), emailAddress, storedReferralCode);
+              await AsyncStorage.removeItem(REFERRAL_CODE_KEY);
+            }
+          } catch (e) { console.error('[Sign Up] Referral error:', e); }
         }
         // Pass account type as query param to ensure onboarding knows the user type
         console.log('[Sign Up] Redirecting to onboarding with accountType:', selectedAccountType);
@@ -367,6 +408,30 @@ export default function SignUpScreen() {
         } catch (accountTypeError) {
           console.error('[Sign Up] Failed to set account type:', accountTypeError);
           // Continue anyway - the user can set up their business later
+        }
+
+        // Process referral if a code was used
+        if (storedReferralCode && result.createdUserId) {
+          console.log('[Sign Up] Processing referral with code:', storedReferralCode);
+          try {
+            const referrer = await findUserByReferralCode(storedReferralCode);
+            if (referrer) {
+              await recordReferral(
+                referrer.userId,
+                referrer.userName,
+                result.createdUserId,
+                fullName.trim(),
+                emailAddress,
+                storedReferralCode
+              );
+              console.log('[Sign Up] Referral recorded successfully');
+              // Clear the stored referral code
+              await AsyncStorage.removeItem(REFERRAL_CODE_KEY);
+            }
+          } catch (referralError) {
+            console.error('[Sign Up] Failed to record referral:', referralError);
+            // Don't block sign-up for referral errors
+          }
         }
 
         // Pass account type as query param to ensure onboarding knows the user type

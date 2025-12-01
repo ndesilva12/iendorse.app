@@ -3969,10 +3969,10 @@ export default function UnifiedLibrary({
             {mapEntries.length > 0 && (
               <TouchableOpacity
                 onPress={() => setShowMapModal(true)}
-                style={[styles.headerActionButton, { backgroundColor: colors.backgroundSecondary }]}
+                style={styles.headerActionButton}
                 activeOpacity={0.7}
               >
-                <MapPin size={20} color={colors.primary} strokeWidth={2} />
+                <MapPin size={24} color={colors.primary} strokeWidth={2} />
               </TouchableOpacity>
             )}
 
@@ -3983,7 +3983,7 @@ export default function UnifiedLibrary({
                 style={[styles.addEndorsementButton, { backgroundColor: colors.primary }]}
                 activeOpacity={0.7}
               >
-                <Plus size={24} color={colors.white} strokeWidth={2.5} />
+                <Plus size={20} color={colors.white} strokeWidth={2.5} />
               </TouchableOpacity>
             )}
           </View>
@@ -5781,12 +5781,12 @@ const styles = StyleSheet.create({
   endorsedHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   addEndorsementButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
