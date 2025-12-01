@@ -387,7 +387,7 @@ const getPlaceDetailsWeb = async (placeId: string): Promise<PlaceDetails | null>
             return;
           }
 
-          const photoUrls = place.photos?.slice(0, 5).map((photo: any) =>
+          const photoUrls = place.photos?.slice(0, 1).map((photo: any) =>
             photo.getUrl({ maxWidth: 800 })
           ) || [];
 
@@ -466,7 +466,7 @@ const getPlaceDetailsNative = async (placeId: string): Promise<PlaceDetails | nu
       priceLevel: place.price_level,
       openingHours: place.opening_hours?.weekday_text,
       isOpenNow: place.opening_hours?.open_now,
-      photoReferences: place.photos?.slice(0, 5).map((p: any) => p.photo_reference) || [],
+      photoReferences: place.photos?.slice(0, 1).map((p: any) => p.photo_reference) || [],
       reviews: place.reviews?.slice(0, 5).map((r: any) => ({
         author: r.author_name,
         rating: r.rating,
