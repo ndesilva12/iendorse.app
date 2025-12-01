@@ -42,6 +42,8 @@ import { submitBrandRequest } from '@/services/firebase/brandRequestService';
 import { searchPlaces, PlaceSearchResult, getPlacePhotoUrl, formatCategory } from '@/services/firebase/placesService';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { useReferralCode } from '@/hooks/useReferralCode';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 
 interface Comment {
   id: string;
@@ -112,6 +114,7 @@ const UserCard = ({ item, colors, router, clerkUser, profile, library }: {
   const [isFollowingUser, setIsFollowingUser] = useState(false);
   const [checkingFollowStatus, setCheckingFollowStatus] = useState(true);
   const [showActionMenu, setShowActionMenu] = useState(false);
+  const { referralCode } = useReferralCode();
 
   // Check follow status on mount
   useEffect(() => {
@@ -192,13 +195,14 @@ const UserCard = ({ item, colors, router, clerkUser, profile, library }: {
   };
 
   const handleShare = () => {
-    const shareUrl = `${Platform.OS === 'web' ? window.location.origin : 'https://iendorse.app'}/user/${item.id}`;
+    const baseUrl = `https://iendorse.app/user/${item.id}`;
+    const shareUrl = appendReferralTracking(baseUrl, referralCode);
     if (Platform.OS === 'web') {
       navigator.clipboard.writeText(shareUrl);
       Alert.alert('Link Copied', 'Profile link copied to clipboard');
     } else {
       RNShare.share({
-        message: `Check out ${userName}'s profile on Endorse: ${shareUrl}`,
+        message: `Check out ${userName}'s profile on iEndorse: ${shareUrl}`,
       });
     }
     setShowActionMenu(false);
@@ -299,6 +303,7 @@ export default function SearchScreen() {
   const { values: firebaseValues, brands: firebaseBrands, valuesMatrix } = useData();
   const colors = isDarkMode ? darkColors : lightColors;
   const { width } = useWindowDimensions();
+  const { referralCode } = useReferralCode();
 
   // Helper function to normalize category names to handle variations and synonyms
   const normalizeCategory = useCallback((category: string): string => {
@@ -717,8 +722,9 @@ export default function SearchScreen() {
   }, [commentText, selectedProductId, clerkUser, getProductInteraction]);
 
   const handleShare = useCallback(async (product: Product) => {
-    const shareUrl = `${Platform.OS === 'web' ? window.location.origin : 'https://iendorse.app'}/brand/${product.id}`;
-    const message = `Check out ${product.name} on Endorse!`;
+    const baseUrl = `https://iendorse.app/brand/${product.id}`;
+    const shareUrl = appendReferralTracking(baseUrl, referralCode);
+    const message = `Check out ${product.name} on iEndorse!`;
 
     try {
       if (Platform.OS === 'web') {
@@ -751,7 +757,7 @@ export default function SearchScreen() {
     } catch (error) {
       console.error('Error sharing:', error);
     }
-  }, []);
+  }, [referralCode]);
 
   const handleVisitBrand = useCallback(async (product: Product) => {
     try {

@@ -270,6 +270,52 @@ export function getReferralLink(referralCode: string, baseUrl?: string): string 
 }
 
 /**
+ * Append referral tracking parameter to any URL
+ * This allows tracking shares even to existing users
+ */
+export function appendReferralTracking(url: string, referralCode: string | null | undefined): string {
+  if (!referralCode || !url) return url;
+
+  try {
+    // Handle URLs with existing query parameters
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}ref=${referralCode}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Record a share event for tracking purposes
+ * This tracks when users share content (even to existing users)
+ */
+export async function recordShareEvent(
+  sharerId: string,
+  sharerReferralCode: string,
+  contentType: 'brand' | 'business' | 'user' | 'list' | 'place' | 'value' | 'other',
+  contentId: string,
+  contentName?: string
+): Promise<void> {
+  try {
+    const shareData = {
+      sharerId,
+      sharerReferralCode,
+      contentType,
+      contentId,
+      contentName: contentName || '',
+      createdAt: Timestamp.now(),
+    };
+
+    const shareRef = doc(collection(db, 'shareEvents'));
+    await setDoc(shareRef, shareData);
+    console.log('[Referral] Recorded share event:', contentType, contentId);
+  } catch (error) {
+    // Don't throw - sharing should still work even if tracking fails
+    console.error('[Referral] Error recording share event:', error);
+  }
+}
+
+/**
  * Get all referrals (admin function)
  */
 export async function getAllReferrals(): Promise<Referral[]> {

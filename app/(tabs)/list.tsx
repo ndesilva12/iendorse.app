@@ -4834,7 +4834,7 @@ const styles = StyleSheet.create({
   headerLogo: {
     width: 161,
     height: 47,
-    marginTop: 4,
+    marginTop: 8,
     alignSelf: 'flex-start',
   },
   headerActions: {

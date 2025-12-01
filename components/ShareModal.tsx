@@ -1,8 +1,9 @@
 /**
  * ShareModal Component
  * Modal for sharing brands, businesses, or lists with platform options
+ * Supports referral tracking by appending user's referral code to shared URLs
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +18,7 @@ import {
 import { X, Mail, Facebook, Twitter, Linkedin, Link as LinkIcon, MessageCircle, Share2 } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import * as Clipboard from 'expo-clipboard';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 
 interface ShareModalProps {
   visible: boolean;
@@ -25,6 +27,7 @@ interface ShareModalProps {
   title: string;
   description?: string;
   isDarkMode?: boolean;
+  referralCode?: string | null; // Optional referral code for tracking
 }
 
 export default function ShareModal({
@@ -34,13 +37,19 @@ export default function ShareModal({
   title,
   description,
   isDarkMode = false,
+  referralCode,
 }: ShareModalProps) {
   const colors = isDarkMode ? darkColors : lightColors;
   const [copied, setCopied] = useState(false);
 
+  // URL with referral tracking appended
+  const trackedUrl = useMemo(() => {
+    return appendReferralTracking(shareUrl, referralCode);
+  }, [shareUrl, referralCode]);
+
   const handleCopyLink = async () => {
     try {
-      await Clipboard.setStringAsync(shareUrl);
+      await Clipboard.setStringAsync(trackedUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
 
@@ -57,7 +66,7 @@ export default function ShareModal({
 
   const handleShare = async (platform: string) => {
     const encodedTitle = encodeURIComponent(title);
-    const encodedUrl = encodeURIComponent(shareUrl);
+    const encodedUrl = encodeURIComponent(trackedUrl);
     const encodedDescription = description ? encodeURIComponent(description) : '';
 
     let url = '';
@@ -185,7 +194,7 @@ export default function ShareModal({
               {/* URL Display */}
               <View style={[styles.urlContainer, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
                 <Text style={[styles.urlText, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {shareUrl}
+                  {trackedUrl}
                 </Text>
               </View>
             </View>
