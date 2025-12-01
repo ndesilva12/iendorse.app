@@ -1,6 +1,6 @@
 // Library types for list management
 
-export type ListEntryType = 'brand' | 'business' | 'value' | 'link' | 'text' | 'place';
+export type ListEntryType = 'brand' | 'business' | 'value' | 'link' | 'text' | 'place' | 'pending_business';
 
 export type ValueListMode = 'maxPain' | 'maxBenefit';
 
@@ -64,7 +64,18 @@ export interface TextListEntry extends BaseListEntry {
   content: string;
 }
 
-export type ListEntry = BrandListEntry | BusinessListEntry | PlaceListEntry | ValueListEntry | LinkListEntry | TextListEntry;
+// Pending business entry - created manually by user, awaiting admin approval
+export interface PendingBusinessListEntry extends BaseListEntry {
+  type: 'pending_business';
+  pendingBusinessName: string;
+  pendingBusinessCategory: string;
+  description?: string;
+  website?: string;
+  location?: string;
+  logoUrl?: string;
+}
+
+export type ListEntry = BrandListEntry | BusinessListEntry | PlaceListEntry | ValueListEntry | LinkListEntry | TextListEntry | PendingBusinessListEntry;
 
 export interface UserList {
   id: string;

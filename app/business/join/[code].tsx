@@ -81,7 +81,7 @@ export default function JoinTeamPage() {
         setSuccess(true);
         // Redirect to home after 2 seconds
         setTimeout(() => {
-          router.replace('/(tabs)/home');
+          router.replace('/(tabs)/list');
         }, 2000);
       } else {
         setError('Failed to accept invitation. Please try again.');

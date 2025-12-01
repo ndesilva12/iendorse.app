@@ -18,6 +18,7 @@ import {
   where,
   orderBy,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore';
 
 export type ClaimStatus = 'pending' | 'approved' | 'rejected';
@@ -393,6 +394,69 @@ export const deleteClaim = async (claimId: string): Promise<void> => {
     console.log('[BusinessClaimService] Claim deleted:', claimId);
   } catch (error) {
     console.error('[BusinessClaimService] Error deleting claim:', error);
+    throw error;
+  }
+};
+
+/**
+ * Revert a business account back to a personal account
+ * This removes all business info from the user's profile
+ */
+export const revertToPersonalAccount = async (
+  userId: string,
+  revokedBy: string,
+  reason: string
+): Promise<void> => {
+  console.log('[BusinessClaimService] Reverting user to personal account:', userId);
+
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      throw new Error('User not found');
+    }
+
+    const userData = userDoc.data();
+    console.log('[BusinessClaimService] Current user data:', JSON.stringify(userData, null, 2));
+
+    // Update user document to remove business info
+    const updateData: any = {
+      accountType: 'personal',
+      businessInfo: deleteField(), // Remove business info entirely
+    };
+
+    // Also remove businessRole if it exists in userDetails
+    if (userData.userDetails?.role) {
+      updateData['userDetails.role'] = deleteField();
+    }
+
+    await updateDoc(userRef, updateData);
+    console.log('[BusinessClaimService] User reverted to personal account:', userId);
+
+    // Find and update any approved claims for this user to rejected
+    const claimsRef = collection(db, 'businessClaims');
+    const q = query(
+      claimsRef,
+      where('userId', '==', userId),
+      where('status', '==', 'approved')
+    );
+    const snapshot = await getDocs(q);
+
+    for (const claimDoc of snapshot.docs) {
+      await updateDoc(doc(db, 'businessClaims', claimDoc.id), {
+        status: 'rejected',
+        reviewedAt: Timestamp.now(),
+        reviewedBy: revokedBy,
+        reviewNotes: `Claim revoked and account reverted to personal: ${reason}`,
+        revertedAt: Timestamp.now(),
+      });
+      console.log('[BusinessClaimService] Claim reverted:', claimDoc.id);
+    }
+
+    console.log('[BusinessClaimService] ✅ Account reversion complete');
+  } catch (error) {
+    console.error('[BusinessClaimService] ❌ Error reverting account:', error);
     throw error;
   }
 };

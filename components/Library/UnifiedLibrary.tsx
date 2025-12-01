@@ -77,6 +77,7 @@ import { reorderListEntries } from '@/services/firebase/listService';
 import { getTopBrands, getTopBusinesses } from '@/services/firebase/topRankingsService';
 import { getCumulativeDays } from '@/services/firebase/endorsementHistoryService';
 import { searchPlaces, getPlaceDetails, PlaceSearchResult, getPlacePhotoUrl, formatCategory } from '@/services/firebase/placesService';
+import { submitBrandRequest } from '@/services/firebase/brandRequestService';
 import {
   DndContext,
   closestCenter,
@@ -362,9 +363,23 @@ export default function UnifiedLibrary({
   const [loadingPlaces, setLoadingPlaces] = useState(false);
   const [placesSearchDebounce, setPlacesSearchDebounce] = useState<NodeJS.Timeout | null>(null);
 
+  // Create business form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    name: '',
+    category: '',
+    description: '',
+    website: '',
+    location: '',
+  });
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
+  const [showCreateSuccess, setShowCreateSuccess] = useState(false);
+
   // Endorsement list filter state
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [localFilter, setLocalFilter] = useState<'all' | 'local'>('all');
+  const [listSearchQuery, setListSearchQuery] = useState('');
+  const [showListSearch, setShowListSearch] = useState(false);
 
   // Section selection state
   // Profile views (preview/view) ALWAYS default to endorsement
@@ -710,10 +725,17 @@ export default function UnifiedLibrary({
   const mapEntries = useMemo((): MapEntry[] => {
     if (!endorsementList?.entries) return [];
 
-    // Helper to get entry category (same logic as in render)
+    // Helper to get entry category (looks up from brands context if not stored on entry)
     const getEntryCategory = (entry: ListEntry): string => {
       let rawCategory: string | undefined;
-      if (entry.type === 'brand') rawCategory = (entry as any).brandCategory;
+      if (entry.type === 'brand') {
+        rawCategory = (entry as any).brandCategory;
+        // Look up from brands context if not stored on entry
+        if (!rawCategory) {
+          const brand = brands.find(b => b.id === (entry as any).brandId);
+          rawCategory = brand?.category;
+        }
+      }
       else if (entry.type === 'business') rawCategory = (entry as any).businessCategory;
       else if (entry.type === 'place') rawCategory = (entry as any).placeCategory;
       return mapToCustomCategory(rawCategory);
@@ -986,6 +1008,93 @@ export default function UnifiedLibrary({
       router.push(`/place/${item.placeId}`);
     }
   }, [router]);
+
+  // Handle creating a manual business entry
+  const handleCreateBusiness = useCallback(async () => {
+    if (!createFormData.name.trim() || !createFormData.category) {
+      Alert.alert('Error', 'Please enter a name and select a category');
+      return;
+    }
+
+    if (!endorsementList?.id || !currentUserId) {
+      Alert.alert('Error', 'Unable to add to endorsements. Please try again.');
+      return;
+    }
+
+    setIsSubmittingCreate(true);
+
+    try {
+      // Get logo from website if provided
+      let logoUrl: string | undefined;
+      if (createFormData.website) {
+        logoUrl = getLogoUrl(createFormData.website, { size: 128 });
+      }
+
+      // Create the entry for the user's endorsement list
+      // Use 'pending_business' type to indicate it's awaiting admin approval
+      const entry: any = {
+        type: 'pending_business',
+        pendingBusinessName: createFormData.name.trim(),
+        pendingBusinessCategory: createFormData.category,
+        createdAt: new Date(),
+      };
+
+      // Add optional fields
+      if (createFormData.description) entry.description = createFormData.description;
+      if (createFormData.website) entry.website = createFormData.website;
+      if (createFormData.location) entry.location = createFormData.location;
+      if (logoUrl) entry.logoUrl = logoUrl;
+
+      // Add to endorsement list
+      const addedEntry = await library.addEntry(endorsementList.id, entry);
+
+      // Submit brand request for admin review
+      await submitBrandRequest(
+        createFormData.name.trim(),
+        currentUserId,
+        profile?.displayName || profile?.firstName || 'User',
+        clerkUser?.emailAddresses?.[0]?.emailAddress,
+        {
+          category: createFormData.category,
+          description: createFormData.description,
+          website: createFormData.website,
+          location: createFormData.location,
+          logoUrl,
+          listEntryId: addedEntry?.id,
+          source: 'manual_entry',
+        }
+      );
+
+      // Show success state on button briefly
+      setShowCreateSuccess(true);
+
+      // Close modal after brief success display
+      setTimeout(() => {
+        setShowAddEndorsementModal(false);
+        setShowCreateSuccess(false);
+        setShowCreateForm(false);
+        setCreateFormData({
+          name: '',
+          category: '',
+          description: '',
+          website: '',
+          location: '',
+        });
+        setAddSearchQuery('');
+        setAddedItemIds(new Set());
+      }, 800);
+
+      // Reload library
+      if (currentUserId) {
+        await library.loadUserLists(currentUserId, true);
+      }
+    } catch (error) {
+      console.error('[UnifiedLibrary] Error creating business:', error);
+      Alert.alert('Error', 'Failed to create business. Please try again.');
+    } finally {
+      setIsSubmittingCreate(false);
+    }
+  }, [createFormData, endorsementList, currentUserId, library, profile, clerkUser]);
 
   // Share handlers - Open ShareOptionsModal first
   const handleShareList = (list: UserList) => {
@@ -1399,12 +1508,16 @@ export default function UnifiedLibrary({
         return (entry as any).brandName || (entry as any).name || 'Brand';
       case 'business':
         return (entry as any).businessName || (entry as any).name || 'Business';
+      case 'pending_business':
+        return (entry as any).pendingBusinessName || (entry as any).name || 'Pending Business';
       case 'value':
         return (entry as any).valueName || (entry as any).name || 'Value';
       case 'link':
         return (entry as any).title || (entry as any).name || 'Link';
       case 'text':
         return 'Note';
+      case 'place':
+        return (entry as any).placeName || (entry as any).name || 'Place';
       default:
         return 'Item';
     }
@@ -2137,6 +2250,127 @@ export default function UnifiedLibrary({
           );
         }
         break;
+
+      case 'pending_business':
+        if ('pendingBusinessName' in entry) {
+          const pendingName = (entry as any).pendingBusinessName || 'Pending Business';
+          const pendingCategory = (entry as any).pendingBusinessCategory || 'Other';
+          const pendingWebsite = (entry as any).website;
+          // Get logo from website if available
+          let logoUrl = (entry as any).logoUrl;
+          if (!logoUrl && pendingWebsite) {
+            logoUrl = getLogoUrl(pendingWebsite, { size: 128 });
+          }
+
+          // Get display label for category
+          const categoryLabel = getCustomCategoryLabel(pendingCategory);
+
+          // Endorsement section: render as card with position-based background
+          if (isEndorsementSection && entryIndex !== undefined) {
+            const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            return (
+              <View
+                style={[
+                  styles.endorsementEntryCard,
+                  { backgroundColor: cardBgColor },
+                ]}
+              >
+                {logoUrl ? (
+                  <Image
+                    source={{ uri: logoUrl }}
+                    style={styles.endorsementEntryCardImage}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
+                  />
+                ) : (
+                  <View style={[styles.endorsementEntryCardImage, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Globe size={32} color={colors.textSecondary} />
+                  </View>
+                )}
+                <View style={styles.endorsementEntryCardContent}>
+                  <View style={styles.endorsementEntryCardFirstLine}>
+                    <Text style={[styles.endorsementEntryCardNumber, { color: colors.text }]}>{entryIndex + 1}.</Text>
+                    <Text style={[styles.endorsementEntryCardName, { color: colors.text }]} numberOfLines={1}>
+                      {pendingName}
+                    </Text>
+                  </View>
+                  <Text style={[styles.endorsementEntryCardCategory, { color: colors.primary }]} numberOfLines={1}>
+                    Pending Review
+                  </Text>
+                </View>
+                {(mode === 'edit' || mode === 'view' || mode === 'preview') && (
+                  <TouchableOpacity
+                    style={styles.endorsementEntryOptionsButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleOpenActionModal(entry);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <MoreVertical size={18} color={colors.textSecondary} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          }
+
+          // Non-endorsement section: render original style
+          return (
+            <View>
+              <View
+                style={[
+                  styles.brandCard,
+                  { backgroundColor: 'transparent' },
+                ]}
+              >
+                <View style={styles.brandCardInner}>
+                  <View style={styles.brandLogoContainer}>
+                    {logoUrl ? (
+                      <Image
+                        source={{ uri: logoUrl }}
+                        style={[styles.brandLogo, { backgroundColor: '#FFFFFF' }]}
+                        contentFit="cover"
+                        transition={200}
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <View style={[styles.brandLogo, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Globe size={24} color={colors.textSecondary} />
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.brandCardContent}>
+                    <Text style={[styles.brandName, { color: colors.white }]} numberOfLines={2}>
+                      {pendingName}
+                    </Text>
+                    <Text style={[styles.brandCategory, { color: colors.primary }]} numberOfLines={1}>
+                      Pending Review • {categoryLabel}
+                    </Text>
+                  </View>
+                  <View style={styles.brandScoreContainer}>
+                    <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+                  </View>
+                  {(mode === 'edit' || mode === 'view' || mode === 'preview') && (
+                    <TouchableOpacity
+                      style={[styles.quickAddButton, { backgroundColor: colors.background }]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleOpenActionModal(entry);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ transform: [{ rotate: '90deg' }] }}>
+                        <MoreVertical size={18} color={colors.textSecondary} strokeWidth={2} />
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+          );
+        }
+        break;
     }
 
     return null;
@@ -2435,12 +2669,20 @@ export default function UnifiedLibrary({
     // Apply filter to entries
     const allEntries = isReordering ? localEntries : endorsementList.entries;
 
-    // Helper to get category from entry (maps to custom categories)
+    // Helper to get category from entry (maps to custom categories, looks up from brands context if not stored)
     const getEntryCategory = (entry: ListEntry): string => {
       let rawCategory: string | undefined;
-      if (entry.type === 'brand') rawCategory = (entry as any).brandCategory;
+      if (entry.type === 'brand') {
+        rawCategory = (entry as any).brandCategory;
+        // Look up from brands context if not stored on entry
+        if (!rawCategory) {
+          const brand = brands.find(b => b.id === (entry as any).brandId);
+          rawCategory = brand?.category;
+        }
+      }
       else if (entry.type === 'business') rawCategory = (entry as any).businessCategory;
       else if (entry.type === 'place') rawCategory = (entry as any).placeCategory;
+      else if (entry.type === 'pending_business') rawCategory = (entry as any).pendingBusinessCategory;
       // Map to custom category
       return mapToCustomCategory(rawCategory);
     };
@@ -2465,13 +2707,32 @@ export default function UnifiedLibrary({
       : allEntries.filter(entry => entry && isLocalEntry(entry));
 
     // Then apply category filter (uses custom category IDs)
-    const filteredEntries = categoryFilter === 'all'
+    const categoryFilteredEntries = categoryFilter === 'all'
       ? localFilteredEntries
       : localFilteredEntries.filter(entry => {
           const categoryId = getEntryCategory(entry);
           return categoryId === categoryFilter;
         });
-    const entriesToDisplay = filteredEntries;
+
+    // Apply search filter if search query is active
+    const getEntryName = (entry: ListEntry): string => {
+      if (entry.type === 'brand') return (entry as any).brandName || '';
+      if (entry.type === 'business') return (entry as any).businessName || '';
+      if (entry.type === 'place') return (entry as any).placeName || '';
+      if (entry.type === 'pending_business') return (entry as any).pendingBusinessName || '';
+      if (entry.type === 'value') return (entry as any).valueName || '';
+      return '';
+    };
+
+    const searchFilteredEntries = listSearchQuery.trim()
+      ? categoryFilteredEntries.filter(entry => {
+          const name = getEntryName(entry).toLowerCase();
+          const search = listSearchQuery.toLowerCase().trim();
+          return name.includes(search);
+        })
+      : categoryFilteredEntries;
+
+    const entriesToDisplay = searchFilteredEntries;
 
     // Check if there are local entries to show the local filter
     const hasLocalEntries = allEntries.some(e => e && isLocalEntry(e));
@@ -2499,85 +2760,137 @@ export default function UnifiedLibrary({
       // Show category filter if there are categories to filter by
       const showCategoryFilter = uniqueCategories.length > 1;
 
-      if (!showLocalFilter && !showCategoryFilter) return null;
+      // Always show if there are entries (for search functionality)
+      if (!showLocalFilter && !showCategoryFilter && allEntries.length < 2) return null;
 
       return (
         <View style={styles.filterButtonsContainer}>
-          {/* Local/All filter row + Category filters combined */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterButtonsScroll}>
-            {/* All filter */}
-            <TouchableOpacity
-              key="all"
-              style={[
-                styles.filterButton,
-                localFilter === 'all' && categoryFilter === 'all'
-                  ? { backgroundColor: colors.primary }
-                  : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
-              ]}
-              onPress={() => {
-                setLocalFilter('all');
-                setCategoryFilter('all');
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.filterButtonText,
-                { color: localFilter === 'all' && categoryFilter === 'all' ? '#FFFFFF' : colors.text }
-              ]}>
-                All
-              </Text>
-            </TouchableOpacity>
-
-            {/* Local filter */}
-            {showLocalFilter && (
+          {showListSearch ? (
+            // Search bar mode - replaces all filter options
+            <View style={styles.listSearchContainer}>
+              <View style={[styles.listSearchInputContainer, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Search size={18} color={colors.textSecondary} strokeWidth={2} />
+                <TextInput
+                  style={[styles.listSearchInput, { color: colors.text }]}
+                  placeholder="Search endorsements..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={listSearchQuery}
+                  onChangeText={setListSearchQuery}
+                  autoFocus
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {listSearchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setListSearchQuery('')}
+                    style={styles.listSearchClearButton}
+                    activeOpacity={0.7}
+                  >
+                    <X size={16} color={colors.textSecondary} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <TouchableOpacity
-                key="local"
+                onPress={() => {
+                  setShowListSearch(false);
+                  setListSearchQuery('');
+                }}
+                style={styles.listSearchCancelButton}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.listSearchCancelText, { color: colors.primary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // Normal filter mode
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterButtonsScroll}>
+              {/* Search icon */}
+              <TouchableOpacity
                 style={[
                   styles.filterButton,
-                  localFilter === 'local' && categoryFilter === 'all'
+                  styles.filterButtonIcon,
+                  { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
+                ]}
+                onPress={() => setShowListSearch(true)}
+                activeOpacity={0.7}
+              >
+                <Search size={16} color={colors.text} strokeWidth={2} />
+              </TouchableOpacity>
+
+              {/* All filter */}
+              <TouchableOpacity
+                key="all"
+                style={[
+                  styles.filterButton,
+                  localFilter === 'all' && categoryFilter === 'all'
                     ? { backgroundColor: colors.primary }
                     : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
                 ]}
                 onPress={() => {
-                  setLocalFilter('local');
+                  setLocalFilter('all');
                   setCategoryFilter('all');
                 }}
                 activeOpacity={0.7}
               >
                 <Text style={[
                   styles.filterButtonText,
-                  { color: localFilter === 'local' && categoryFilter === 'all' ? '#FFFFFF' : colors.text }
+                  { color: localFilter === 'all' && categoryFilter === 'all' ? '#FFFFFF' : colors.text }
                 ]}>
-                  Local
+                  All
                 </Text>
               </TouchableOpacity>
-            )}
 
-            {/* Category filters */}
-            {showCategoryFilter && uniqueCategories.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[
-                  styles.filterButton,
-                  categoryFilter === cat.id
-                    ? { backgroundColor: colors.primary }
-                    : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
-                ]}
-                onPress={() => {
-                  setLocalFilter('all'); // Reset local filter when selecting category
-                  setCategoryFilter(cat.id);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={[
-                  styles.filterButtonText,
-                  { color: categoryFilter === cat.id ? '#FFFFFF' : colors.text }
-                ]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+              {/* Local filter */}
+              {showLocalFilter && (
+                <TouchableOpacity
+                  key="local"
+                  style={[
+                    styles.filterButton,
+                    localFilter === 'local' && categoryFilter === 'all'
+                      ? { backgroundColor: colors.primary }
+                      : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
+                  ]}
+                  onPress={() => {
+                    setLocalFilter('local');
+                    setCategoryFilter('all');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    { color: localFilter === 'local' && categoryFilter === 'all' ? '#FFFFFF' : colors.text }
+                  ]}>
+                    Local
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Category filters */}
+              {showCategoryFilter && uniqueCategories.map(cat => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[
+                    styles.filterButton,
+                    categoryFilter === cat.id
+                      ? { backgroundColor: colors.primary }
+                      : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
+                  ]}
+                  onPress={() => {
+                    setLocalFilter('all'); // Reset local filter when selecting category
+                    setCategoryFilter(cat.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    { color: categoryFilter === cat.id ? '#FFFFFF' : colors.text }
+                  ]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
       );
     };
@@ -4123,6 +4436,9 @@ export default function UnifiedLibrary({
           setShowAddEndorsementModal(false);
           setAddSearchQuery('');
           setAddedItemIds(new Set());
+          setShowCreateForm(false);
+          setShowCreateSuccess(false);
+          setCreateFormData({ name: '', category: '', description: '', website: '', location: '' });
         }}
       >
         <View style={[
@@ -4142,6 +4458,9 @@ export default function UnifiedLibrary({
                   setShowAddEndorsementModal(false);
                   setAddSearchQuery('');
                   setAddedItemIds(new Set());
+                  setShowCreateForm(false);
+                  setShowCreateSuccess(false);
+                  setCreateFormData({ name: '', category: '', description: '', website: '', location: '' });
                 }}
                 style={styles.addEndorsementCloseButton}
                 activeOpacity={0.7}
@@ -4198,10 +4517,121 @@ export default function UnifiedLibrary({
                     Search for brands, businesses, or any local business
                   </Text>
                 </View>
+              ) : showCreateSuccess ? (
+                <View style={styles.addEndorsementEmptyContainer}>
+                  <Text style={[styles.addEndorsementEmptyTitle, { color: colors.primary }]}>Business Created!</Text>
+                  <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
+                    Your entry has been added and submitted for review.
+                  </Text>
+                </View>
+              ) : showCreateForm ? (
+                <View style={styles.addEndorsementEmptyContainer}>
+                  <Text style={[styles.addEndorsementEmptyTitle, { color: colors.text }]}>Create Business</Text>
+                  <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
+                    Add a business that's not in our database yet
+                  </Text>
+                  <TextInput
+                    style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                    placeholder="Business name *"
+                    placeholderTextColor={colors.textSecondary}
+                    value={createFormData.name}
+                    onChangeText={(text) => setCreateFormData({ ...createFormData, name: text })}
+                    autoFocus
+                  />
+                  <View style={[styles.createFormSelect, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                    <Text style={[styles.createFormSelectLabel, { color: createFormData.category ? colors.text : colors.textSecondary }]}>
+                      {createFormData.category ? CUSTOM_CATEGORIES.find(c => c.id === createFormData.category)?.label : 'Select category *'}
+                    </Text>
+                  </View>
+                  <View style={styles.createFormCategoryGrid}>
+                    {CUSTOM_CATEGORIES.map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[
+                          styles.createFormCategoryChip,
+                          {
+                            backgroundColor: createFormData.category === cat.id ? colors.primary : colors.backgroundSecondary,
+                            borderColor: createFormData.category === cat.id ? colors.primary : colors.border,
+                          }
+                        ]}
+                        onPress={() => setCreateFormData({ ...createFormData, category: cat.id })}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[
+                          styles.createFormCategoryChipText,
+                          { color: createFormData.category === cat.id ? '#FFFFFF' : colors.text }
+                        ]}>
+                          {cat.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                    placeholder="Website (optional)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={createFormData.website}
+                    onChangeText={(text) => setCreateFormData({ ...createFormData, website: text })}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                  />
+                  <TextInput
+                    style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                    placeholder="Location (optional)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={createFormData.location}
+                    onChangeText={(text) => setCreateFormData({ ...createFormData, location: text })}
+                  />
+                  <TextInput
+                    style={[styles.createFormInput, styles.createFormTextArea, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                    placeholder="Description (optional)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={createFormData.description}
+                    onChangeText={(text) => setCreateFormData({ ...createFormData, description: text })}
+                    multiline
+                    numberOfLines={3}
+                  />
+                  <View style={styles.createFormButtonRow}>
+                    <TouchableOpacity
+                      style={[styles.createFormCancelButton, { borderColor: colors.border }]}
+                      onPress={() => {
+                        setShowCreateForm(false);
+                        setCreateFormData({ name: addSearchQuery, category: '', description: '', website: '', location: '' });
+                      }}
+                    >
+                      <Text style={[styles.createFormCancelText, { color: colors.textSecondary }]}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.createFormSubmitButton, { backgroundColor: showCreateSuccess ? '#22C55E' : colors.primary, opacity: isSubmittingCreate ? 0.6 : 1 }]}
+                      onPress={handleCreateBusiness}
+                      disabled={isSubmittingCreate || showCreateSuccess}
+                    >
+                      {showCreateSuccess ? (
+                        <Check size={20} color="#FFFFFF" strokeWidth={3} />
+                      ) : (
+                        <Text style={styles.createFormSubmitText}>
+                          {isSubmittingCreate ? 'Creating...' : 'Create'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
               ) : addSearchResults.brands.length === 0 && addSearchResults.businesses.length === 0 && placesResults.length === 0 && !loadingPlaces ? (
                 <View style={styles.addEndorsementEmptyContainer}>
                   <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
                     No results found for "{addSearchQuery}"
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.createButton, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      setCreateFormData({ ...createFormData, name: addSearchQuery });
+                      setShowCreateForm(true);
+                    }}
+                  >
+                    <Text style={styles.createButtonText}>Create</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.createSubtext, { color: colors.textSecondary }]}>
+                    Add this business to your endorsements
                   </Text>
                 </View>
               ) : (
@@ -4385,6 +4815,24 @@ export default function UnifiedLibrary({
                           </TouchableOpacity>
                         </View>
                       ))}
+                    </View>
+                  )}
+
+                  {/* Create Button - appears at bottom of search results */}
+                  {addSearchQuery.trim() && !loadingPlaces && (
+                    <View style={styles.createButtonContainer}>
+                      <Text style={[styles.createButtonContainerText, { color: colors.textSecondary }]}>
+                        Can't find what you're looking for?
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.createButton, { backgroundColor: colors.primary }]}
+                        onPress={() => {
+                          setCreateFormData({ ...createFormData, name: addSearchQuery });
+                          setShowCreateForm(true);
+                        }}
+                      >
+                        <Text style={styles.createButtonText}>Create</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
                 </>
@@ -5063,8 +5511,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
   },
+  filterButtonIcon: {
+    paddingHorizontal: 12,
+  },
   filterButtonText: {
     fontSize: 14,
+    fontWeight: '500',
+  },
+  // List search styles
+  listSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    gap: 12,
+  },
+  listSearchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  listSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+    outlineStyle: 'none',
+  } as any,
+  listSearchClearButton: {
+    padding: 4,
+  },
+  listSearchCancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  listSearchCancelText: {
+    fontSize: 15,
     fontWeight: '500',
   },
   reorderEntryRow: {
@@ -5468,6 +5953,108 @@ const styles = StyleSheet.create({
   addEndorsementTextButtonLabel: {
     color: '#FFFFFF',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  addEndorsementEmptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  // Create business form styles
+  createButton: {
+    marginTop: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  createSubtext: {
+    marginTop: 8,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  createButtonContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  createButtonContainerText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  createFormInput: {
+    width: '100%',
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+  },
+  createFormTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  createFormSelect: {
+    width: '100%',
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  createFormSelectLabel: {
+    fontSize: 16,
+  },
+  createFormCategoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    width: '100%',
+  },
+  createFormCategoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  createFormCategoryChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  createFormButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    width: '100%',
+  },
+  createFormCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  createFormCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  createFormSubmitButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  createFormSubmitText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
   // Map modal styles

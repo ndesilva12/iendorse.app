@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Search as SearchIcon, TrendingUp, TrendingDown, Minus, ScanBarcode, X, Heart, MessageCircle, Share2, ExternalLink, MoreVertical, UserPlus, UserMinus, List as ListIcon, Plus } from 'lucide-react-native';
+import { Search as SearchIcon, TrendingUp, TrendingDown, Minus, ScanBarcode, X, Heart, MessageCircle, Share2, ExternalLink, MoreVertical, UserPlus, UserMinus, List as ListIcon, Plus, Check, Globe } from 'lucide-react-native';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
 import {
@@ -39,6 +39,7 @@ import { useLibrary } from '@/contexts/LibraryContext';
 import { followEntity, unfollowEntity, isFollowing, getFollowing } from '@/services/firebase/followService';
 import { getTopBrands, getTopBusinesses } from '@/services/firebase/topRankingsService';
 import { submitBrandRequest } from '@/services/firebase/brandRequestService';
+import { searchPlaces, PlaceSearchResult, getPlacePhotoUrl, formatCategory } from '@/services/firebase/placesService';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
@@ -79,6 +80,20 @@ interface ProductInteraction {
   comments: Comment[];
   likesCount: number;
 }
+
+// ===== Custom Categories =====
+const CUSTOM_CATEGORIES = [
+  { id: 'technology', label: 'Technology', color: '#3B82F6' },
+  { id: 'retail', label: 'Retail', color: '#10B981' },
+  { id: 'food_beverage', label: 'Food & Beverage', color: '#F59E0B' },
+  { id: 'finance', label: 'Finance', color: '#6366F1' },
+  { id: 'automotive', label: 'Automotive', color: '#EF4444' },
+  { id: 'entertainment', label: 'Entertainment', color: '#EC4899' },
+  { id: 'health_wellness', label: 'Health & Wellness', color: '#14B8A6' },
+  { id: 'fashion', label: 'Fashion', color: '#8B5CF6' },
+  { id: 'travel', label: 'Travel', color: '#06B6D4' },
+  { id: 'other', label: 'Other', color: '#6B7280' },
+];
 
 // Separate UserCard component to properly use hooks
 const UserCard = ({ item, colors, router, clerkUser, profile, library }: {
@@ -362,11 +377,22 @@ export default function SearchScreen() {
   const [lookingUp, setLookingUp] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
-  // Brand request form state
-  const [showRequestForm, setShowRequestForm] = useState(false);
-  const [requestBrandName, setRequestBrandName] = useState('');
-  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
-  const [showRequestSuccess, setShowRequestSuccess] = useState(false);
+  // Create business form state (replaces simple request form)
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    name: '',
+    category: '',
+    description: '',
+    website: '',
+    location: '',
+  });
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
+  const [showCreateSuccess, setShowCreateSuccess] = useState(false);
+
+  // Google Places search state
+  const [placesResults, setPlacesResults] = useState<PlaceSearchResult[]>([]);
+  const [loadingPlaces, setLoadingPlaces] = useState(false);
+  const [placesSearchDebounce, setPlacesSearchDebounce] = useState<NodeJS.Timeout | null>(null);
 
   // Fetch Firebase businesses and public users on mount
   useEffect(() => {
@@ -883,54 +909,101 @@ export default function SearchScreen() {
         // Combine product, business, brand, and user results
         const combinedResults = [...(productResults || []), ...businessResults, ...brandResults, ...userResults];
         setResults(combinedResults);
+
+        // Also search Google Places with debouncing
+        if (placesSearchDebounce) {
+          clearTimeout(placesSearchDebounce);
+        }
+        const timeoutId = setTimeout(async () => {
+          if (text.trim().length >= 2) {
+            setLoadingPlaces(true);
+            try {
+              const places = await searchPlaces(text.trim());
+              setPlacesResults(places);
+            } catch (error) {
+              console.error('Error searching places:', error);
+              setPlacesResults([]);
+            } finally {
+              setLoadingPlaces(false);
+            }
+          }
+        }, 500);
+        setPlacesSearchDebounce(timeoutId);
       } else {
         setResults([]);
+        setPlacesResults([]);
+        if (placesSearchDebounce) {
+          clearTimeout(placesSearchDebounce);
+        }
       }
     } catch (error) {
       console.error('Error during search:', error);
       setResults([]);
+      setPlacesResults([]);
     }
   };
 
-  // Handle brand request submission
-  const handleSubmitBrandRequest = async () => {
-    if (!requestBrandName.trim()) {
-      Alert.alert('Error', 'Please enter a brand or business name');
+  // Handle business creation submission
+  const handleCreateBusiness = async () => {
+    if (!createFormData.name.trim() || !createFormData.category) {
+      Alert.alert('Error', 'Please enter a name and select a category');
       return;
     }
 
     if (!clerkUser?.id) {
-      Alert.alert('Error', 'Please sign in to submit a request');
+      Alert.alert('Error', 'Please sign in to create a business');
       return;
     }
 
-    setIsSubmittingRequest(true);
+    setIsSubmittingCreate(true);
     try {
       const userName = clerkUser?.firstName
         ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim()
         : clerkUser?.username || 'Anonymous';
       const userEmail = clerkUser?.primaryEmailAddress?.emailAddress;
 
+      // Get logo from website if provided
+      let logoUrl: string | undefined;
+      if (createFormData.website) {
+        logoUrl = getLogoUrl(createFormData.website, { size: 128 });
+      }
+
+      // Submit brand request with extended data for admin review
       await submitBrandRequest(
-        requestBrandName.trim(),
+        createFormData.name.trim(),
         clerkUser.id,
         userName,
-        userEmail
+        userEmail,
+        {
+          category: createFormData.category,
+          description: createFormData.description,
+          website: createFormData.website,
+          location: createFormData.location,
+          logoUrl,
+          source: 'manual_entry',
+        }
       );
 
-      setShowRequestSuccess(true);
-      setRequestBrandName('');
-      setShowRequestForm(false);
+      // Show success state on button
+      setShowCreateSuccess(true);
 
-      // Auto-hide success message after 3 seconds
+      // Reset and close after brief success display
       setTimeout(() => {
-        setShowRequestSuccess(false);
-      }, 3000);
+        setShowCreateSuccess(false);
+        setShowCreateForm(false);
+        setCreateFormData({
+          name: '',
+          category: '',
+          description: '',
+          website: '',
+          location: '',
+        });
+      }, 1500);
     } catch (error) {
-      console.error('Error submitting brand request:', error);
-      Alert.alert('Error', 'Failed to submit request. Please try again.');
+      console.error('Error creating business:', error);
+      Alert.alert('Error', 'Failed to create business. Please try again.');
     } finally {
-      setIsSubmittingRequest(false);
+      setIsSubmittingCreate(false);
     }
   };
 
@@ -1632,77 +1705,207 @@ export default function SearchScreen() {
             }
           />
         )
-      ) : results.length === 0 ? (
-        <View style={styles.emptyState}>
-          {showRequestSuccess ? (
-            <>
-              <Text style={[styles.emptyTitle, { color: colors.primary }]}>Request Submitted!</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Thank you for your suggestion. We'll review it soon.
+      ) : showCreateForm ? (
+        <ScrollView style={styles.createFormContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.createFormContent}>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Create Business</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+              Add a business that's not in our database yet
+            </Text>
+            <TextInput
+              style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+              placeholder="Business name *"
+              placeholderTextColor={colors.textSecondary}
+              value={createFormData.name}
+              onChangeText={(text) => setCreateFormData({ ...createFormData, name: text })}
+              autoFocus
+            />
+            <View style={[styles.createFormSelect, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+              <Text style={[styles.createFormSelectLabel, { color: createFormData.category ? colors.text : colors.textSecondary }]}>
+                {createFormData.category ? CUSTOM_CATEGORIES.find(c => c.id === createFormData.category)?.label : 'Select category *'}
               </Text>
-            </>
-          ) : showRequestForm ? (
-            <>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>Request a Brand</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Enter the name of the brand or business you'd like us to add
-              </Text>
-              <TextInput
-                style={[styles.requestInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
-                placeholder="Brand or business name"
-                placeholderTextColor={colors.textSecondary}
-                value={requestBrandName}
-                onChangeText={setRequestBrandName}
-                autoFocus
-              />
-              <View style={styles.requestButtonRow}>
+            </View>
+            <View style={styles.createFormCategoryGrid}>
+              {CUSTOM_CATEGORIES.map((cat) => (
                 <TouchableOpacity
-                  style={[styles.requestCancelButton, { borderColor: colors.border }]}
-                  onPress={() => {
-                    setShowRequestForm(false);
-                    setRequestBrandName('');
-                  }}
+                  key={cat.id}
+                  style={[
+                    styles.createFormCategoryChip,
+                    {
+                      backgroundColor: createFormData.category === cat.id ? colors.primary : colors.backgroundSecondary,
+                      borderColor: createFormData.category === cat.id ? colors.primary : colors.border,
+                    }
+                  ]}
+                  onPress={() => setCreateFormData({ ...createFormData, category: cat.id })}
+                  activeOpacity={0.7}
                 >
-                  <Text style={[styles.requestCancelText, { color: colors.textSecondary }]}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.requestSubmitButton, { backgroundColor: colors.primary, opacity: isSubmittingRequest ? 0.6 : 1 }]}
-                  onPress={handleSubmitBrandRequest}
-                  disabled={isSubmittingRequest}
-                >
-                  <Text style={styles.requestSubmitText}>
-                    {isSubmittingRequest ? 'Submitting...' : 'Submit'}
+                  <Text style={[
+                    styles.createFormCategoryChipText,
+                    { color: createFormData.category === cat.id ? '#FFFFFF' : colors.text }
+                  ]}>
+                    {cat.label}
                   </Text>
                 </TouchableOpacity>
-              </View>
-            </>
-          ) : (
-            <>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Try searching for a different product or brand
-              </Text>
+              ))}
+            </View>
+            <TextInput
+              style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+              placeholder="Website (optional)"
+              placeholderTextColor={colors.textSecondary}
+              value={createFormData.website}
+              onChangeText={(text) => setCreateFormData({ ...createFormData, website: text })}
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+            <TextInput
+              style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+              placeholder="Location (optional)"
+              placeholderTextColor={colors.textSecondary}
+              value={createFormData.location}
+              onChangeText={(text) => setCreateFormData({ ...createFormData, location: text })}
+            />
+            <TextInput
+              style={[styles.createFormInput, styles.createFormTextArea, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+              placeholder="Description (optional)"
+              placeholderTextColor={colors.textSecondary}
+              value={createFormData.description}
+              onChangeText={(text) => setCreateFormData({ ...createFormData, description: text })}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.createFormButtonRow}>
               <TouchableOpacity
-                style={[styles.requestButton, { backgroundColor: colors.primary }]}
-                onPress={() => setShowRequestForm(true)}
+                style={[styles.createFormCancelButton, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowCreateForm(false);
+                  setCreateFormData({ name: query, category: '', description: '', website: '', location: '' });
+                }}
               >
-                <Text style={styles.requestButtonText}>Request</Text>
+                <Text style={[styles.createFormCancelText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={[styles.requestSubtext, { color: colors.textSecondary }]}>
-                Submit a brand or business that we should add
-              </Text>
-            </>
-          )}
+              <TouchableOpacity
+                style={[styles.createFormSubmitButton, { backgroundColor: showCreateSuccess ? '#22C55E' : colors.primary, opacity: isSubmittingCreate ? 0.6 : 1 }]}
+                onPress={handleCreateBusiness}
+                disabled={isSubmittingCreate || showCreateSuccess}
+              >
+                {showCreateSuccess ? (
+                  <Check size={20} color="#FFFFFF" strokeWidth={3} />
+                ) : (
+                  <Text style={styles.createFormSubmitText}>
+                    {isSubmittingCreate ? 'Creating...' : 'Create'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      ) : results.length === 0 && placesResults.length === 0 && !loadingPlaces ? (
+        <View style={styles.emptyState}>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+            Try searching for a different product or brand
+          </Text>
+          <TouchableOpacity
+            style={[styles.createButton, { backgroundColor: colors.primary }]}
+            onPress={() => {
+              setCreateFormData({ ...createFormData, name: query });
+              setShowCreateForm(true);
+            }}
+          >
+            <Text style={styles.createButtonText}>Create</Text>
+          </TouchableOpacity>
+          <Text style={[styles.createSubtext, { color: colors.textSecondary }]}>
+            Add this business to our database
+          </Text>
         </View>
       ) : (
-        <FlatList
-          key="search-results"
-          data={results}
-          renderItem={renderProduct}
-          keyExtractor={item => item.id}
-          contentContainerStyle={[styles.listContent, { paddingBottom: 100 }]}
-          showsVerticalScrollIndicator={false}
-        />
+        <ScrollView style={styles.searchResultsContainer} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          {/* Database Results */}
+          {results.length > 0 && (
+            <View style={styles.searchResultsSection}>
+              <Text style={[styles.searchResultsSectionTitle, { color: colors.textSecondary }]}>
+                Results ({results.length})
+              </Text>
+              {results.map((item) => (
+                <View key={item.id}>
+                  {renderProduct({ item, index: 0 })}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Google Places Results */}
+          {loadingPlaces && (
+            <View style={styles.searchResultsSection}>
+              <Text style={[styles.searchResultsSectionTitle, { color: colors.textSecondary }]}>
+                Searching all businesses...
+              </Text>
+            </View>
+          )}
+
+          {!loadingPlaces && placesResults.length > 0 && (
+            <View style={styles.searchResultsSection}>
+              <Text style={[styles.searchResultsSectionTitle, { color: colors.textSecondary }]}>
+                All Businesses ({placesResults.length})
+              </Text>
+              {placesResults.map((place) => (
+                <TouchableOpacity
+                  key={place.placeId}
+                  style={styles.placeResultItem}
+                  onPress={() => router.push(`/place/${place.placeId}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.placeResultLogo}>
+                    {place.photoReference ? (
+                      <Image
+                        source={{ uri: getPlacePhotoUrl(place.photoReference) }}
+                        style={styles.placeResultLogoImage}
+                        contentFit="cover"
+                        transition={200}
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <View style={[styles.placeResultLogoImage, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Globe size={24} color={colors.textSecondary} />
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.placeResultText}>
+                    <Text style={[styles.placeResultName, { color: colors.text }]} numberOfLines={2}>
+                      {place.name}
+                    </Text>
+                    <Text style={[styles.placeResultCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {formatCategory(place.category)}{place.rating ? ` · ${place.rating}★` : ''}
+                    </Text>
+                    {place.address && (
+                      <Text style={[styles.placeResultAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {place.address}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Create Button at bottom of results */}
+          {query.trim() && !loadingPlaces && (
+            <View style={styles.createButtonContainer}>
+              <Text style={[styles.createButtonContainerText, { color: colors.textSecondary }]}>
+                Can't find what you're looking for?
+              </Text>
+              <TouchableOpacity
+                style={[styles.createButton, { backgroundColor: colors.primary }]}
+                onPress={() => {
+                  setCreateFormData({ ...createFormData, name: query });
+                  setShowCreateForm(true);
+                }}
+              >
+                <Text style={styles.createButtonText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
       )}
 
       {/* Post Detail Modal */}
@@ -2347,58 +2550,165 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  requestButton: {
-    marginTop: 24,
+  // Create button styles
+  createButton: {
+    marginTop: 16,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
   },
-  requestButtonText: {
+  createButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
-  requestSubtext: {
+  createSubtext: {
     marginTop: 8,
     fontSize: 13,
     textAlign: 'center',
   },
-  requestInput: {
-    width: '100%',
+  createButtonContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
     marginTop: 16,
+  },
+  createButtonContainerText: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+
+  // Create form styles
+  createFormContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  createFormContent: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  createFormInput: {
+    width: '100%',
+    marginTop: 12,
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
   },
-  requestButtonRow: {
+  createFormTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  createFormSelect: {
+    width: '100%',
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  createFormSelectLabel: {
+    fontSize: 16,
+  },
+  createFormCategoryGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
     width: '100%',
   },
-  requestCancelButton: {
+  createFormCategoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  createFormCategoryChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  createFormButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+    width: '100%',
+  },
+  createFormCancelButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
   },
-  requestCancelText: {
+  createFormCancelText: {
     fontSize: 16,
     fontWeight: '600',
   },
-  requestSubmitButton: {
+  createFormSubmitButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  requestSubmitText: {
+  createFormSubmitText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+
+  // Search results styles
+  searchResultsContainer: {
+    flex: 1,
+  },
+  searchResultsSection: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  searchResultsSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+
+  // Place result styles
+  placeResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  placeResultLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  placeResultLogoImage: {
+    width: 48,
+    height: 48,
+  },
+  placeResultText: {
+    flex: 1,
+  },
+  placeResultName: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  placeResultCategory: {
+    fontSize: 13,
+  },
+  placeResultAddress: {
+    fontSize: 12,
+    marginTop: 2,
   },
   listContent: {
     paddingHorizontal: Platform.OS === 'web' ? 4 : 8,
