@@ -20,8 +20,8 @@ export default function Root({ children }: PropsWithChildren) {
         <meta property="og:title" content="iEndorse - Build Your Endorsement List" />
         <meta property="og:description" content="Build your endorsement list of favorite brands and businesses. Discover what your friends recommend. Earn discounts for your endorsements." />
         <meta property="og:image" content="https://iendorse.app/og-image.png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
+        <meta property="og:image:width" content="730" />
+        <meta property="og:image:height" content="340" />
         <meta property="og:site_name" content="iEndorse" />
 
         {/* Twitter Card */}
