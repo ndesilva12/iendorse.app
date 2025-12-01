@@ -28,6 +28,8 @@ import { calculateBrandScore, calculateSimilarityScore } from '@/lib/scoring';
 import ItemOptionsModal from '@/components/ItemOptionsModal';
 import { useUser } from '@/contexts/UserContext';
 import { Cause } from '@/types';
+import { useReferralCode } from '@/hooks/useReferralCode';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 
 type FilterType = 'all' | 'brand' | 'business' | 'user';
 
@@ -63,6 +65,7 @@ export default function FollowingFollowersList({
   const router = useRouter();
   const { brands, valuesMatrix } = useData();
   const { clerkUser } = useUser();
+  const { referralCode } = useReferralCode();
 
   const [loading, setLoading] = useState(true);
   const [follows, setFollows] = useState<EnrichedFollow[]>([]);
@@ -292,18 +295,19 @@ export default function FollowingFollowersList({
     const entityId = mode === 'following' ? follow.followedId : follow.followerId;
     const type = mode === 'following' ? follow.followedType : 'user';
 
-    let shareUrl = '';
+    let baseUrl = '';
     if (type === 'brand') {
-      shareUrl = `iendorse://brand/${entityId}`;
+      baseUrl = `https://iendorse.app/brand/${entityId}`;
     } else if (type === 'business') {
-      shareUrl = `iendorse://business/${entityId}`;
+      baseUrl = `https://iendorse.app/business/${entityId}`;
     } else if (type === 'user') {
-      shareUrl = `iendorse://user/${entityId}`;
+      baseUrl = `https://iendorse.app/user/${entityId}`;
     }
+    const shareUrl = appendReferralTracking(baseUrl, referralCode);
 
     try {
       await Share.share({
-        message: `Check out ${follow.name} on iEndorse Money: ${shareUrl}`,
+        message: `Check out ${follow.name} on iEndorse: ${shareUrl}`,
         title: follow.name,
       });
     } catch (error) {
