@@ -109,6 +109,20 @@ export const [UserProvider, useUser] = createContextHook(() => {
             }
           }
 
+          // Auto-verify organic users: if they don't have isVerified set and are not a celebrity account
+          // This ensures all existing organic users get the blue verification badge
+          const needsVerification = firebaseProfile.isVerified !== true && firebaseProfile.isCelebrityAccount !== true;
+          if (needsVerification) {
+            console.log('[UserContext] 🔧 Organic user without verification. Setting isVerified: true...');
+            firebaseProfile.isVerified = true;
+            try {
+              await saveUserProfile(clerkUser.id, firebaseProfile);
+              console.log('[UserContext] ✅ User verified in Firebase');
+            } catch (error) {
+              console.error('[UserContext] ❌ Failed to verify user:', error);
+            }
+          }
+
           // Ensure required fields are initialized
           firebaseProfile.id = clerkUser.id;
 

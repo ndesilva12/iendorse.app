@@ -17,6 +17,7 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import MenuButton from '@/components/MenuButton';
 import EndorsedBadge from '@/components/EndorsedBadge';
+import VerificationBadge from '@/components/VerificationBadge';
 import { UnifiedLibrary } from '@/components/Library';
 import FollowingFollowersList from '@/components/FollowingFollowersList';
 import { useLibrary } from '@/contexts/LibraryContext';
@@ -406,6 +407,13 @@ export default function ProfileScreen() {
             <View style={styles.titleContainer}>
               <View style={styles.nameRow}>
                 <Text style={[styles.profileName, { color: colors.text }]}>{userName}</Text>
+                {(profile.isVerified || profile.isCelebrityAccount) && (
+                  <VerificationBadge
+                    type={profile.isVerified ? 'verified' : 'celebrity'}
+                    isDarkMode={isDarkMode}
+                    size="medium"
+                  />
+                )}
                 {!editing && (
                   <TouchableOpacity
                     onPress={() => setEditing(true)}

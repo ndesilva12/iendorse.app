@@ -282,32 +282,7 @@ export default function PlaceDetailScreen() {
             </View>
           </View>
 
-          {/* Horizontal Photo Thumbnails - above action buttons */}
-          {place.photoReferences.length > 1 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.photoThumbnailsHorizontal}
-              contentContainerStyle={styles.photoThumbnailsContent}
-            >
-              {place.photoReferences.slice(0, 8).map((ref, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => setCurrentPhotoIndex(index)}
-                  style={[
-                    styles.thumbnailHorizontal,
-                    currentPhotoIndex === index && styles.thumbnailActive,
-                  ]}
-                >
-                  <Image
-                    source={{ uri: getPlacePhotoUrl(ref, 200) }}
-                    style={styles.thumbnailImageHorizontal}
-                    contentFit="cover"
-                  />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+          {/* Photo thumbnails removed to reduce Google Places Photos API costs */}
 
           {/* Action Buttons */}
           <View style={styles.actionsContainer}>

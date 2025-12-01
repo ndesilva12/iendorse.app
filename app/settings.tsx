@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, Lock, Download, Shield, FileText, ExternalLink, Trash2, Building2, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { ChevronLeft, Lock, Download, Shield, FileText, ExternalLink, Trash2, Building2, ChevronDown, ChevronUp, Users } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser as useUserContext } from '@/contexts/UserContext';
 import { useUser, useAuth } from '@clerk/clerk-expo';
@@ -383,6 +383,31 @@ export default function SettingsScreen() {
               <View style={styles.actionLeft}>
                 <Trash2 size={22} color="#EF4444" strokeWidth={2} />
                 <Text style={[styles.actionText, { color: '#EF4444' }]}>Delete Account</Text>
+              </View>
+              <ExternalLink size={18} color={colors.textSecondary} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Admin Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Users size={24} color={colors.primary} strokeWidth={2} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Admin
+            </Text>
+          </View>
+
+          <View style={[styles.card, { backgroundColor: colors.backgroundSecondary }]}>
+            {/* Prominent Users */}
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={() => router.push('/admin/prominent-users')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.actionLeft}>
+                <Users size={22} color={colors.primary} strokeWidth={2} />
+                <Text style={[styles.actionText, { color: colors.text }]}>Manage Prominent Users</Text>
               </View>
               <ExternalLink size={18} color={colors.textSecondary} strokeWidth={2} />
             </TouchableOpacity>

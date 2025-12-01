@@ -26,6 +26,7 @@ import { UserProfile } from '@/types';
 import { getUserLists, resolveList, copyListToLibrary, getEndorsementList } from '@/services/firebase/listService';
 import { UserList } from '@/types/library';
 import EndorsedBadge from '@/components/EndorsedBadge';
+import VerificationBadge from '@/components/VerificationBadge';
 import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
 import { calculateSimilarityScore, getSimilarityLabel } from '@/lib/scoring';
 import { followEntity, unfollowEntity, isFollowing, getFollowersCount, getFollowingCount } from '@/services/firebase/followService';
@@ -457,6 +458,13 @@ export default function UserProfileScreen() {
             <View style={styles.titleContainer}>
               <View style={styles.nameRow}>
                 <Text style={[styles.userName, { color: colors.text }]}>{userName}</Text>
+                {(userProfile?.isVerified || userProfile?.isCelebrityAccount) && (
+                  <VerificationBadge
+                    type={userProfile.isVerified ? 'verified' : 'celebrity'}
+                    isDarkMode={isDarkMode}
+                    size="medium"
+                  />
+                )}
               </View>
               {userDetails?.location && (
                 <View style={styles.locationRow}>

@@ -48,6 +48,8 @@ function cleanUserProfile(profile: UserProfile): Partial<UserProfile> {
     ...(profile.isPublicProfile !== undefined && { isPublicProfile: profile.isPublicProfile }),
     ...(profile.alignedListPublic !== undefined && { alignedListPublic: profile.alignedListPublic }),
     ...(profile.unalignedListPublic !== undefined && { unalignedListPublic: profile.unalignedListPublic }),
+    ...(profile.isVerified !== undefined && { isVerified: profile.isVerified }),
+    ...(profile.isCelebrityAccount !== undefined && { isCelebrityAccount: profile.isCelebrityAccount }),
   });
 
   console.log('[Firebase cleanUserProfile] Cleaned profile:', JSON.stringify(cleaned, null, 2));
@@ -64,6 +66,13 @@ export async function saveUserProfile(userId: string, profile: UserProfile): Pro
   try {
     console.log('[Firebase] 🔄 Saving profile for user:', userId);
     console.log('[Firebase] Profile data:', JSON.stringify(profile, null, 2));
+
+    // Auto-verify organic users: set isVerified: true for non-celebrity accounts
+    // This ensures all organic users get the blue verification badge
+    if (profile.isCelebrityAccount !== true && profile.isVerified !== true) {
+      profile.isVerified = true;
+      console.log('[Firebase] 🔧 Auto-setting isVerified: true for organic user');
+    }
 
     // Clean the profile to remove any undefined fields
     const cleanedProfile = cleanUserProfile(profile);
