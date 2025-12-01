@@ -4428,122 +4428,118 @@ export default function UnifiedLibrary({
                     Search for brands, businesses, or any local business
                   </Text>
                 </View>
+              ) : showCreateSuccess ? (
+                <View style={styles.addEndorsementEmptyContainer}>
+                  <Text style={[styles.addEndorsementEmptyTitle, { color: colors.primary }]}>Business Created!</Text>
+                  <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
+                    Your entry has been added and submitted for review.
+                  </Text>
+                </View>
+              ) : showCreateForm ? (
+                <View style={styles.addEndorsementEmptyContainer}>
+                  <Text style={[styles.addEndorsementEmptyTitle, { color: colors.text }]}>Create Business</Text>
+                  <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
+                    Add a business that's not in our database yet
+                  </Text>
+                  <TextInput
+                    style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                    placeholder="Business name *"
+                    placeholderTextColor={colors.textSecondary}
+                    value={createFormData.name}
+                    onChangeText={(text) => setCreateFormData({ ...createFormData, name: text })}
+                    autoFocus
+                  />
+                  <View style={[styles.createFormSelect, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                    <Text style={[styles.createFormSelectLabel, { color: createFormData.category ? colors.text : colors.textSecondary }]}>
+                      {createFormData.category ? CUSTOM_CATEGORIES.find(c => c.id === createFormData.category)?.label : 'Select category *'}
+                    </Text>
+                  </View>
+                  <View style={styles.createFormCategoryGrid}>
+                    {CUSTOM_CATEGORIES.map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[
+                          styles.createFormCategoryChip,
+                          {
+                            backgroundColor: createFormData.category === cat.id ? colors.primary : colors.backgroundSecondary,
+                            borderColor: createFormData.category === cat.id ? colors.primary : colors.border,
+                          }
+                        ]}
+                        onPress={() => setCreateFormData({ ...createFormData, category: cat.id })}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[
+                          styles.createFormCategoryChipText,
+                          { color: createFormData.category === cat.id ? '#FFFFFF' : colors.text }
+                        ]}>
+                          {cat.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                    placeholder="Website (optional)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={createFormData.website}
+                    onChangeText={(text) => setCreateFormData({ ...createFormData, website: text })}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                  />
+                  <TextInput
+                    style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                    placeholder="Location (optional)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={createFormData.location}
+                    onChangeText={(text) => setCreateFormData({ ...createFormData, location: text })}
+                  />
+                  <TextInput
+                    style={[styles.createFormInput, styles.createFormTextArea, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                    placeholder="Description (optional)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={createFormData.description}
+                    onChangeText={(text) => setCreateFormData({ ...createFormData, description: text })}
+                    multiline
+                    numberOfLines={3}
+                  />
+                  <View style={styles.createFormButtonRow}>
+                    <TouchableOpacity
+                      style={[styles.createFormCancelButton, { borderColor: colors.border }]}
+                      onPress={() => {
+                        setShowCreateForm(false);
+                        setCreateFormData({ name: addSearchQuery, category: '', description: '', website: '', location: '' });
+                      }}
+                    >
+                      <Text style={[styles.createFormCancelText, { color: colors.textSecondary }]}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.createFormSubmitButton, { backgroundColor: colors.primary, opacity: isSubmittingCreate ? 0.6 : 1 }]}
+                      onPress={handleCreateBusiness}
+                      disabled={isSubmittingCreate}
+                    >
+                      <Text style={styles.createFormSubmitText}>
+                        {isSubmittingCreate ? 'Creating...' : 'Create'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               ) : addSearchResults.brands.length === 0 && addSearchResults.businesses.length === 0 && placesResults.length === 0 && !loadingPlaces ? (
                 <View style={styles.addEndorsementEmptyContainer}>
-                  {showCreateSuccess ? (
-                    <>
-                      <Text style={[styles.addEndorsementEmptyTitle, { color: colors.primary }]}>Business Created!</Text>
-                      <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
-                        Your entry has been added and submitted for review.
-                      </Text>
-                    </>
-                  ) : showCreateForm ? (
-                    <>
-                      <Text style={[styles.addEndorsementEmptyTitle, { color: colors.text }]}>Create Business</Text>
-                      <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
-                        Add a business that's not in our database yet
-                      </Text>
-                      <TextInput
-                        style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
-                        placeholder="Business name *"
-                        placeholderTextColor={colors.textSecondary}
-                        value={createFormData.name}
-                        onChangeText={(text) => setCreateFormData({ ...createFormData, name: text })}
-                        autoFocus
-                      />
-                      <View style={[styles.createFormSelect, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                        <Text style={[styles.createFormSelectLabel, { color: createFormData.category ? colors.text : colors.textSecondary }]}>
-                          {createFormData.category ? CUSTOM_CATEGORIES.find(c => c.id === createFormData.category)?.label : 'Select category *'}
-                        </Text>
-                      </View>
-                      <View style={styles.createFormCategoryGrid}>
-                        {CUSTOM_CATEGORIES.map((cat) => (
-                          <TouchableOpacity
-                            key={cat.id}
-                            style={[
-                              styles.createFormCategoryChip,
-                              {
-                                backgroundColor: createFormData.category === cat.id ? colors.primary : colors.backgroundSecondary,
-                                borderColor: createFormData.category === cat.id ? colors.primary : colors.border,
-                              }
-                            ]}
-                            onPress={() => setCreateFormData({ ...createFormData, category: cat.id })}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[
-                              styles.createFormCategoryChipText,
-                              { color: createFormData.category === cat.id ? '#FFFFFF' : colors.text }
-                            ]}>
-                              {cat.label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      <TextInput
-                        style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
-                        placeholder="Website (optional)"
-                        placeholderTextColor={colors.textSecondary}
-                        value={createFormData.website}
-                        onChangeText={(text) => setCreateFormData({ ...createFormData, website: text })}
-                        autoCapitalize="none"
-                        keyboardType="url"
-                      />
-                      <TextInput
-                        style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
-                        placeholder="Location (optional)"
-                        placeholderTextColor={colors.textSecondary}
-                        value={createFormData.location}
-                        onChangeText={(text) => setCreateFormData({ ...createFormData, location: text })}
-                      />
-                      <TextInput
-                        style={[styles.createFormInput, styles.createFormTextArea, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
-                        placeholder="Description (optional)"
-                        placeholderTextColor={colors.textSecondary}
-                        value={createFormData.description}
-                        onChangeText={(text) => setCreateFormData({ ...createFormData, description: text })}
-                        multiline
-                        numberOfLines={3}
-                      />
-                      <View style={styles.createFormButtonRow}>
-                        <TouchableOpacity
-                          style={[styles.createFormCancelButton, { borderColor: colors.border }]}
-                          onPress={() => {
-                            setShowCreateForm(false);
-                            setCreateFormData({ name: addSearchQuery, category: '', description: '', website: '', location: '' });
-                          }}
-                        >
-                          <Text style={[styles.createFormCancelText, { color: colors.textSecondary }]}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.createFormSubmitButton, { backgroundColor: colors.primary, opacity: isSubmittingCreate ? 0.6 : 1 }]}
-                          onPress={handleCreateBusiness}
-                          disabled={isSubmittingCreate}
-                        >
-                          <Text style={styles.createFormSubmitText}>
-                            {isSubmittingCreate ? 'Creating...' : 'Create'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
-                        No results found for "{addSearchQuery}"
-                      </Text>
-                      <TouchableOpacity
-                        style={[styles.createButton, { backgroundColor: colors.primary }]}
-                        onPress={() => {
-                          setCreateFormData({ ...createFormData, name: addSearchQuery });
-                          setShowCreateForm(true);
-                        }}
-                      >
-                        <Text style={styles.createButtonText}>Create</Text>
-                      </TouchableOpacity>
-                      <Text style={[styles.createSubtext, { color: colors.textSecondary }]}>
-                        Add this business to your endorsements
-                      </Text>
-                    </>
-                  )}
+                  <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
+                    No results found for "{addSearchQuery}"
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.createButton, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      setCreateFormData({ ...createFormData, name: addSearchQuery });
+                      setShowCreateForm(true);
+                    }}
+                  >
+                    <Text style={styles.createButtonText}>Create</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.createSubtext, { color: colors.textSecondary }]}>
+                    Add this business to your endorsements
+                  </Text>
                 </View>
               ) : (
                 <>
