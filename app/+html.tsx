@@ -8,9 +8,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover, user-scalable=no" />
-        {/* Theme color matches app background for consistent status bar */}
-        <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)" />
-        <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="rgb(3, 68, 102)" />
 
         {/* Basic SEO Meta Tags */}
         <title>iEndorse - Build Your Endorsement List</title>
@@ -38,8 +36,7 @@ export default function Root({ children }: PropsWithChildren) {
 
         {/* iOS Specific Meta Tags - CRITICAL FOR STANDALONE MODE */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        {/* Use default for light mode status bar with matching background, black-translucent for dark */}
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="iEndorse" />
         <link rel="apple-touch-icon" href="/icon-512.png" />
 
