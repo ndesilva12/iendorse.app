@@ -23,6 +23,7 @@ import { ArrowLeft, Search, Building2, UserX, Calendar, Mail, Phone, MapPin } fr
 import {
   getApprovedClaims,
   revokeClaim,
+  revertToPersonalAccount,
   BusinessClaim,
 } from '@/services/firebase/businessClaimService';
 
@@ -69,37 +70,52 @@ export default function ClaimedBusinessesAdmin() {
     setRevokeModalVisible(true);
   };
 
-  const confirmRevoke = async (deleteCompletely: boolean) => {
+  const confirmRevoke = async (action: 'revoke' | 'delete' | 'revert') => {
     if (!selectedClaim || !user?.primaryEmailAddress?.emailAddress) return;
 
     if (!revokeReason.trim()) {
-      Alert.alert('Required', 'Please provide a reason for revoking this claim');
+      Alert.alert('Required', 'Please provide a reason for this action');
       return;
     }
 
     setIsRevoking(true);
     try {
-      await revokeClaim(
-        selectedClaim.id,
-        user.primaryEmailAddress.emailAddress,
-        revokeReason.trim(),
-        deleteCompletely
-      );
+      if (action === 'revert') {
+        // Fully revert to personal account - removes all business info
+        await revertToPersonalAccount(
+          selectedClaim.userId,
+          user.primaryEmailAddress.emailAddress,
+          revokeReason.trim()
+        );
 
-      Alert.alert(
-        'Success',
-        deleteCompletely
-          ? 'Claim has been deleted and the business is now available for others to claim.'
-          : 'Claim has been revoked. The user will need to submit a new claim.'
-      );
+        Alert.alert(
+          'Success',
+          'Business account has been fully reverted to a personal account. All business info has been removed.'
+        );
+      } else {
+        // Just revoke or delete the claim
+        await revokeClaim(
+          selectedClaim.id,
+          user.primaryEmailAddress.emailAddress,
+          revokeReason.trim(),
+          action === 'delete'
+        );
+
+        Alert.alert(
+          'Success',
+          action === 'delete'
+            ? 'Claim has been deleted and the business is now available for others to claim.'
+            : 'Claim has been revoked. The user will need to submit a new claim.'
+        );
+      }
 
       setRevokeModalVisible(false);
       setSelectedClaim(null);
       setRevokeReason('');
       loadClaims();
     } catch (error) {
-      console.error('Error revoking claim:', error);
-      Alert.alert('Error', 'Failed to revoke claim');
+      console.error('Error processing action:', error);
+      Alert.alert('Error', 'Failed to process action');
     } finally {
       setIsRevoking(false);
     }
@@ -293,7 +309,7 @@ export default function ClaimedBusinessesAdmin() {
 
               <TouchableOpacity
                 style={[styles.modalButtonRevoke, !revokeReason.trim() && styles.buttonDisabled]}
-                onPress={() => confirmRevoke(false)}
+                onPress={() => confirmRevoke('revoke')}
                 disabled={isRevoking || !revokeReason.trim()}
               >
                 {isRevoking ? (
@@ -305,8 +321,19 @@ export default function ClaimedBusinessesAdmin() {
             </View>
 
             <TouchableOpacity
+              style={[styles.revertButton, !revokeReason.trim() && styles.buttonDisabled]}
+              onPress={() => confirmRevoke('revert')}
+              disabled={isRevoking || !revokeReason.trim()}
+            >
+              <Text style={styles.revertButtonText}>Revert to Personal Account</Text>
+            </TouchableOpacity>
+            <Text style={styles.revertHelpText}>
+              This will remove all business info and convert the user back to a personal account
+            </Text>
+
+            <TouchableOpacity
               style={[styles.deleteButton, !revokeReason.trim() && styles.buttonDisabled]}
-              onPress={() => confirmRevoke(true)}
+              onPress={() => confirmRevoke('delete')}
               disabled={isRevoking || !revokeReason.trim()}
             >
               <Text style={styles.deleteButtonText}>Delete Claim Permanently</Text>
@@ -579,6 +606,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  revertButton: {
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  revertButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  revertHelpText: {
+    fontSize: 12,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 12,
   },
   deleteButton: {
     paddingVertical: 14,

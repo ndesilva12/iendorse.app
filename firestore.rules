@@ -102,6 +102,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Brand Requests collection - OPEN ACCESS
+    // Users can submit requests for new brands/businesses to be added
+    match /brandRequests/{requestId} {
+      allow read, write: if true;
+    }
+
     // Deny all other collections
     match /{document=**} {
       allow read, write: if false;
