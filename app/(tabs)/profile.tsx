@@ -35,6 +35,10 @@ import BusinessProfileEditor from '@/components/BusinessProfileEditor';
 
 import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
 import { getFollowersCount, getFollowingCount } from '@/services/firebase/followService';
+import { getUserReferralCode, getReferralCount, getReferralLink } from '@/services/firebase/referralService';
+import * as Clipboard from 'expo-clipboard';
+import { Share } from 'react-native';
+import { Gift, Copy, Share2 as ShareIcon } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const { profile, isDarkMode, clerkUser, setUserDetails } = useUser();
@@ -78,6 +82,9 @@ export default function ProfileScreen() {
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalMode, setFollowModalMode] = useState<'followers' | 'following'>('followers');
   const [selectedStatSection, setSelectedStatSection] = useState<'endorsements' | 'followers' | 'following'>('endorsements');
+  const [referralCode, setReferralCode] = useState('');
+  const [referralCount, setReferralCount] = useState(0);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   // Library context
   const library = useLibrary();
@@ -182,6 +189,29 @@ export default function ProfileScreen() {
   const userName = userDetails.name || clerkUser?.firstName || 'User';
   const profileImageUrl = profileImage || userDetails.profileImage || clerkUser?.imageUrl;
 
+  // Handle copying referral link
+  const handleCopyReferralLink = async () => {
+    const link = getReferralLink(referralCode);
+    await Clipboard.setStringAsync(link);
+    Alert.alert('Copied!', 'Your invite link has been copied to clipboard.');
+  };
+
+  // Handle sharing referral link
+  const handleShareReferral = async () => {
+    const link = getReferralLink(referralCode);
+    const message = `Join me on iEndorse! Use my invite link to sign up: ${link}`;
+
+    try {
+      await Share.share({
+        message,
+        url: link,
+        title: 'Join iEndorse',
+      });
+    } catch (error) {
+      console.error('[ProfileScreen] Error sharing:', error);
+    }
+  };
+
   // Fetch user businesses
   useEffect(() => {
     const fetchBusinesses = async () => {
@@ -210,6 +240,23 @@ export default function ProfileScreen() {
       }
     };
     loadFollowCounts();
+  }, [clerkUser?.id]);
+
+  // Load referral data
+  useEffect(() => {
+    const loadReferralData = async () => {
+      if (!clerkUser?.id) return;
+
+      try {
+        const code = await getUserReferralCode(clerkUser.id);
+        const count = await getReferralCount(clerkUser.id);
+        setReferralCode(code);
+        setReferralCount(count);
+      } catch (error) {
+        console.error('[ProfileScreen] Error loading referral data:', error);
+      }
+    };
+    loadReferralData();
   }, [clerkUser?.id]);
 
   // Calculate aligned and unaligned brands based on user's values
@@ -285,7 +332,7 @@ export default function ProfileScreen() {
         <View style={[styles.stickyHeaderContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
           <View style={[styles.header, { backgroundColor: colors.background }]}>
             <Image
-              source={require('@/assets/images/endorsemulti1.png')}
+              source={require('@/assets/images/endorsing.png')}
               style={styles.headerLogo}
               resizeMode="contain"
             />
@@ -314,7 +361,7 @@ export default function ProfileScreen() {
       <View style={[styles.stickyHeaderContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={[styles.header, { backgroundColor: colors.background }]}>
           <Image
-            source={require('@/assets/images/endorsemulti1.png')}
+            source={require('@/assets/images/endorsing.png')}
             style={styles.headerLogo}
             resizeMode="contain"
           />
@@ -439,7 +486,7 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {/* Endorsements/Following/Followers Counters */}
+          {/* Endorsements/Following/Followers/Referrals Counters */}
           {!editing && (
             <View style={styles.followStatsContainer}>
               <TouchableOpacity
@@ -451,7 +498,7 @@ export default function ProfileScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={[styles.followStatCount, { color: selectedStatSection === 'endorsements' ? colors.primary : colors.text }]}>{library.state.endorsementList?.entries?.length || 0}</Text>
-                <Text style={[styles.followStatLabel, { color: selectedStatSection === 'endorsements' ? colors.primary : colors.textSecondary }]}>Endorsements</Text>
+                <Text style={[styles.followStatLabel, { color: selectedStatSection === 'endorsements' ? colors.primary : colors.textSecondary }]}>Endorsed</Text>
               </TouchableOpacity>
               <View style={[styles.followStatDivider, { backgroundColor: colors.border }]} />
               <TouchableOpacity
@@ -478,6 +525,15 @@ export default function ProfileScreen() {
               >
                 <Text style={[styles.followStatCount, { color: selectedStatSection === 'followers' ? colors.primary : colors.text }]}>{followersCount}</Text>
                 <Text style={[styles.followStatLabel, { color: selectedStatSection === 'followers' ? colors.primary : colors.textSecondary }]}>Followers</Text>
+              </TouchableOpacity>
+              <View style={[styles.followStatDivider, { backgroundColor: colors.border }]} />
+              <TouchableOpacity
+                style={styles.followStatButton}
+                onPress={() => setShowInviteModal(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.followStatCount, { color: colors.text }]}>{referralCount}</Text>
+                <Text style={[styles.followStatLabel, { color: colors.textSecondary }]}>Referrals</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -673,6 +729,75 @@ export default function ProfileScreen() {
                 }}
               />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Invite/Referral Modal */}
+      <Modal
+        visible={showInviteModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowInviteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.inviteModalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Invite Friends</Text>
+              <TouchableOpacity
+                onPress={() => setShowInviteModal(false)}
+                style={[styles.modalCloseButton, { backgroundColor: colors.backgroundSecondary }]}
+              >
+                <X size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inviteContent}>
+              {/* Referral Stats */}
+              <View style={[styles.referralStatsCard, { backgroundColor: colors.backgroundSecondary }]}>
+                <Gift size={32} color={colors.primary} strokeWidth={1.5} />
+                <Text style={[styles.referralStatsTitle, { color: colors.text }]}>
+                  You've invited {referralCount} {referralCount === 1 ? 'friend' : 'friends'}
+                </Text>
+                <Text style={[styles.referralStatsSubtitle, { color: colors.textSecondary }]}>
+                  Share your unique link to invite more people to join iEndorse
+                </Text>
+              </View>
+
+              {/* Referral Code Display */}
+              <View style={[styles.referralCodeContainer, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Text style={[styles.referralCodeLabel, { color: colors.textSecondary }]}>Your Invite Code</Text>
+                <Text style={[styles.referralCode, { color: colors.primary }]}>{referralCode}</Text>
+              </View>
+
+              {/* Referral Link */}
+              <View style={[styles.referralLinkContainer, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Text style={[styles.referralLinkLabel, { color: colors.textSecondary }]}>Your Invite Link</Text>
+                <Text style={[styles.referralLink, { color: colors.text }]} numberOfLines={1}>
+                  {getReferralLink(referralCode)}
+                </Text>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.inviteActions}>
+                <TouchableOpacity
+                  style={[styles.inviteActionButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                  onPress={handleCopyReferralLink}
+                  activeOpacity={0.7}
+                >
+                  <Copy size={20} color={colors.primary} strokeWidth={2} />
+                  <Text style={[styles.inviteActionText, { color: colors.text }]}>Copy Link</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.inviteActionButton, styles.shareButton, { backgroundColor: colors.primary }]}
+                  onPress={handleShareReferral}
+                  activeOpacity={0.7}
+                >
+                  <ShareIcon size={20} color={colors.white} strokeWidth={2} />
+                  <Text style={[styles.inviteActionText, { color: colors.white }]}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1054,7 +1179,7 @@ const styles = StyleSheet.create({
   },
   followStatButton: {
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
   followStatCount: {
     fontSize: 18,
@@ -1098,5 +1223,85 @@ const styles = StyleSheet.create({
   modalCloseButton: {
     padding: 8,
     borderRadius: 20,
+  },
+  // Invite modal styles
+  inviteModalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'web' ? 50 : 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+  },
+  inviteContent: {
+    gap: 16,
+    paddingBottom: 16,
+  },
+  referralStatsCard: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 16,
+    gap: 8,
+  },
+  referralStatsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  referralStatsSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  referralCodeContainer: {
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  referralCodeLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  referralCode: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 3,
+  },
+  referralLinkContainer: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  referralLinkLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  referralLink: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  inviteActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  shareButton: {
+    borderWidth: 0,
+  },
+  inviteActionText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

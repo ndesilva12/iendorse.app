@@ -32,6 +32,8 @@ import { calculateSimilarityScore, getSimilarityLabel, normalizeSimilarityScores
 import { getAllUserBusinesses } from '@/services/firebase/businessService';
 import { followEntity, unfollowEntity, isFollowing as checkIsFollowing, getFollowersCount, getFollowingCount } from '@/services/firebase/followService';
 import FollowingFollowersList from '@/components/FollowingFollowersList';
+import { useReferralCode } from '@/hooks/useReferralCode';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 
 interface BusinessUser {
   id: string;
@@ -49,6 +51,7 @@ export default function BusinessDetailScreen() {
   const library = useLibrary();
   const colors = isDarkMode ? darkColors : lightColors;
   const scrollViewRef = useRef<ScrollView>(null);
+  const { referralCode } = useReferralCode();
 
   const [business, setBusiness] = useState<BusinessUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -305,10 +308,11 @@ export default function BusinessDetailScreen() {
     if (!business) return;
 
     try {
-      const message = `Check out ${business.businessInfo.name} on Endorse Money!`;
-      const url = Platform.OS === 'web'
+      const message = `Check out ${business.businessInfo.name} on iEndorse!`;
+      const baseUrl = Platform.OS === 'web'
         ? `${window.location.origin}/business/${business.id}`
-        : `iendorse://business/${business.id}`;
+        : `https://iendorse.app/business/${business.id}`;
+      const url = appendReferralTracking(baseUrl, referralCode);
 
       await Share.share({
         message: `${message}\n${url}`,

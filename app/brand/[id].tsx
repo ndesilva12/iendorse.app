@@ -29,6 +29,8 @@ import { calculateBrandScore, getBrandScoreLabel, getBrandScoreColor, normalizeB
 import { followEntity, unfollowEntity, isFollowing as checkIsFollowing, getFollowersCount, getFollowingCount } from '@/services/firebase/followService';
 import FollowingFollowersList from '@/components/FollowingFollowersList';
 import { Review as FirebaseReview, getEntityReviews, createReview, likeReview, unlikeReview, hasLikedReview, getUserLikedReviewIds } from '@/services/firebase/reviewService';
+import { useReferralCode } from '@/hooks/useReferralCode';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 
 export default function BrandDetailScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -37,6 +39,7 @@ export default function BrandDetailScreen() {
   const library = useLibrary();
   const colors = isDarkMode ? darkColors : lightColors;
   const scrollViewRef = useRef<ScrollView>(null);
+  const { referralCode } = useReferralCode();
 
   console.log('[BrandDetail] Loading brand with ID:', id, 'Name:', name);
 
@@ -524,10 +527,11 @@ export default function BrandDetailScreen() {
     if (!brand) return;
 
     try {
-      const message = `Check out ${brand.name} on Endorse Money!`;
-      const url = Platform.OS === 'web'
+      const message = `Check out ${brand.name} on iEndorse!`;
+      const baseUrl = Platform.OS === 'web'
         ? `${window.location.origin}/brand/${brand.id}`
-        : `iendorse://brand/${brand.id}`;
+        : `https://iendorse.app/brand/${brand.id}`;
+      const url = appendReferralTracking(baseUrl, referralCode);
 
       await Share.share({
         message: `${message}\n${url}`,

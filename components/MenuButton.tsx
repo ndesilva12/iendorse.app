@@ -1,5 +1,5 @@
 import { useRouter, useSegments } from 'expo-router';
-import { Menu, LogOut, User, Heart } from 'lucide-react-native';
+import { Menu, LogOut, User, Heart, Gift } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   View,
@@ -11,10 +11,15 @@ import {
   Image,
   Dimensions,
   Platform,
+  Alert,
+  Share,
 } from 'react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
 import { useClerk } from '@clerk/clerk-expo';
+import { useReferralCode } from '@/hooks/useReferralCode';
+import { getReferralLink } from '@/services/firebase/referralService';
+import * as Clipboard from 'expo-clipboard';
 
 export default function MenuButton() {
   const router = useRouter();
@@ -23,6 +28,8 @@ export default function MenuButton() {
   const colors = isDarkMode ? darkColors : lightColors;
   const { signOut } = useClerk();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const { referralCode } = useReferralCode();
   const isBusiness = profile.accountType === 'business';
 
   const handleSignOut = async () => {
@@ -64,6 +71,34 @@ export default function MenuButton() {
     router.push('/onboarding');
   };
 
+  const handleInvite = () => {
+    setIsMenuVisible(false);
+    setShowInviteModal(true);
+  };
+
+  const handleCopyInviteLink = async () => {
+    if (!referralCode) return;
+    const link = getReferralLink(referralCode);
+    await Clipboard.setStringAsync(link);
+    Alert.alert('Copied!', 'Your invite link has been copied to clipboard.');
+  };
+
+  const handleShareInvite = async () => {
+    if (!referralCode) return;
+    const link = getReferralLink(referralCode);
+    const message = `Join me on iEndorse! Use my invite link to sign up: ${link}`;
+
+    try {
+      await Share.share({
+        message,
+        url: link,
+        title: 'Join iEndorse',
+      });
+    } catch (error) {
+      console.error('[MenuButton] Error sharing:', error);
+    }
+  };
+
   return (
     <>
       <TouchableOpacity
@@ -99,7 +134,7 @@ export default function MenuButton() {
           >
             <View style={styles.logoContainer}>
               <Image
-                source={require('@/assets/images/endorsemulti1.png')}
+                source={require('@/assets/images/endorsing.png')}
                 style={styles.menuLogo}
                 resizeMode="contain"
               />
@@ -151,6 +186,18 @@ export default function MenuButton() {
                 </View>
               </TouchableOpacity>
 
+              {/* Invite Friends menu item */}
+              <TouchableOpacity
+                style={[styles.menuItem, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
+                onPress={handleInvite}
+                activeOpacity={0.7}
+              >
+                <View style={styles.menuItemLeft}>
+                  <Gift size={26} color={colors.primary} strokeWidth={2} />
+                  <Text style={[styles.menuItemTitle, { color: colors.text }]}>Invite Friends</Text>
+                </View>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={handleSignOut}
@@ -162,6 +209,72 @@ export default function MenuButton() {
                 </View>
               </TouchableOpacity>
             </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Invite Modal */}
+      <Modal
+        visible={showInviteModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowInviteModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowInviteModal(false)}
+        >
+          <TouchableOpacity
+            style={[styles.inviteModalContainer, { backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB' }]}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.inviteModalHeader}>
+              <Text style={[styles.inviteModalTitle, { color: colors.text }]}>Invite Friends</Text>
+            </View>
+
+            <View style={styles.inviteContent}>
+              {/* Referral Code Display */}
+              <View style={[styles.referralCodeBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Text style={[styles.referralCodeLabel, { color: colors.textSecondary }]}>Your Invite Code</Text>
+                <Text style={[styles.referralCode, { color: colors.primary }]}>{referralCode || '...'}</Text>
+              </View>
+
+              {/* Invite Link */}
+              <View style={[styles.referralLinkBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Text style={[styles.referralLinkLabel, { color: colors.textSecondary }]}>Your Invite Link</Text>
+                <Text style={[styles.referralLink, { color: colors.text }]} numberOfLines={1}>
+                  {referralCode ? getReferralLink(referralCode) : '...'}
+                </Text>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.inviteActions}>
+                <TouchableOpacity
+                  style={[styles.inviteActionButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                  onPress={handleCopyInviteLink}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.inviteActionText, { color: colors.text }]}>Copy Link</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.inviteActionButton, { backgroundColor: colors.primary }]}
+                  onPress={handleShareInvite}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.inviteActionText, { color: colors.white }]}>Share</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.closeInviteButton, { borderColor: colors.border }]}
+                onPress={() => setShowInviteModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.closeInviteText, { color: colors.text }]}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -238,5 +351,85 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 22,
     fontWeight: '700' as const,
+  },
+  // Invite modal styles
+  inviteModalContainer: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  inviteModalHeader: {
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    alignItems: 'center',
+  },
+  inviteModalTitle: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+  },
+  inviteContent: {
+    padding: 24,
+    gap: 16,
+  },
+  referralCodeBox: {
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  referralCodeLabel: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    marginBottom: 6,
+  },
+  referralCode: {
+    fontSize: 28,
+    fontWeight: '700' as const,
+    letterSpacing: 3,
+  },
+  referralLinkBox: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  referralLinkLabel: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    marginBottom: 6,
+  },
+  referralLink: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  inviteActionButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  inviteActionText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  closeInviteButton: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  closeInviteText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
   },
 });

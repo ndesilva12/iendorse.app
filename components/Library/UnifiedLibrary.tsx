@@ -78,6 +78,8 @@ import { getTopBrands, getTopBusinesses } from '@/services/firebase/topRankingsS
 import { getCumulativeDays } from '@/services/firebase/endorsementHistoryService';
 import { searchPlaces, getPlaceDetails, PlaceSearchResult, getPlacePhotoUrl, formatCategory } from '@/services/firebase/placesService';
 import { submitBrandRequest } from '@/services/firebase/brandRequestService';
+import { useReferralCode } from '@/hooks/useReferralCode';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 import {
   DndContext,
   closestCenter,
@@ -276,6 +278,7 @@ export default function UnifiedLibrary({
   const { profile, clerkUser } = useUser();
   const router = useRouter();
   const { brands } = useData();
+  const { referralCode } = useReferralCode();
 
   // Use context's expandedListId for persistent state across navigation
   const openedListId = library.state.expandedListId;
@@ -1131,7 +1134,9 @@ export default function UnifiedLibrary({
 
   const performShareList = async (list: UserList) => {
     try {
-      const message = `Check out my list "${list.name}" on Endorse Money!\n${list.description || ''}`;
+      const baseUrl = getListShareUrl(list);
+      const shareUrl = appendReferralTracking(baseUrl, referralCode);
+      const message = `Check out my list "${list.name}" on iEndorse!\n${list.description ? list.description + '\n' : ''}${shareUrl}`;
       await Share.share({
         message,
         title: list.name,
@@ -1189,13 +1194,17 @@ export default function UnifiedLibrary({
       switch (entry.type) {
         case 'brand':
           const brandName = (entry as any).brandName || (entry as any).name || 'Brand';
+          const brandId = (entry as any).brandId || entry.id;
+          const brandUrl = appendReferralTracking(`https://iendorse.app/brand/${brandId}`, referralCode);
           title = brandName;
-          message = `Check out ${brandName} on Endorse Money!`;
+          message = `Check out ${brandName} on iEndorse!\n${brandUrl}`;
           break;
         case 'business':
           const businessName = (entry as any).businessName || (entry as any).name || 'Business';
+          const businessId = (entry as any).businessId || entry.id;
+          const businessUrl = appendReferralTracking(`https://iendorse.app/business/${businessId}`, referralCode);
           title = businessName;
-          message = `Check out ${businessName} on Endorse Money!`;
+          message = `Check out ${businessName} on iEndorse!\n${businessUrl}`;
           break;
         case 'value':
           const valueName = (entry as any).valueName || (entry as any).name || 'Value';
@@ -1680,21 +1689,33 @@ export default function UnifiedLibrary({
 
   // Helper function to get card background color based on position
   const getEntryCardBackgroundColor = (index: number): string => {
-    // Use app blue with different opacities
+    // All cards: 10% opacity app blue
     // Light mode: rgb(3, 68, 102), Dark mode: rgb(0, 170, 250)
-    if (index < 5) {
-      // Top 5: 35% opacity
-      return isDarkMode ? 'rgba(0, 170, 250, 0.35)' : 'rgba(3, 68, 102, 0.35)';
-    } else if (index < 10) {
-      // 6-10: 20% opacity
-      return isDarkMode ? 'rgba(0, 170, 250, 0.20)' : 'rgba(3, 68, 102, 0.20)';
-    }
-    // 11+: 10% opacity
     return isDarkMode ? 'rgba(0, 170, 250, 0.10)' : 'rgba(3, 68, 102, 0.10)';
   };
 
+  // Helper function to get card border style based on position
+  const getEntryCardBorderStyle = (index: number): { borderWidth: number; borderColor: string } | {} => {
+    if (index < 5) {
+      // Top 5: Outlined in app blue
+      return {
+        borderWidth: 2,
+        borderColor: isDarkMode ? 'rgba(0, 170, 250, 1)' : 'rgba(3, 68, 102, 1)',
+      };
+    } else if (index < 10) {
+      // 6-10: Outlined in dark blue (much darker than app blue)
+      return {
+        borderWidth: 2,
+        borderColor: isDarkMode ? 'rgba(0, 80, 120, 1)' : 'rgba(2, 45, 70, 1)',
+      };
+    }
+    // 11+: no outline
+    return {};
+  };
+
   // EXACT copy of Home tab's renderListEntry with score calculation
-  const renderListEntry = (entry: ListEntry, isEndorsementSection: boolean = false, entryIndex?: number) => {
+  // originalIndex is used for border styling when filtered (to keep outlines based on original position)
+  const renderListEntry = (entry: ListEntry, isEndorsementSection: boolean = false, entryIndex?: number, originalIndex?: number) => {
     if (!entry) return null;
 
     switch (entry.type) {
@@ -1737,11 +1758,14 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            // Use originalIndex for border styling to maintain outlines based on original list position when filtered
+            const cardBorderStyle = getEntryCardBorderStyle(originalIndex ?? entryIndex);
             return (
               <TouchableOpacity
                 style={[
                   styles.endorsementEntryCard,
                   { backgroundColor: cardBgColor },
+                  cardBorderStyle,
                 ]}
                 onPress={() => {
                   router.push({
@@ -1868,11 +1892,14 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            // Use originalIndex for border styling to maintain outlines based on original list position when filtered
+            const cardBorderStyle = getEntryCardBorderStyle(originalIndex ?? entryIndex);
             return (
               <TouchableOpacity
                 style={[
                   styles.endorsementEntryCard,
                   { backgroundColor: cardBgColor },
+                  cardBorderStyle,
                 ]}
                 onPress={() => {
                   router.push({
@@ -2133,11 +2160,14 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            // Use originalIndex for border styling to maintain outlines based on original list position when filtered
+            const cardBorderStyle = getEntryCardBorderStyle(originalIndex ?? entryIndex);
             return (
               <TouchableOpacity
                 style={[
                   styles.endorsementEntryCard,
                   { backgroundColor: cardBgColor },
+                  cardBorderStyle,
                 ]}
                 onPress={() => {
                   router.push({
@@ -2268,11 +2298,14 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            // Use originalIndex for border styling to maintain outlines based on original list position when filtered
+            const cardBorderStyle = getEntryCardBorderStyle(originalIndex ?? entryIndex);
             return (
               <View
                 style={[
                   styles.endorsementEntryCard,
                   { backgroundColor: cardBgColor },
+                  cardBorderStyle,
                 ]}
               >
                 {logoUrl ? (
@@ -2403,7 +2436,7 @@ export default function UnifiedLibrary({
           <View style={[styles.listProfileImageContainer, { backgroundColor: 'transparent', borderColor: colors.border }]}>
             {useAppIcon ? (
               <Image
-                source={require('@/assets/images/endorseofficialicon.png')}
+                source={require('@/assets/images/endorsing1.png')}
                 style={styles.listProfileImage}
                 contentFit="cover"
                 transition={200}
@@ -2740,8 +2773,9 @@ export default function UnifiedLibrary({
     const showLocalFilter = hasLocalEntries && hasNonLocalEntries;
 
     // Get categories that have entries (using custom category system)
+    // Use allEntries to keep filter options consistent regardless of which filter is selected
     const categoryCounts = new Map<string, number>();
-    localFilteredEntries.forEach(entry => {
+    allEntries.forEach(entry => {
       const categoryId = getEntryCategory(entry);
       if (categoryId) {
         categoryCounts.set(categoryId, (categoryCounts.get(categoryId) || 0) + 1);
@@ -2749,9 +2783,18 @@ export default function UnifiedLibrary({
     });
 
     // Only show categories that have at least one entry, in predefined order
+    // Categories remain constant regardless of local/category filter selection
     const uniqueCategories = CUSTOM_CATEGORIES
       .filter(cat => categoryCounts.has(cat.id))
       .map(cat => ({ id: cat.id, label: cat.label, count: categoryCounts.get(cat.id) || 0 }));
+
+    // Create lookup map for original positions (used for outline styling when filtered)
+    const originalPositionMap = new Map<string, number>();
+    allEntries.forEach((entry, idx) => {
+      if (entry && entry.id) {
+        originalPositionMap.set(entry.id, idx);
+      }
+    });
 
     // Render filter buttons
     const renderFilterButtons = () => {
@@ -2929,6 +2972,9 @@ export default function UnifiedLibrary({
       const isFirst = index === 0;
       const isLast = index === entriesToDisplay.length - 1;
 
+      // Get original position for border styling (maintains outlines when filtered)
+      const originalIndex = originalPositionMap.get(entry.id);
+
       if (isReordering) {
         // Sortable entry for both mobile (long press) and desktop (drag handle)
         const SortableEntry = () => {
@@ -2975,9 +3021,10 @@ export default function UnifiedLibrary({
       }
 
       // Normal (non-reorder) mode - render card directly with index for styling
+      // Pass originalIndex to maintain outlines based on original list position when filtered
       return (
         <View key={entry.id} style={styles.endorsementEntryWrapper}>
-          {renderListEntry(entry, true, index)}
+          {renderListEntry(entry, true, index, originalIndex)}
         </View>
       );
     };
@@ -3379,7 +3426,7 @@ export default function UnifiedLibrary({
           <View style={[styles.listDetailImageContainer, { backgroundColor: 'transparent', borderColor: colors.border }]}>
             {useAppIcon ? (
               <Image
-                source={require('@/assets/images/endorseofficialicon.png')}
+                source={require('@/assets/images/endorsing1.png')}
                 style={styles.listDetailImage}
                 contentFit="cover"
                 transition={200}
@@ -3969,10 +4016,10 @@ export default function UnifiedLibrary({
             {mapEntries.length > 0 && (
               <TouchableOpacity
                 onPress={() => setShowMapModal(true)}
-                style={[styles.headerActionButton, { backgroundColor: colors.backgroundSecondary }]}
+                style={styles.headerActionButton}
                 activeOpacity={0.7}
               >
-                <MapPin size={20} color={colors.primary} strokeWidth={2} />
+                <MapPin size={28} color={colors.primary} strokeWidth={2} />
               </TouchableOpacity>
             )}
 
@@ -3983,7 +4030,7 @@ export default function UnifiedLibrary({
                 style={[styles.addEndorsementButton, { backgroundColor: colors.primary }]}
                 activeOpacity={0.7}
               >
-                <Plus size={24} color={colors.white} strokeWidth={2.5} />
+                <Plus size={20} color={colors.white} strokeWidth={2.5} />
               </TouchableOpacity>
             )}
           </View>
@@ -4391,6 +4438,7 @@ export default function UnifiedLibrary({
             : undefined
         }
         isDarkMode={isDarkMode}
+        referralCode={referralCode}
       />
 
       <ConfirmModal
@@ -5660,7 +5708,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   headerActionButton: {
-    padding: 8,
+    padding: 10,
   },
   endorsedActionDropdown: {
     position: 'absolute',
@@ -5781,12 +5829,12 @@ const styles = StyleSheet.create({
   endorsedHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 16,
   },
   addEndorsementButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

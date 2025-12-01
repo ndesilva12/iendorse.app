@@ -27,6 +27,8 @@ import { useLibrary } from '@/contexts/LibraryContext';
 import { followEntity, unfollowEntity, isFollowing as checkIsFollowing } from '@/services/firebase/followService';
 import { addEntryToList, removeEntryFromList } from '@/services/firebase/listService';
 import ItemOptionsModal from '@/components/ItemOptionsModal';
+import { useReferralCode } from '@/hooks/useReferralCode';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 
 // ===== Types =====
 type BrowseSection = 'global' | 'local' | 'values';
@@ -106,6 +108,7 @@ export default function BrowseScreen() {
   const { brands, valuesMatrix, values: firebaseValues } = useData();
   const library = useLibrary();
   const colors = isDarkMode ? darkColors : lightColors;
+  const { referralCode } = useReferralCode();
 
   // Section state
   const [selectedSection, setSelectedSection] = useState<BrowseSection>('global');
@@ -339,8 +342,10 @@ export default function BrowseScreen() {
 
   const handleShareBrand = (brandId: string, brandName: string) => {
     console.log('[Browse] handleShareBrand called:', brandId, brandName);
+    const baseUrl = `https://iendorse.app/brand/${brandId}`;
+    const shareUrl = appendReferralTracking(baseUrl, referralCode);
     if (Platform.OS === 'web') {
-      navigator.clipboard.writeText(`${window.location.origin}/brand/${brandId}`);
+      navigator.clipboard.writeText(shareUrl);
       Alert.alert('Success', 'Link copied to clipboard');
     } else {
       Alert.alert('Share', 'Share functionality coming soon');
@@ -962,7 +967,7 @@ export default function BrowseScreen() {
       <View style={[styles.mainHeaderContainer, { backgroundColor: colors.background, borderBottomColor: 'rgba(0, 0, 0, 0.05)' }]}>
         <View style={[styles.header, { backgroundColor: colors.background }]}>
           <Image
-            source={require('@/assets/images/endorsemulti1.png')}
+            source={require('@/assets/images/endorsing.png')}
             style={styles.headerLogo}
             resizeMode="contain"
           />

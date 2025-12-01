@@ -1,8 +1,9 @@
 /**
  * ShareOptionsModal Component
  * Simple modal with Share or Copy Link options
+ * Supports referral tracking by appending user's referral code to shared URLs
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,6 +17,7 @@ import {
 import { Share2, Link as LinkIcon } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import * as Clipboard from 'expo-clipboard';
+import { appendReferralTracking } from '@/services/firebase/referralService';
 
 interface ShareOptionsModalProps {
   visible: boolean;
@@ -23,6 +25,7 @@ interface ShareOptionsModalProps {
   onShare: () => Promise<void>;
   shareUrl?: string;
   isDarkMode?: boolean;
+  referralCode?: string | null; // Optional referral code for tracking
 }
 
 export default function ShareOptionsModal({
@@ -31,18 +34,25 @@ export default function ShareOptionsModal({
   onShare,
   shareUrl,
   isDarkMode = false,
+  referralCode,
 }: ShareOptionsModalProps) {
   const colors = isDarkMode ? darkColors : lightColors;
   const [copied, setCopied] = useState(false);
 
+  // URL with referral tracking appended
+  const trackedUrl = useMemo(() => {
+    if (!shareUrl) return '';
+    return appendReferralTracking(shareUrl, referralCode);
+  }, [shareUrl, referralCode]);
+
   const handleCopyLink = async () => {
-    if (!shareUrl) {
+    if (!trackedUrl) {
       Alert.alert('Error', 'No link available to copy');
       return;
     }
 
     try {
-      await Clipboard.setStringAsync(shareUrl);
+      await Clipboard.setStringAsync(trackedUrl);
       setCopied(true);
       setTimeout(() => {
         setCopied(false);

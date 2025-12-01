@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { MapPin, ChevronDown, ChevronUp, MoreVertical, X, UserMinus, UserPlus, Heart, Share2 } from 'lucide-react-native';
+import { MapPin, ChevronDown, ChevronUp, Plus, X, UserMinus, UserPlus, Heart, Share2 } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { BusinessUser, isBusinessWithinRange } from '@/services/firebase/businessService';
 import { Cause } from '@/types';
@@ -490,8 +490,8 @@ export default function LocalBusinessView({
               }}
               activeOpacity={0.7}
             >
-              <View style={{ transform: [{ rotate: '90deg' }] }}>
-                <MoreVertical size={18} color={colors.textSecondary} strokeWidth={2} />
+              <View style={[styles.plusIconCircle, { backgroundColor: colors.primary }]}>
+                <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
               </View>
             </TouchableOpacity>
           </View>
@@ -839,6 +839,13 @@ const styles = StyleSheet.create({
     padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  plusIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptySection: {
     padding: 40,

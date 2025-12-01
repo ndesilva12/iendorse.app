@@ -1,20 +1,20 @@
 module.exports = {
   expo: {
-    name: "Endorse",
-    slug: "upright",
+    name: "iEndorse",
+    slug: "iendorse",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/images/endorseofficialicon.png",
-    scheme: "myapp",
+    icon: "./assets/images/endorsing1.png",
+    scheme: "iendorse",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     extra: {
       googlePlacesApiKey: process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '',
     },
     splash: {
-      image: "./assets/images/endorseofficialicon.png",
+      image: "./assets/images/endorsing.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff"
+      backgroundColor: "#111827"
     },
     ios: {
       supportsTablet: true,
@@ -36,8 +36,8 @@ module.exports = {
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/images/endorseofficialicon.png",
-        backgroundColor: "#ffffff"
+        foregroundImage: "./assets/images/endorsing1.png",
+        backgroundColor: "#111827"
       },
       package: "app.rork.playbook",
       permissions: [
@@ -53,12 +53,12 @@ module.exports = {
     web: {
       bundler: "metro",
       output: "static",
-      favicon: "./assets/images/endorseofficialicon.png",
-      name: "Endorse",
-      shortName: "Endorse",
-      description: "Endorse - Vote With Your Money",
-      themeColor: "#ffffff",
-      backgroundColor: "#ffffff",
+      favicon: "./assets/images/endorsing1.png",
+      name: "iEndorse",
+      shortName: "iEndorse",
+      description: "iEndorse - Build Your Endorsement List",
+      themeColor: "#034466",
+      backgroundColor: "#111827",
       display: "standalone",
       orientation: "portrait",
       startUrl: "/",
