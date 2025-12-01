@@ -16,6 +16,14 @@ export interface BrandRequest {
   notes?: string;
   createdAt: Date;
   reviewedAt?: Date;
+  // Extended fields for manual business entries
+  category?: string;
+  description?: string;
+  website?: string;
+  location?: string;
+  logoUrl?: string;
+  listEntryId?: string; // ID of the entry in user's endorsement list (for linking after approval)
+  source?: 'search_request' | 'manual_entry'; // Track how the request was created
 }
 
 const COLLECTION_NAME = 'brandRequests';
@@ -27,17 +35,35 @@ export async function submitBrandRequest(
   brandName: string,
   userId: string,
   userName: string,
-  userEmail?: string
+  userEmail?: string,
+  extendedData?: {
+    category?: string;
+    description?: string;
+    website?: string;
+    location?: string;
+    logoUrl?: string;
+    listEntryId?: string;
+    source?: 'search_request' | 'manual_entry';
+  }
 ): Promise<string> {
   try {
-    const requestData = {
+    const requestData: Record<string, any> = {
       brandName: brandName.trim(),
       userId,
       userName,
       userEmail: userEmail || '',
       status: 'pending',
       createdAt: Timestamp.now(),
+      source: extendedData?.source || 'search_request',
     };
+
+    // Add optional extended fields if provided
+    if (extendedData?.category) requestData.category = extendedData.category;
+    if (extendedData?.description) requestData.description = extendedData.description;
+    if (extendedData?.website) requestData.website = extendedData.website;
+    if (extendedData?.location) requestData.location = extendedData.location;
+    if (extendedData?.logoUrl) requestData.logoUrl = extendedData.logoUrl;
+    if (extendedData?.listEntryId) requestData.listEntryId = extendedData.listEntryId;
 
     const docRef = await addDoc(collection(db, COLLECTION_NAME), requestData);
     console.log('[BrandRequest] Submitted request:', docRef.id);
@@ -68,6 +94,14 @@ export async function getAllBrandRequests(): Promise<BrandRequest[]> {
         notes: data.notes,
         createdAt: data.createdAt?.toDate() || new Date(),
         reviewedAt: data.reviewedAt?.toDate(),
+        // Extended fields
+        category: data.category,
+        description: data.description,
+        website: data.website,
+        location: data.location,
+        logoUrl: data.logoUrl,
+        listEntryId: data.listEntryId,
+        source: data.source || 'search_request',
       };
     });
   } catch (error) {

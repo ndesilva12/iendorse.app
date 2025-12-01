@@ -77,6 +77,7 @@ import { reorderListEntries } from '@/services/firebase/listService';
 import { getTopBrands, getTopBusinesses } from '@/services/firebase/topRankingsService';
 import { getCumulativeDays } from '@/services/firebase/endorsementHistoryService';
 import { searchPlaces, getPlaceDetails, PlaceSearchResult, getPlacePhotoUrl, formatCategory } from '@/services/firebase/placesService';
+import { submitBrandRequest } from '@/services/firebase/brandRequestService';
 import {
   DndContext,
   closestCenter,
@@ -361,6 +362,18 @@ export default function UnifiedLibrary({
   const [placesResults, setPlacesResults] = useState<PlaceSearchResult[]>([]);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
   const [placesSearchDebounce, setPlacesSearchDebounce] = useState<NodeJS.Timeout | null>(null);
+
+  // Create business form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    name: '',
+    category: '',
+    description: '',
+    website: '',
+    location: '',
+  });
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
+  const [showCreateSuccess, setShowCreateSuccess] = useState(false);
 
   // Endorsement list filter state
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -987,6 +1000,91 @@ export default function UnifiedLibrary({
     }
   }, [router]);
 
+  // Handle creating a manual business entry
+  const handleCreateBusiness = useCallback(async () => {
+    if (!createFormData.name.trim() || !createFormData.category) {
+      Alert.alert('Error', 'Please enter a name and select a category');
+      return;
+    }
+
+    if (!endorsementList?.id || !currentUserId) {
+      Alert.alert('Error', 'Unable to add to endorsements. Please try again.');
+      return;
+    }
+
+    setIsSubmittingCreate(true);
+
+    try {
+      // Get logo from website if provided
+      let logoUrl: string | undefined;
+      if (createFormData.website) {
+        logoUrl = getLogoUrl(createFormData.website, { size: 128 });
+      }
+
+      // Create the entry for the user's endorsement list
+      // Use 'pending_business' type to indicate it's awaiting admin approval
+      const entry: any = {
+        type: 'pending_business',
+        pendingBusinessName: createFormData.name.trim(),
+        pendingBusinessCategory: createFormData.category,
+        createdAt: new Date(),
+      };
+
+      // Add optional fields
+      if (createFormData.description) entry.description = createFormData.description;
+      if (createFormData.website) entry.website = createFormData.website;
+      if (createFormData.location) entry.location = createFormData.location;
+      if (logoUrl) entry.logoUrl = logoUrl;
+
+      // Add to endorsement list
+      const addedEntry = await library.addEntry(endorsementList.id, entry);
+
+      // Submit brand request for admin review
+      await submitBrandRequest(
+        createFormData.name.trim(),
+        currentUserId,
+        profile?.displayName || profile?.firstName || 'User',
+        clerkUser?.emailAddresses?.[0]?.emailAddress,
+        {
+          category: createFormData.category,
+          description: createFormData.description,
+          website: createFormData.website,
+          location: createFormData.location,
+          logoUrl,
+          listEntryId: addedEntry?.id,
+          source: 'manual_entry',
+        }
+      );
+
+      // Show success state
+      setShowCreateSuccess(true);
+
+      // Reset form after delay
+      setTimeout(() => {
+        setShowCreateSuccess(false);
+        setShowCreateForm(false);
+        setCreateFormData({
+          name: '',
+          category: '',
+          description: '',
+          website: '',
+          location: '',
+        });
+        setAddSearchQuery('');
+      }, 2000);
+
+      // Reload library
+      if (currentUserId) {
+        await library.loadUserLists(currentUserId, true);
+      }
+    } catch (error) {
+      console.error('[UnifiedLibrary] Error creating business:', error);
+      Alert.alert('Error', 'Failed to create business. Please try again.');
+    } finally {
+      setIsSubmittingCreate(false);
+    }
+  }, [createFormData, endorsementList, currentUserId, library, profile, clerkUser]);
+
   // Share handlers - Open ShareOptionsModal first
   const handleShareList = (list: UserList) => {
     setSharingItem({ type: 'list', data: list });
@@ -1399,12 +1497,16 @@ export default function UnifiedLibrary({
         return (entry as any).brandName || (entry as any).name || 'Brand';
       case 'business':
         return (entry as any).businessName || (entry as any).name || 'Business';
+      case 'pending_business':
+        return (entry as any).pendingBusinessName || (entry as any).name || 'Pending Business';
       case 'value':
         return (entry as any).valueName || (entry as any).name || 'Value';
       case 'link':
         return (entry as any).title || (entry as any).name || 'Link';
       case 'text':
         return 'Note';
+      case 'place':
+        return (entry as any).placeName || (entry as any).name || 'Place';
       default:
         return 'Item';
     }
@@ -2137,6 +2239,127 @@ export default function UnifiedLibrary({
           );
         }
         break;
+
+      case 'pending_business':
+        if ('pendingBusinessName' in entry) {
+          const pendingName = (entry as any).pendingBusinessName || 'Pending Business';
+          const pendingCategory = (entry as any).pendingBusinessCategory || 'Other';
+          const pendingWebsite = (entry as any).website;
+          // Get logo from website if available
+          let logoUrl = (entry as any).logoUrl;
+          if (!logoUrl && pendingWebsite) {
+            logoUrl = getLogoUrl(pendingWebsite, { size: 128 });
+          }
+
+          // Get display label for category
+          const categoryLabel = getCustomCategoryLabel(pendingCategory);
+
+          // Endorsement section: render as card with position-based background
+          if (isEndorsementSection && entryIndex !== undefined) {
+            const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            return (
+              <View
+                style={[
+                  styles.endorsementEntryCard,
+                  { backgroundColor: cardBgColor },
+                ]}
+              >
+                {logoUrl ? (
+                  <Image
+                    source={{ uri: logoUrl }}
+                    style={styles.endorsementEntryCardImage}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
+                  />
+                ) : (
+                  <View style={[styles.endorsementEntryCardImage, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Globe size={32} color={colors.textSecondary} />
+                  </View>
+                )}
+                <View style={styles.endorsementEntryCardContent}>
+                  <View style={styles.endorsementEntryCardFirstLine}>
+                    <Text style={[styles.endorsementEntryCardNumber, { color: colors.text }]}>{entryIndex + 1}.</Text>
+                    <Text style={[styles.endorsementEntryCardName, { color: colors.text }]} numberOfLines={1}>
+                      {pendingName}
+                    </Text>
+                  </View>
+                  <Text style={[styles.endorsementEntryCardCategory, { color: colors.primary }]} numberOfLines={1}>
+                    Pending Review
+                  </Text>
+                </View>
+                {(mode === 'edit' || mode === 'view' || mode === 'preview') && (
+                  <TouchableOpacity
+                    style={styles.endorsementEntryOptionsButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleOpenActionModal(entry);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <MoreVertical size={18} color={colors.textSecondary} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          }
+
+          // Non-endorsement section: render original style
+          return (
+            <View>
+              <View
+                style={[
+                  styles.brandCard,
+                  { backgroundColor: 'transparent' },
+                ]}
+              >
+                <View style={styles.brandCardInner}>
+                  <View style={styles.brandLogoContainer}>
+                    {logoUrl ? (
+                      <Image
+                        source={{ uri: logoUrl }}
+                        style={[styles.brandLogo, { backgroundColor: '#FFFFFF' }]}
+                        contentFit="cover"
+                        transition={200}
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <View style={[styles.brandLogo, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Globe size={24} color={colors.textSecondary} />
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.brandCardContent}>
+                    <Text style={[styles.brandName, { color: colors.white }]} numberOfLines={2}>
+                      {pendingName}
+                    </Text>
+                    <Text style={[styles.brandCategory, { color: colors.primary }]} numberOfLines={1}>
+                      Pending Review • {categoryLabel}
+                    </Text>
+                  </View>
+                  <View style={styles.brandScoreContainer}>
+                    <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+                  </View>
+                  {(mode === 'edit' || mode === 'view' || mode === 'preview') && (
+                    <TouchableOpacity
+                      style={[styles.quickAddButton, { backgroundColor: colors.background }]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleOpenActionModal(entry);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ transform: [{ rotate: '90deg' }] }}>
+                        <MoreVertical size={18} color={colors.textSecondary} strokeWidth={2} />
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+          );
+        }
+        break;
     }
 
     return null;
@@ -2441,6 +2664,7 @@ export default function UnifiedLibrary({
       if (entry.type === 'brand') rawCategory = (entry as any).brandCategory;
       else if (entry.type === 'business') rawCategory = (entry as any).businessCategory;
       else if (entry.type === 'place') rawCategory = (entry as any).placeCategory;
+      else if (entry.type === 'pending_business') rawCategory = (entry as any).pendingBusinessCategory;
       // Map to custom category
       return mapToCustomCategory(rawCategory);
     };
@@ -4123,6 +4347,9 @@ export default function UnifiedLibrary({
           setShowAddEndorsementModal(false);
           setAddSearchQuery('');
           setAddedItemIds(new Set());
+          setShowCreateForm(false);
+          setShowCreateSuccess(false);
+          setCreateFormData({ name: '', category: '', description: '', website: '', location: '' });
         }}
       >
         <View style={[
@@ -4142,6 +4369,9 @@ export default function UnifiedLibrary({
                   setShowAddEndorsementModal(false);
                   setAddSearchQuery('');
                   setAddedItemIds(new Set());
+                  setShowCreateForm(false);
+                  setShowCreateSuccess(false);
+                  setCreateFormData({ name: '', category: '', description: '', website: '', location: '' });
                 }}
                 style={styles.addEndorsementCloseButton}
                 activeOpacity={0.7}
@@ -4200,9 +4430,120 @@ export default function UnifiedLibrary({
                 </View>
               ) : addSearchResults.brands.length === 0 && addSearchResults.businesses.length === 0 && placesResults.length === 0 && !loadingPlaces ? (
                 <View style={styles.addEndorsementEmptyContainer}>
-                  <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
-                    No results found for "{addSearchQuery}"
-                  </Text>
+                  {showCreateSuccess ? (
+                    <>
+                      <Text style={[styles.addEndorsementEmptyTitle, { color: colors.primary }]}>Business Created!</Text>
+                      <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
+                        Your entry has been added and submitted for review.
+                      </Text>
+                    </>
+                  ) : showCreateForm ? (
+                    <>
+                      <Text style={[styles.addEndorsementEmptyTitle, { color: colors.text }]}>Create Business</Text>
+                      <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
+                        Add a business that's not in our database yet
+                      </Text>
+                      <TextInput
+                        style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                        placeholder="Business name *"
+                        placeholderTextColor={colors.textSecondary}
+                        value={createFormData.name}
+                        onChangeText={(text) => setCreateFormData({ ...createFormData, name: text })}
+                        autoFocus
+                      />
+                      <View style={[styles.createFormSelect, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                        <Text style={[styles.createFormSelectLabel, { color: createFormData.category ? colors.text : colors.textSecondary }]}>
+                          {createFormData.category ? CUSTOM_CATEGORIES.find(c => c.id === createFormData.category)?.label : 'Select category *'}
+                        </Text>
+                      </View>
+                      <View style={styles.createFormCategoryGrid}>
+                        {CUSTOM_CATEGORIES.map((cat) => (
+                          <TouchableOpacity
+                            key={cat.id}
+                            style={[
+                              styles.createFormCategoryChip,
+                              {
+                                backgroundColor: createFormData.category === cat.id ? colors.primary : colors.backgroundSecondary,
+                                borderColor: createFormData.category === cat.id ? colors.primary : colors.border,
+                              }
+                            ]}
+                            onPress={() => setCreateFormData({ ...createFormData, category: cat.id })}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[
+                              styles.createFormCategoryChipText,
+                              { color: createFormData.category === cat.id ? '#FFFFFF' : colors.text }
+                            ]}>
+                              {cat.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TextInput
+                        style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                        placeholder="Website (optional)"
+                        placeholderTextColor={colors.textSecondary}
+                        value={createFormData.website}
+                        onChangeText={(text) => setCreateFormData({ ...createFormData, website: text })}
+                        autoCapitalize="none"
+                        keyboardType="url"
+                      />
+                      <TextInput
+                        style={[styles.createFormInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                        placeholder="Location (optional)"
+                        placeholderTextColor={colors.textSecondary}
+                        value={createFormData.location}
+                        onChangeText={(text) => setCreateFormData({ ...createFormData, location: text })}
+                      />
+                      <TextInput
+                        style={[styles.createFormInput, styles.createFormTextArea, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
+                        placeholder="Description (optional)"
+                        placeholderTextColor={colors.textSecondary}
+                        value={createFormData.description}
+                        onChangeText={(text) => setCreateFormData({ ...createFormData, description: text })}
+                        multiline
+                        numberOfLines={3}
+                      />
+                      <View style={styles.createFormButtonRow}>
+                        <TouchableOpacity
+                          style={[styles.createFormCancelButton, { borderColor: colors.border }]}
+                          onPress={() => {
+                            setShowCreateForm(false);
+                            setCreateFormData({ name: addSearchQuery, category: '', description: '', website: '', location: '' });
+                          }}
+                        >
+                          <Text style={[styles.createFormCancelText, { color: colors.textSecondary }]}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.createFormSubmitButton, { backgroundColor: colors.primary, opacity: isSubmittingCreate ? 0.6 : 1 }]}
+                          onPress={handleCreateBusiness}
+                          disabled={isSubmittingCreate}
+                        >
+                          <Text style={styles.createFormSubmitText}>
+                            {isSubmittingCreate ? 'Creating...' : 'Create'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[styles.addEndorsementEmptyText, { color: colors.textSecondary }]}>
+                        No results found for "{addSearchQuery}"
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.createButton, { backgroundColor: colors.primary }]}
+                        onPress={() => {
+                          setCreateFormData({ ...createFormData, name: addSearchQuery });
+                          setShowCreateForm(true);
+                        }}
+                      >
+                        <Text style={styles.createButtonText}>Create</Text>
+                      </TouchableOpacity>
+                      <Text style={[styles.createSubtext, { color: colors.textSecondary }]}>
+                        Add this business to your endorsements
+                      </Text>
+                    </>
+                  )}
                 </View>
               ) : (
                 <>
@@ -4385,6 +4726,24 @@ export default function UnifiedLibrary({
                           </TouchableOpacity>
                         </View>
                       ))}
+                    </View>
+                  )}
+
+                  {/* Create Button - appears at bottom of search results */}
+                  {addSearchQuery.trim() && !loadingPlaces && (
+                    <View style={styles.createButtonContainer}>
+                      <Text style={[styles.createButtonContainerText, { color: colors.textSecondary }]}>
+                        Can't find what you're looking for?
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.createButton, { backgroundColor: colors.primary }]}
+                        onPress={() => {
+                          setCreateFormData({ ...createFormData, name: addSearchQuery });
+                          setShowCreateForm(true);
+                        }}
+                      >
+                        <Text style={styles.createButtonText}>Create</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
                 </>
@@ -5468,6 +5827,108 @@ const styles = StyleSheet.create({
   addEndorsementTextButtonLabel: {
     color: '#FFFFFF',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  addEndorsementEmptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  // Create business form styles
+  createButton: {
+    marginTop: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  createSubtext: {
+    marginTop: 8,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  createButtonContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  createButtonContainerText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  createFormInput: {
+    width: '100%',
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+  },
+  createFormTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  createFormSelect: {
+    width: '100%',
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  createFormSelectLabel: {
+    fontSize: 16,
+  },
+  createFormCategoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    width: '100%',
+  },
+  createFormCategoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  createFormCategoryChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  createFormButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    width: '100%',
+  },
+  createFormCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  createFormCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  createFormSubmitButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  createFormSubmitText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
   // Map modal styles
