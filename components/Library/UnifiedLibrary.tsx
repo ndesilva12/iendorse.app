@@ -1703,10 +1703,10 @@ export default function UnifiedLibrary({
         borderColor: isDarkMode ? 'rgba(0, 170, 250, 1)' : 'rgba(3, 68, 102, 1)',
       };
     } else if (index < 10) {
-      // 6-10: Outlined in muted blue (between app blue and background)
+      // 6-10: Outlined in dark blue (much darker than app blue)
       return {
         borderWidth: 2,
-        borderColor: isDarkMode ? 'rgba(0, 120, 180, 1)' : 'rgba(80, 130, 160, 1)',
+        borderColor: isDarkMode ? 'rgba(0, 80, 120, 1)' : 'rgba(2, 45, 70, 1)',
       };
     }
     // 11+: no outline
@@ -1714,7 +1714,8 @@ export default function UnifiedLibrary({
   };
 
   // EXACT copy of Home tab's renderListEntry with score calculation
-  const renderListEntry = (entry: ListEntry, isEndorsementSection: boolean = false, entryIndex?: number) => {
+  // originalIndex is used for border styling when filtered (to keep outlines based on original position)
+  const renderListEntry = (entry: ListEntry, isEndorsementSection: boolean = false, entryIndex?: number, originalIndex?: number) => {
     if (!entry) return null;
 
     switch (entry.type) {
@@ -1757,7 +1758,8 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
-            const cardBorderStyle = getEntryCardBorderStyle(entryIndex);
+            // Use originalIndex for border styling to maintain outlines based on original list position when filtered
+            const cardBorderStyle = getEntryCardBorderStyle(originalIndex ?? entryIndex);
             return (
               <TouchableOpacity
                 style={[
@@ -1890,7 +1892,8 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
-            const cardBorderStyle = getEntryCardBorderStyle(entryIndex);
+            // Use originalIndex for border styling to maintain outlines based on original list position when filtered
+            const cardBorderStyle = getEntryCardBorderStyle(originalIndex ?? entryIndex);
             return (
               <TouchableOpacity
                 style={[
@@ -2157,7 +2160,8 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
-            const cardBorderStyle = getEntryCardBorderStyle(entryIndex);
+            // Use originalIndex for border styling to maintain outlines based on original list position when filtered
+            const cardBorderStyle = getEntryCardBorderStyle(originalIndex ?? entryIndex);
             return (
               <TouchableOpacity
                 style={[
@@ -2294,7 +2298,8 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
-            const cardBorderStyle = getEntryCardBorderStyle(entryIndex);
+            // Use originalIndex for border styling to maintain outlines based on original list position when filtered
+            const cardBorderStyle = getEntryCardBorderStyle(originalIndex ?? entryIndex);
             return (
               <View
                 style={[
@@ -2768,8 +2773,9 @@ export default function UnifiedLibrary({
     const showLocalFilter = hasLocalEntries && hasNonLocalEntries;
 
     // Get categories that have entries (using custom category system)
+    // Use allEntries to keep filter options consistent regardless of which filter is selected
     const categoryCounts = new Map<string, number>();
-    localFilteredEntries.forEach(entry => {
+    allEntries.forEach(entry => {
       const categoryId = getEntryCategory(entry);
       if (categoryId) {
         categoryCounts.set(categoryId, (categoryCounts.get(categoryId) || 0) + 1);
@@ -2777,9 +2783,18 @@ export default function UnifiedLibrary({
     });
 
     // Only show categories that have at least one entry, in predefined order
+    // Categories remain constant regardless of local/category filter selection
     const uniqueCategories = CUSTOM_CATEGORIES
       .filter(cat => categoryCounts.has(cat.id))
       .map(cat => ({ id: cat.id, label: cat.label, count: categoryCounts.get(cat.id) || 0 }));
+
+    // Create lookup map for original positions (used for outline styling when filtered)
+    const originalPositionMap = new Map<string, number>();
+    allEntries.forEach((entry, idx) => {
+      if (entry && entry.id) {
+        originalPositionMap.set(entry.id, idx);
+      }
+    });
 
     // Render filter buttons
     const renderFilterButtons = () => {
@@ -2957,6 +2972,9 @@ export default function UnifiedLibrary({
       const isFirst = index === 0;
       const isLast = index === entriesToDisplay.length - 1;
 
+      // Get original position for border styling (maintains outlines when filtered)
+      const originalIndex = originalPositionMap.get(entry.id);
+
       if (isReordering) {
         // Sortable entry for both mobile (long press) and desktop (drag handle)
         const SortableEntry = () => {
@@ -3003,9 +3021,10 @@ export default function UnifiedLibrary({
       }
 
       // Normal (non-reorder) mode - render card directly with index for styling
+      // Pass originalIndex to maintain outlines based on original list position when filtered
       return (
         <View key={entry.id} style={styles.endorsementEntryWrapper}>
-          {renderListEntry(entry, true, index)}
+          {renderListEntry(entry, true, index, originalIndex)}
         </View>
       );
     };
