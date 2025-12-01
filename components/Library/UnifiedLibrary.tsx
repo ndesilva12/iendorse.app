@@ -1691,21 +1691,12 @@ export default function UnifiedLibrary({
   const getEntryCardBackgroundColor = (index: number): string => {
     // Use app blue with different opacities based on ranking tiers
     // Light mode: rgb(3, 68, 102), Dark mode: rgb(0, 170, 250)
-    if (index < 5) {
-      // Top 5: 35% opacity (with outline)
-      return isDarkMode ? 'rgba(0, 170, 250, 0.35)' : 'rgba(3, 68, 102, 0.35)';
-    } else if (index < 10) {
-      // 6-10: Same 35% opacity as top 5 (no outline)
-      return isDarkMode ? 'rgba(0, 170, 250, 0.35)' : 'rgba(3, 68, 102, 0.35)';
-    } else if (index < 15) {
-      // 11-15: 20% opacity
+    if (index < 10) {
+      // Top 10: 20% opacity (1-5 with outline, 6-10 no outline)
       return isDarkMode ? 'rgba(0, 170, 250, 0.20)' : 'rgba(3, 68, 102, 0.20)';
-    } else if (index < 20) {
-      // 16-20: 10% opacity
-      return isDarkMode ? 'rgba(0, 170, 250, 0.10)' : 'rgba(3, 68, 102, 0.10)';
     }
-    // 21+: Black fill background
-    return isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.85)';
+    // 11+: 10% opacity (standard for all ranked items beyond top 10)
+    return isDarkMode ? 'rgba(0, 170, 250, 0.10)' : 'rgba(3, 68, 102, 0.10)';
   };
 
   // Helper function to get card border style based on position
@@ -4008,7 +3999,7 @@ export default function UnifiedLibrary({
                 style={styles.headerActionButton}
                 activeOpacity={0.7}
               >
-                <MapPin size={24} color={colors.primary} strokeWidth={2} />
+                <MapPin size={28} color={colors.primary} strokeWidth={2} />
               </TouchableOpacity>
             )}
 
@@ -5697,7 +5688,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   headerActionButton: {
-    padding: 8,
+    padding: 10,
   },
   endorsedActionDropdown: {
     position: 'absolute',
@@ -5818,7 +5809,7 @@ const styles = StyleSheet.create({
   endorsedHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   addEndorsementButton: {
     width: 36,
