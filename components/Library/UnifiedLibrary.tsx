@@ -378,6 +378,8 @@ export default function UnifiedLibrary({
   // Endorsement list filter state
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [localFilter, setLocalFilter] = useState<'all' | 'local'>('all');
+  const [listSearchQuery, setListSearchQuery] = useState('');
+  const [showListSearch, setShowListSearch] = useState(false);
 
   // Section selection state
   // Profile views (preview/view) ALWAYS default to endorsement
@@ -723,10 +725,17 @@ export default function UnifiedLibrary({
   const mapEntries = useMemo((): MapEntry[] => {
     if (!endorsementList?.entries) return [];
 
-    // Helper to get entry category (same logic as in render)
+    // Helper to get entry category (looks up from brands context if not stored on entry)
     const getEntryCategory = (entry: ListEntry): string => {
       let rawCategory: string | undefined;
-      if (entry.type === 'brand') rawCategory = (entry as any).brandCategory;
+      if (entry.type === 'brand') {
+        rawCategory = (entry as any).brandCategory;
+        // Look up from brands context if not stored on entry
+        if (!rawCategory) {
+          const brand = brands.find(b => b.id === (entry as any).brandId);
+          rawCategory = brand?.category;
+        }
+      }
       else if (entry.type === 'business') rawCategory = (entry as any).businessCategory;
       else if (entry.type === 'place') rawCategory = (entry as any).placeCategory;
       return mapToCustomCategory(rawCategory);
@@ -2660,10 +2669,17 @@ export default function UnifiedLibrary({
     // Apply filter to entries
     const allEntries = isReordering ? localEntries : endorsementList.entries;
 
-    // Helper to get category from entry (maps to custom categories)
+    // Helper to get category from entry (maps to custom categories, looks up from brands context if not stored)
     const getEntryCategory = (entry: ListEntry): string => {
       let rawCategory: string | undefined;
-      if (entry.type === 'brand') rawCategory = (entry as any).brandCategory;
+      if (entry.type === 'brand') {
+        rawCategory = (entry as any).brandCategory;
+        // Look up from brands context if not stored on entry
+        if (!rawCategory) {
+          const brand = brands.find(b => b.id === (entry as any).brandId);
+          rawCategory = brand?.category;
+        }
+      }
       else if (entry.type === 'business') rawCategory = (entry as any).businessCategory;
       else if (entry.type === 'place') rawCategory = (entry as any).placeCategory;
       else if (entry.type === 'pending_business') rawCategory = (entry as any).pendingBusinessCategory;
@@ -2691,13 +2707,32 @@ export default function UnifiedLibrary({
       : allEntries.filter(entry => entry && isLocalEntry(entry));
 
     // Then apply category filter (uses custom category IDs)
-    const filteredEntries = categoryFilter === 'all'
+    const categoryFilteredEntries = categoryFilter === 'all'
       ? localFilteredEntries
       : localFilteredEntries.filter(entry => {
           const categoryId = getEntryCategory(entry);
           return categoryId === categoryFilter;
         });
-    const entriesToDisplay = filteredEntries;
+
+    // Apply search filter if search query is active
+    const getEntryName = (entry: ListEntry): string => {
+      if (entry.type === 'brand') return (entry as any).brandName || '';
+      if (entry.type === 'business') return (entry as any).businessName || '';
+      if (entry.type === 'place') return (entry as any).placeName || '';
+      if (entry.type === 'pending_business') return (entry as any).pendingBusinessName || '';
+      if (entry.type === 'value') return (entry as any).valueName || '';
+      return '';
+    };
+
+    const searchFilteredEntries = listSearchQuery.trim()
+      ? categoryFilteredEntries.filter(entry => {
+          const name = getEntryName(entry).toLowerCase();
+          const search = listSearchQuery.toLowerCase().trim();
+          return name.includes(search);
+        })
+      : categoryFilteredEntries;
+
+    const entriesToDisplay = searchFilteredEntries;
 
     // Check if there are local entries to show the local filter
     const hasLocalEntries = allEntries.some(e => e && isLocalEntry(e));
@@ -2725,85 +2760,137 @@ export default function UnifiedLibrary({
       // Show category filter if there are categories to filter by
       const showCategoryFilter = uniqueCategories.length > 1;
 
-      if (!showLocalFilter && !showCategoryFilter) return null;
+      // Always show if there are entries (for search functionality)
+      if (!showLocalFilter && !showCategoryFilter && allEntries.length < 2) return null;
 
       return (
         <View style={styles.filterButtonsContainer}>
-          {/* Local/All filter row + Category filters combined */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterButtonsScroll}>
-            {/* All filter */}
-            <TouchableOpacity
-              key="all"
-              style={[
-                styles.filterButton,
-                localFilter === 'all' && categoryFilter === 'all'
-                  ? { backgroundColor: colors.primary }
-                  : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
-              ]}
-              onPress={() => {
-                setLocalFilter('all');
-                setCategoryFilter('all');
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.filterButtonText,
-                { color: localFilter === 'all' && categoryFilter === 'all' ? '#FFFFFF' : colors.text }
-              ]}>
-                All
-              </Text>
-            </TouchableOpacity>
-
-            {/* Local filter */}
-            {showLocalFilter && (
+          {showListSearch ? (
+            // Search bar mode - replaces all filter options
+            <View style={styles.listSearchContainer}>
+              <View style={[styles.listSearchInputContainer, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Search size={18} color={colors.textSecondary} strokeWidth={2} />
+                <TextInput
+                  style={[styles.listSearchInput, { color: colors.text }]}
+                  placeholder="Search endorsements..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={listSearchQuery}
+                  onChangeText={setListSearchQuery}
+                  autoFocus
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {listSearchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setListSearchQuery('')}
+                    style={styles.listSearchClearButton}
+                    activeOpacity={0.7}
+                  >
+                    <X size={16} color={colors.textSecondary} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <TouchableOpacity
-                key="local"
+                onPress={() => {
+                  setShowListSearch(false);
+                  setListSearchQuery('');
+                }}
+                style={styles.listSearchCancelButton}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.listSearchCancelText, { color: colors.primary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // Normal filter mode
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterButtonsScroll}>
+              {/* Search icon */}
+              <TouchableOpacity
                 style={[
                   styles.filterButton,
-                  localFilter === 'local' && categoryFilter === 'all'
+                  styles.filterButtonIcon,
+                  { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
+                ]}
+                onPress={() => setShowListSearch(true)}
+                activeOpacity={0.7}
+              >
+                <Search size={16} color={colors.text} strokeWidth={2} />
+              </TouchableOpacity>
+
+              {/* All filter */}
+              <TouchableOpacity
+                key="all"
+                style={[
+                  styles.filterButton,
+                  localFilter === 'all' && categoryFilter === 'all'
                     ? { backgroundColor: colors.primary }
                     : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
                 ]}
                 onPress={() => {
-                  setLocalFilter('local');
+                  setLocalFilter('all');
                   setCategoryFilter('all');
                 }}
                 activeOpacity={0.7}
               >
                 <Text style={[
                   styles.filterButtonText,
-                  { color: localFilter === 'local' && categoryFilter === 'all' ? '#FFFFFF' : colors.text }
+                  { color: localFilter === 'all' && categoryFilter === 'all' ? '#FFFFFF' : colors.text }
                 ]}>
-                  Local
+                  All
                 </Text>
               </TouchableOpacity>
-            )}
 
-            {/* Category filters */}
-            {showCategoryFilter && uniqueCategories.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[
-                  styles.filterButton,
-                  categoryFilter === cat.id
-                    ? { backgroundColor: colors.primary }
-                    : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
-                ]}
-                onPress={() => {
-                  setLocalFilter('all'); // Reset local filter when selecting category
-                  setCategoryFilter(cat.id);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={[
-                  styles.filterButtonText,
-                  { color: categoryFilter === cat.id ? '#FFFFFF' : colors.text }
-                ]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+              {/* Local filter */}
+              {showLocalFilter && (
+                <TouchableOpacity
+                  key="local"
+                  style={[
+                    styles.filterButton,
+                    localFilter === 'local' && categoryFilter === 'all'
+                      ? { backgroundColor: colors.primary }
+                      : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
+                  ]}
+                  onPress={() => {
+                    setLocalFilter('local');
+                    setCategoryFilter('all');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    { color: localFilter === 'local' && categoryFilter === 'all' ? '#FFFFFF' : colors.text }
+                  ]}>
+                    Local
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Category filters */}
+              {showCategoryFilter && uniqueCategories.map(cat => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[
+                    styles.filterButton,
+                    categoryFilter === cat.id
+                      ? { backgroundColor: colors.primary }
+                      : { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }
+                  ]}
+                  onPress={() => {
+                    setLocalFilter('all'); // Reset local filter when selecting category
+                    setCategoryFilter(cat.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    { color: categoryFilter === cat.id ? '#FFFFFF' : colors.text }
+                  ]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
       );
     };
@@ -5424,8 +5511,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
   },
+  filterButtonIcon: {
+    paddingHorizontal: 12,
+  },
   filterButtonText: {
     fontSize: 14,
+    fontWeight: '500',
+  },
+  // List search styles
+  listSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    gap: 12,
+  },
+  listSearchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  listSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+    outlineStyle: 'none',
+  } as any,
+  listSearchClearButton: {
+    padding: 4,
+  },
+  listSearchCancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  listSearchCancelText: {
+    fontSize: 15,
     fontWeight: '500',
   },
   reorderEntryRow: {
