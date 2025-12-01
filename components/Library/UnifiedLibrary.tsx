@@ -1689,27 +1689,19 @@ export default function UnifiedLibrary({
 
   // Helper function to get card background color based on position
   const getEntryCardBackgroundColor = (index: number): string => {
-    // All cards: 10% opacity app blue
     // Light mode: rgb(3, 68, 102), Dark mode: rgb(0, 170, 250)
-    return isDarkMode ? 'rgba(0, 170, 250, 0.10)' : 'rgba(3, 68, 102, 0.10)';
+    // Top 10: gradient from 40% down to 13% (stepping down 3% each position)
+    // 11+: 10% opacity
+    const opacities = [0.40, 0.37, 0.34, 0.31, 0.28, 0.25, 0.22, 0.19, 0.16, 0.13];
+    const opacity = index < 10 ? opacities[index] : 0.10;
+    return isDarkMode
+      ? `rgba(0, 170, 250, ${opacity})`
+      : `rgba(3, 68, 102, ${opacity})`;
   };
 
   // Helper function to get card border style based on position
   const getEntryCardBorderStyle = (index: number): { borderWidth: number; borderColor: string } | {} => {
-    if (index < 5) {
-      // Top 5: Outlined in app blue
-      return {
-        borderWidth: 2,
-        borderColor: isDarkMode ? 'rgba(0, 170, 250, 1)' : 'rgba(3, 68, 102, 1)',
-      };
-    } else if (index < 10) {
-      // 6-10: Outlined in dark blue (much darker than app blue)
-      return {
-        borderWidth: 2,
-        borderColor: isDarkMode ? 'rgba(0, 80, 120, 1)' : 'rgba(2, 45, 70, 1)',
-      };
-    }
-    // 11+: no outline
+    // No outlines for any cards
     return {};
   };
 
