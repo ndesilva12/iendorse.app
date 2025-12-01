@@ -1689,13 +1689,8 @@ export default function UnifiedLibrary({
 
   // Helper function to get card background color based on position
   const getEntryCardBackgroundColor = (index: number): string => {
-    // Use app blue with different opacities based on ranking tiers
+    // All cards: 10% opacity app blue
     // Light mode: rgb(3, 68, 102), Dark mode: rgb(0, 170, 250)
-    if (index < 10) {
-      // Top 10: 20% opacity (1-5 with outline, 6-10 no outline)
-      return isDarkMode ? 'rgba(0, 170, 250, 0.20)' : 'rgba(3, 68, 102, 0.20)';
-    }
-    // 11+: 10% opacity (standard for all ranked items beyond top 10)
     return isDarkMode ? 'rgba(0, 170, 250, 0.10)' : 'rgba(3, 68, 102, 0.10)';
   };
 
@@ -1707,8 +1702,14 @@ export default function UnifiedLibrary({
         borderWidth: 2,
         borderColor: isDarkMode ? 'rgba(0, 170, 250, 1)' : 'rgba(3, 68, 102, 1)',
       };
+    } else if (index < 10) {
+      // 6-10: Outlined in muted blue (between app blue and background)
+      return {
+        borderWidth: 2,
+        borderColor: isDarkMode ? 'rgba(0, 120, 180, 1)' : 'rgba(80, 130, 160, 1)',
+      };
     }
-    // All others: no outline
+    // 11+: no outline
     return {};
   };
 
