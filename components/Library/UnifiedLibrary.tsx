@@ -1680,17 +1680,36 @@ export default function UnifiedLibrary({
 
   // Helper function to get card background color based on position
   const getEntryCardBackgroundColor = (index: number): string => {
-    // Use app blue with different opacities
+    // Use app blue with different opacities based on ranking tiers
     // Light mode: rgb(3, 68, 102), Dark mode: rgb(0, 170, 250)
     if (index < 5) {
-      // Top 5: 35% opacity
+      // Top 5: 35% opacity (with outline)
       return isDarkMode ? 'rgba(0, 170, 250, 0.35)' : 'rgba(3, 68, 102, 0.35)';
     } else if (index < 10) {
-      // 6-10: 20% opacity
+      // 6-10: Same 35% opacity as top 5 (no outline)
+      return isDarkMode ? 'rgba(0, 170, 250, 0.35)' : 'rgba(3, 68, 102, 0.35)';
+    } else if (index < 15) {
+      // 11-15: 20% opacity
       return isDarkMode ? 'rgba(0, 170, 250, 0.20)' : 'rgba(3, 68, 102, 0.20)';
+    } else if (index < 20) {
+      // 16-20: 10% opacity
+      return isDarkMode ? 'rgba(0, 170, 250, 0.10)' : 'rgba(3, 68, 102, 0.10)';
     }
-    // 11+: 10% opacity
-    return isDarkMode ? 'rgba(0, 170, 250, 0.10)' : 'rgba(3, 68, 102, 0.10)';
+    // 21+: Black fill background
+    return isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.85)';
+  };
+
+  // Helper function to get card border style based on position
+  const getEntryCardBorderStyle = (index: number): { borderWidth: number; borderColor: string } | {} => {
+    if (index < 5) {
+      // Top 5: Outlined in app blue
+      return {
+        borderWidth: 2,
+        borderColor: isDarkMode ? 'rgba(0, 170, 250, 1)' : 'rgba(3, 68, 102, 1)',
+      };
+    }
+    // All others: no outline
+    return {};
   };
 
   // EXACT copy of Home tab's renderListEntry with score calculation
@@ -1737,11 +1756,13 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            const cardBorderStyle = getEntryCardBorderStyle(entryIndex);
             return (
               <TouchableOpacity
                 style={[
                   styles.endorsementEntryCard,
                   { backgroundColor: cardBgColor },
+                  cardBorderStyle,
                 ]}
                 onPress={() => {
                   router.push({
@@ -1868,11 +1889,13 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            const cardBorderStyle = getEntryCardBorderStyle(entryIndex);
             return (
               <TouchableOpacity
                 style={[
                   styles.endorsementEntryCard,
                   { backgroundColor: cardBgColor },
+                  cardBorderStyle,
                 ]}
                 onPress={() => {
                   router.push({
@@ -2133,11 +2156,13 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            const cardBorderStyle = getEntryCardBorderStyle(entryIndex);
             return (
               <TouchableOpacity
                 style={[
                   styles.endorsementEntryCard,
                   { backgroundColor: cardBgColor },
+                  cardBorderStyle,
                 ]}
                 onPress={() => {
                   router.push({
@@ -2268,11 +2293,13 @@ export default function UnifiedLibrary({
           // Endorsement section: render as card with position-based background
           if (isEndorsementSection && entryIndex !== undefined) {
             const cardBgColor = getEntryCardBackgroundColor(entryIndex);
+            const cardBorderStyle = getEntryCardBorderStyle(entryIndex);
             return (
               <View
                 style={[
                   styles.endorsementEntryCard,
                   { backgroundColor: cardBgColor },
+                  cardBorderStyle,
                 ]}
               >
                 {logoUrl ? (
