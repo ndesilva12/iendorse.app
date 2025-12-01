@@ -1,21 +1,21 @@
 {
-  "name": "endorse",
-  "short_name": "endorse",
-  "description": "endorse - Vote With Your Money",
+  "name": "iEndorse",
+  "short_name": "iEndorse",
+  "description": "iEndorse - Build Your Endorsement List",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#111827",
+  "theme_color": "#034466",
   "orientation": "portrait",
   "scope": "/",
   "icons": [
     {
-      "src": "/endorseofficialicon.png?v=2",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/endorseofficialicon.png?v=2",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

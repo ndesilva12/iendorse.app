@@ -529,7 +529,7 @@ export default function SharedListScreen() {
       <View style={styles.appHeaderContent}>
         <TouchableOpacity onPress={handleGoHome} activeOpacity={0.7}>
           <Image
-            source={require('@/assets/images/endorsemulti1.png')}
+            source={require('@/assets/images/endorsing.png')}
             style={styles.headerLogo}
             contentFit="contain"
           />

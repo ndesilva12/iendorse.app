@@ -43,7 +43,7 @@ export default function ForBusinessesScreen() {
         <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
           <View style={styles.headerContent}>
             <Image
-              source={require('@/assets/images/endorseofficialicon.png')}
+              source={require('@/assets/images/endorsing1.png')}
               style={styles.headerLogo}
               resizeMode="contain"
             />
@@ -276,7 +276,7 @@ export default function ForBusinessesScreen() {
         {/* Footer */}
         <View style={[styles.footer, { backgroundColor: colors.backgroundSecondary, borderTopColor: colors.border }]}>
           <Image
-            source={require('@/assets/images/endorseofficialicon.png')}
+            source={require('@/assets/images/endorsing1.png')}
             style={styles.footerLogo}
             resizeMode="contain"
           />
