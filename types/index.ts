@@ -188,4 +188,7 @@ export interface UserProfile {
   alignedListPublic?: boolean; // Whether the Aligned system list is publicly viewable (default: true)
   unalignedListPublic?: boolean; // Whether the Unaligned system list is publicly viewable (default: true)
   hasSeenIntro?: boolean; // Whether user has seen the welcome carousel (default: false)
+  // Verification badges
+  isVerified?: boolean; // True for organic/existing verified accounts (shows blue filled badge)
+  isCelebrityAccount?: boolean; // True for celebrity accounts created via batch import (shows grey outlined badge)
 }
