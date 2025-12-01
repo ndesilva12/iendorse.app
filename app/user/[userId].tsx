@@ -303,7 +303,7 @@ export default function UserProfileScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.homeButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/(tabs)/home')}
+            onPress={() => router.push('/(tabs)/list')}
             activeOpacity={0.7}
           >
             <Text style={[styles.homeButtonText, { color: colors.white }]}>Go to Home</Text>

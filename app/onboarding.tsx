@@ -115,7 +115,7 @@ export default function OnboardingScreen() {
       // User has completed values selection - they should go to home
       // Business users don't NEED businessInfo to use the app
       console.log('[Onboarding] User already has causes, redirecting to home');
-      router.replace('/(tabs)/home');
+      router.replace('/(tabs)/list');
       return;
     }
   }, [isLoading, profile?.causes?.length]);
@@ -430,7 +430,7 @@ export default function OnboardingScreen() {
   const handleWelcomeComplete = () => {
     setShowWelcomeModal(false);
     console.log('[Onboarding] Redirecting to browse tab');
-    router.replace('/(tabs)/values');
+    router.replace('/(tabs)/browse');
   };
 
   const toggleCategoryExpanded = (category: string) => {

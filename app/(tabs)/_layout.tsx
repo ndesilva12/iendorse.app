@@ -116,21 +116,21 @@ export default function TabLayout() {
             }}
           >
             <Tabs.Screen
-              name="home"
+              name="list"
               options={{
                 title: "List",
                 tabBarIcon: renderTabIconWithLabel(Home, "List", colors.primary),
               }}
             />
             <Tabs.Screen
-              name="values"
+              name="browse"
               options={{
                 title: "Browse",
                 tabBarIcon: renderTabIconWithLabel(BookOpen, "Browse", colors.primary),
               }}
             />
             <Tabs.Screen
-              name="search"
+              name="explore"
               options={{
                 title: "Explore",
                 tabBarIcon: renderTabIconWithLabel(Compass, "Explore", colors.primary),

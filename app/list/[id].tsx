@@ -120,7 +120,7 @@ export default function SharedListScreen() {
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.dx > 100) {
           if (isSignedIn) {
-            router.push('/(tabs)/home');
+            router.push('/(tabs)/list');
           }
         }
       },
@@ -320,7 +320,7 @@ export default function SharedListScreen() {
   };
 
   const handleGoHome = () => {
-    router.push('/(tabs)/home');
+    router.push('/(tabs)/list');
   };
 
   const handleSignIn = () => {

@@ -1056,11 +1056,12 @@ export default function UnifiedLibrary({
         }
       );
 
-      // Show success state
+      // Show success state on button briefly
       setShowCreateSuccess(true);
 
-      // Reset form after delay
+      // Close modal after brief success display
       setTimeout(() => {
+        setShowAddEndorsementModal(false);
         setShowCreateSuccess(false);
         setShowCreateForm(false);
         setCreateFormData({
@@ -1071,7 +1072,8 @@ export default function UnifiedLibrary({
           location: '',
         });
         setAddSearchQuery('');
-      }, 2000);
+        setAddedItemIds(new Set());
+      }, 800);
 
       // Reload library
       if (currentUserId) {
@@ -4513,13 +4515,17 @@ export default function UnifiedLibrary({
                       <Text style={[styles.createFormCancelText, { color: colors.textSecondary }]}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.createFormSubmitButton, { backgroundColor: colors.primary, opacity: isSubmittingCreate ? 0.6 : 1 }]}
+                      style={[styles.createFormSubmitButton, { backgroundColor: showCreateSuccess ? '#22C55E' : colors.primary, opacity: isSubmittingCreate ? 0.6 : 1 }]}
                       onPress={handleCreateBusiness}
-                      disabled={isSubmittingCreate}
+                      disabled={isSubmittingCreate || showCreateSuccess}
                     >
-                      <Text style={styles.createFormSubmitText}>
-                        {isSubmittingCreate ? 'Creating...' : 'Create'}
-                      </Text>
+                      {showCreateSuccess ? (
+                        <Check size={20} color="#FFFFFF" strokeWidth={3} />
+                      ) : (
+                        <Text style={styles.createFormSubmitText}>
+                          {isSubmittingCreate ? 'Creating...' : 'Create'}
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </View>
