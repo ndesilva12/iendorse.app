@@ -1638,25 +1638,22 @@ export default function SearchScreen() {
             autoCorrect={false}
             underlineColorAndroid="transparent"
           />
-          <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {query.length > 0 && (
             <TouchableOpacity
               onPress={() => {
                 setQuery('');
                 setResults([]);
               }}
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: '#E5E5E5',
+                padding: 8,
                 alignItems: 'center' as const,
                 justifyContent: 'center' as const,
               }}
               activeOpacity={0.7}
             >
-              <X size={18} color="#666666" strokeWidth={2.5} />
+              <X size={20} color={colors.textSecondary} strokeWidth={2} />
             </TouchableOpacity>
-          </View>
+          )}
         </View>
         </View>
       </View>
