@@ -8,7 +8,7 @@
  * - Auto-generated endorsement list with provided businesses
  */
 
-import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { UserProfile, SocialMedia } from '@/types';
 import { UserList, ListEntry, BrandListEntry } from '@/types/library';
@@ -122,7 +122,18 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
       socialMedia.instagram = data.instagram.replace('@', '');
     }
 
-    // Create the user profile
+    // Create the user profile - only include fields that have values
+    const userDetails: Record<string, any> = {
+      name: data.name,
+      description: data.description || `${data.name}'s endorsements`,
+      socialMedia,
+    };
+
+    // Only add optional fields if they have values
+    if (data.location) userDetails.location = data.location;
+    if (data.website) userDetails.website = data.website;
+    if (data.profileImageUrl) userDetails.profileImage = data.profileImageUrl;
+
     const userProfile: Partial<UserProfile> = {
       id: userId,
       accountType: 'individual',
@@ -133,19 +144,8 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
       unalignedListPublic: true,
       hasSeenIntro: true,
       isCelebrityAccount: true, // Mark as celebrity account (grey badge)
-      userDetails: {
-        name: data.name,
-        description: data.description || `${data.name}'s endorsements`,
-        location: data.location,
-        website: data.website,
-        socialMedia,
-      },
+      userDetails: userDetails as any,
     };
-
-    // If profile image is provided, add it
-    if (data.profileImageUrl && userProfile.userDetails) {
-      (userProfile.userDetails as any).profileImage = data.profileImageUrl;
-    }
 
     // Create user document (remove undefined fields)
     const userDoc = removeUndefined({
@@ -838,6 +838,92 @@ export async function normalizeCelebrityAccounts(): Promise<{
     return results;
   } catch (error) {
     console.error('[CelebrityService] Normalization error:', error);
+    results.success = false;
+    results.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    return results;
+  }
+}
+
+/**
+ * Delete all celebrity accounts and their associated data
+ * This removes:
+ * - User documents from 'users' collection (where isCelebrityAccount=true OR id starts with 'celeb_')
+ * - Their endorsement lists from 'userLists' collection
+ */
+export async function deleteAllCelebrityAccounts(): Promise<{
+  success: boolean;
+  deletedUsers: number;
+  deletedLists: number;
+  errors: string[];
+}> {
+  const results = {
+    success: true,
+    deletedUsers: 0,
+    deletedLists: 0,
+    errors: [] as string[],
+  };
+
+  try {
+    console.log('[CelebrityService] Starting deletion of all celebrity accounts...');
+
+    // Find all celebrity accounts
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('isCelebrityAccount', '==', true));
+    const querySnapshot = await getDocs(q);
+
+    console.log(`[CelebrityService] Found ${querySnapshot.size} celebrity accounts to delete`);
+
+    for (const userDoc of querySnapshot.docs) {
+      const userId = userDoc.id;
+      const userData = userDoc.data();
+      const userName = userData.userDetails?.name || userData.fullName || userId;
+
+      try {
+        // Delete the user's endorsement list
+        const listId = `${userId}_endorsement`;
+        const listRef = doc(db, 'userLists', listId);
+        const listDoc = await getDoc(listRef);
+
+        if (listDoc.exists()) {
+          await deleteDoc(listRef);
+          results.deletedLists++;
+          console.log(`[CelebrityService] Deleted list: ${listId}`);
+        }
+
+        // Delete the user document
+        await deleteDoc(doc(db, 'users', userId));
+        results.deletedUsers++;
+        console.log(`[CelebrityService] Deleted user: ${userId} (${userName})`);
+
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (err) {
+        const errorMsg = `Failed to delete ${userId}: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        results.errors.push(errorMsg);
+        console.error(`[CelebrityService] ${errorMsg}`);
+      }
+    }
+
+    // Also clean up any orphaned lists with celeb_ prefix
+    const listsRef = collection(db, 'userLists');
+    const listsSnapshot = await getDocs(listsRef);
+
+    for (const listDoc of listsSnapshot.docs) {
+      if (listDoc.id.startsWith('celeb_')) {
+        try {
+          await deleteDoc(doc(db, 'userLists', listDoc.id));
+          results.deletedLists++;
+          console.log(`[CelebrityService] Deleted orphaned list: ${listDoc.id}`);
+        } catch (err) {
+          results.errors.push(`Failed to delete orphaned list ${listDoc.id}`);
+        }
+      }
+    }
+
+    console.log(`[CelebrityService] Deletion complete: ${results.deletedUsers} users, ${results.deletedLists} lists deleted`);
+    return results;
+  } catch (error) {
+    console.error('[CelebrityService] Deletion error:', error);
     results.success = false;
     results.errors.push(error instanceof Error ? error.message : 'Unknown error');
     return results;
