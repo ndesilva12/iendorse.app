@@ -159,6 +159,8 @@ export interface UserDetails {
   latitude?: number;
   longitude?: number;
   socialMedia?: SocialMedia;
+  profileImage?: string; // Profile photo URL
+  coverImage?: string; // Cover/banner image URL
 }
 
 export interface ValueCodeCustomer {

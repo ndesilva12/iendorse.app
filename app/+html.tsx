@@ -11,13 +11,13 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="theme-color" content="#111827" />
 
         {/* Basic SEO Meta Tags */}
-        <title>iEndorse - Build Your Endorsement List</title>
+        <title>iEndorse - Build Your Endorsement List & Earn</title>
         <meta name="description" content="Build your endorsement list of favorite brands and businesses. Discover what your friends recommend. Earn discounts for your endorsements." />
 
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://iendorse.app/" />
-        <meta property="og:title" content="iEndorse - Build Your Endorsement List" />
+        <meta property="og:title" content="iEndorse - Build Your Endorsement List & Earn" />
         <meta property="og:description" content="Build your endorsement list of favorite brands and businesses. Discover what your friends recommend. Earn discounts for your endorsements." />
         <meta property="og:image" content="https://iendorse.app/og-image.png" />
         <meta property="og:image:width" content="730" />
@@ -27,7 +27,7 @@ export default function Root({ children }: PropsWithChildren) {
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:url" content="https://iendorse.app/" />
-        <meta name="twitter:title" content="iEndorse - Build Your Endorsement List" />
+        <meta name="twitter:title" content="iEndorse - Build Your Endorsement List & Earn" />
         <meta name="twitter:description" content="Build your endorsement list of favorite brands and businesses. Discover what your friends recommend. Earn discounts for your endorsements." />
         <meta name="twitter:image" content="https://iendorse.app/og-image.png" />
 

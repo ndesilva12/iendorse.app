@@ -54,7 +54,9 @@ export default function UserDetailsEditor() {
   const [twitter, setTwitter] = useState(userDetails.socialMedia?.twitter || '');
   const [linkedin, setLinkedin] = useState(userDetails.socialMedia?.linkedin || '');
   const [profileImage, setProfileImage] = useState(userDetails.profileImage || '');
+  const [coverImage, setCoverImage] = useState(userDetails.coverImage || '');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingCoverImage, setUploadingCoverImage] = useState(false);
   const [isPublicProfile, setIsPublicProfile] = useState(profile.isPublicProfile || false);
 
   const handleLocationSelect = (locationName: string, lat: number, lon: number) => {
@@ -90,6 +92,34 @@ export default function UserDetailsEditor() {
     }
   };
 
+  const handleUploadCoverImage = async () => {
+    if (!clerkUser?.id) {
+      Alert.alert('Error', 'User not logged in. Please log in and try again.');
+      return;
+    }
+
+    setUploadingCoverImage(true);
+    try {
+      console.log('[UserDetailsEditor] Starting cover image upload for user:', clerkUser.id);
+      // Use 16:9 aspect ratio for cover images
+      const downloadURL = await pickAndUploadImage(clerkUser.id, 'cover', [16, 9]);
+
+      if (downloadURL) {
+        console.log('[UserDetailsEditor] Cover image uploaded successfully:', downloadURL);
+        setCoverImage(downloadURL);
+        Alert.alert('Success', 'Cover image uploaded! Remember to click "Save Changes" to save it to your profile.');
+      } else {
+        console.log('[UserDetailsEditor] Cover image upload cancelled or failed');
+        Alert.alert('Cancelled', 'Image upload was cancelled.');
+      }
+    } catch (error) {
+      console.error('[UserDetailsEditor] Error uploading cover image:', error);
+      Alert.alert('Error', 'Failed to upload cover image. Please try again.');
+    } finally {
+      setUploadingCoverImage(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!clerkUser?.id) {
       Alert.alert('Error', 'User not logged in. Please log in and try again.');
@@ -119,6 +149,9 @@ export default function UserDetailsEditor() {
     }
     if (profileImage) {
       updateInfo.profileImage = profileImage;
+    }
+    if (coverImage) {
+      updateInfo.coverImage = coverImage;
     }
 
     await setUserDetails(updateInfo);
@@ -150,6 +183,7 @@ export default function UserDetailsEditor() {
     setTwitter(userDetails.socialMedia?.twitter || '');
     setLinkedin(userDetails.socialMedia?.linkedin || '');
     setProfileImage(userDetails.profileImage || '');
+    setCoverImage(userDetails.coverImage || '');
     setIsPublicProfile(profile.isPublicProfile || false);
     setEditing(false);
   };
@@ -196,6 +230,33 @@ export default function UserDetailsEditor() {
         <>
 
       <View style={[styles.card, { backgroundColor: colors.backgroundSecondary }]}>
+        {/* Cover Image Banner */}
+        <View style={styles.coverImageContainer}>
+          {coverImage ? (
+            <Image source={{ uri: coverImage }} style={styles.coverImage} contentFit="cover" />
+          ) : (
+            <View style={[styles.coverImagePlaceholder, { backgroundColor: colors.border }]} />
+          )}
+          {editing && (
+            <TouchableOpacity
+              style={[styles.uploadCoverButton, { backgroundColor: colors.primary }]}
+              onPress={handleUploadCoverImage}
+              disabled={uploadingCoverImage}
+            >
+              {uploadingCoverImage ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <>
+                  <Camera size={14} color={colors.white} strokeWidth={2} />
+                  <Text style={[styles.uploadCoverButtonText, { color: colors.white }]}>
+                    {coverImage ? 'Change Cover' : 'Add Cover'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Compact Header with Icon */}
         <View style={styles.compactHeader}>
           <View style={styles.profileImageWrapper}>
@@ -571,6 +632,39 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     padding: 16,
+    overflow: 'hidden',
+  },
+  // Cover Image Styles
+  coverImageContainer: {
+    height: 120,
+    marginTop: -16,
+    marginHorizontal: -16,
+    marginBottom: 16,
+    position: 'relative',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  coverImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.3,
+  },
+  uploadCoverButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  uploadCoverButtonText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
   },
   // Compact Header Layout
   compactHeader: {

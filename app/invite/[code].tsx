@@ -104,8 +104,8 @@ export default function InviteLandingPage() {
         <View style={styles.welcomeSection}>
           {isValidCode ? (
             <>
-              <View style={[styles.giftIconContainer, { backgroundColor: colors.primary + '15' }]}>
-                <Gift size={48} color={colors.primary} strokeWidth={1.5} />
+              <View style={[styles.giftIconContainer, { backgroundColor: colors.primary }]}>
+                <Gift size={48} color="#FFFFFF" strokeWidth={1.5} />
               </View>
               <Text style={[styles.welcomeTitle, { color: colors.text }]}>
                 You're Invited!
@@ -116,8 +116,8 @@ export default function InviteLandingPage() {
             </>
           ) : (
             <>
-              <View style={[styles.giftIconContainer, { backgroundColor: colors.primary + '15' }]}>
-                <Users size={48} color={colors.primary} strokeWidth={1.5} />
+              <View style={[styles.giftIconContainer, { backgroundColor: colors.primary }]}>
+                <Users size={48} color="#FFFFFF" strokeWidth={1.5} />
               </View>
               <Text style={[styles.welcomeTitle, { color: colors.text }]}>
                 Welcome to iEndorse
@@ -132,8 +132,8 @@ export default function InviteLandingPage() {
         {/* Features */}
         <View style={styles.featuresSection}>
           <View style={styles.featureItem}>
-            <View style={[styles.featureIcon, { backgroundColor: colors.primary + '15' }]}>
-              <Star size={20} color={colors.primary} strokeWidth={2} />
+            <View style={[styles.featureIcon, { backgroundColor: colors.primary }]}>
+              <Star size={20} color="#FFFFFF" strokeWidth={2} />
             </View>
             <View style={styles.featureText}>
               <Text style={[styles.featureTitle, { color: colors.text }]}>
@@ -146,8 +146,8 @@ export default function InviteLandingPage() {
           </View>
 
           <View style={styles.featureItem}>
-            <View style={[styles.featureIcon, { backgroundColor: colors.primary + '15' }]}>
-              <Heart size={20} color={colors.primary} strokeWidth={2} />
+            <View style={[styles.featureIcon, { backgroundColor: colors.primary }]}>
+              <Heart size={20} color="#FFFFFF" strokeWidth={2} />
             </View>
             <View style={styles.featureText}>
               <Text style={[styles.featureTitle, { color: colors.text }]}>
@@ -160,8 +160,8 @@ export default function InviteLandingPage() {
           </View>
 
           <View style={styles.featureItem}>
-            <View style={[styles.featureIcon, { backgroundColor: colors.primary + '15' }]}>
-              <Users size={20} color={colors.primary} strokeWidth={2} />
+            <View style={[styles.featureIcon, { backgroundColor: colors.primary }]}>
+              <Users size={20} color="#FFFFFF" strokeWidth={2} />
             </View>
             <View style={styles.featureText}>
               <Text style={[styles.featureTitle, { color: colors.text }]}>
@@ -200,8 +200,8 @@ export default function InviteLandingPage() {
 
         {/* Referral Code Display */}
         {isValidCode && (
-          <View style={[styles.referralBadge, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-            <Text style={[styles.referralBadgeText, { color: colors.primary }]}>
+          <View style={[styles.referralBadge, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+            <Text style={[styles.referralBadgeText, { color: colors.text }]}>
               Invite code: {code?.toUpperCase()}
             </Text>
           </View>

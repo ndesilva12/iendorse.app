@@ -67,10 +67,10 @@ export async function getTopBrands(limit: number = 50): Promise<RankedItem[]> {
 
     console.log(`[TopRankings] Loaded ${brandsMap.size} brands from database`);
 
-    // Fetch all user lists from Firebase (stored in 'userLists' collection)
-    const listsRef = collection(db, 'userLists');
-    const listsQuery = query(listsRef);
-    const listsSnapshot = await getDocs(listsQuery);
+    // Fetch all user lists from Firebase (all lists now in userLists collection)
+    const userListsRef = collection(db, 'userLists');
+    const userListsQuery = query(userListsRef);
+    const userListsSnapshot = await getDocs(userListsQuery);
 
     // Map to track brand scores: brandId -> { score, count, name, etc }
     const brandScores = new Map<string, {
@@ -83,8 +83,8 @@ export async function getTopBrands(limit: number = 50): Promise<RankedItem[]> {
     }>();
 
     // Process each list
-    listsSnapshot.forEach((doc) => {
-      const listData = doc.data();
+    userListsSnapshot.forEach((docSnap) => {
+      const listData = docSnap.data();
 
       // Only process lists that have entries
       if (!listData.entries || !Array.isArray(listData.entries)) return;
@@ -174,10 +174,10 @@ export async function getTopBusinesses(
 
     console.log(`[TopRankings] Loaded ${businessesMap.size} businesses from database`);
 
-    // Fetch all user lists from Firebase (stored in 'userLists' collection)
-    const listsRef = collection(db, 'userLists');
-    const listsQuery = query(listsRef);
-    const listsSnapshot = await getDocs(listsQuery);
+    // Fetch all user lists from Firebase (all lists now in userLists collection)
+    const userListsRef = collection(db, 'userLists');
+    const userListsQuery = query(userListsRef);
+    const userListsSnapshot = await getDocs(userListsQuery);
 
     // Map to track business scores: businessId -> { score, count, name, etc }
     const businessScores = new Map<string, {
@@ -191,8 +191,8 @@ export async function getTopBusinesses(
     }>();
 
     // Process each list
-    listsSnapshot.forEach((doc) => {
-      const listData = doc.data();
+    userListsSnapshot.forEach((docSnap) => {
+      const listData = docSnap.data();
 
       // Only process lists that have entries
       if (!listData.entries || !Array.isArray(listData.entries)) return;

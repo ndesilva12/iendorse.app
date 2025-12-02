@@ -56,7 +56,7 @@ module.exports = {
       favicon: "./assets/images/endorsing1.png",
       name: "iEndorse",
       shortName: "iEndorse",
-      description: "iEndorse - Build Your Endorsement List",
+      description: "iEndorse - Build Your Endorsement List & Earn",
       themeColor: "#034466",
       backgroundColor: "#111827",
       display: "standalone",

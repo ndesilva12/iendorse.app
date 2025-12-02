@@ -31,6 +31,8 @@ import {
   Check,
   AlertCircle,
   RefreshCw,
+  Link2,
+  Database,
 } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
@@ -40,10 +42,16 @@ import {
   createCelebrityAccount,
   CelebrityAccountData,
   importCelebrityBatch,
+  generateClaimToken,
+  migrateCelebrityListsToUserLists,
+  normalizeCelebrityAccounts,
 } from '@/services/firebase/celebrityService';
+import * as Clipboard from 'expo-clipboard';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { UserProfile } from '@/types';
+import { pickAndUploadImage } from '@/lib/imageUpload';
+import { Camera } from 'lucide-react-native';
 
 interface CelebrityUser {
   userId: string;
@@ -56,6 +64,7 @@ interface CelebrityUser {
   twitter?: string;
   instagram?: string;
   profileImage?: string;
+  coverImage?: string;
 }
 
 export default function ProminentUsersAdmin() {
@@ -86,7 +95,11 @@ export default function ProminentUsersAdmin() {
     twitter: '',
     instagram: '',
     endorsements: '',
+    profileImage: '',
+    coverImage: '',
   });
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [uploadingCoverImage, setUploadingCoverImage] = useState(false);
 
   // Import state
   const [importData, setImportData] = useState('');
@@ -112,6 +125,7 @@ export default function ProminentUsersAdmin() {
               twitter: userData?.userDetails?.socialMedia?.twitter,
               instagram: userData?.userDetails?.socialMedia?.instagram,
               profileImage: (userData?.userDetails as any)?.profileImage,
+              coverImage: (userData?.userDetails as any)?.coverImage,
             };
           } catch {
             return celeb;
@@ -160,7 +174,55 @@ export default function ProminentUsersAdmin() {
       twitter: '',
       instagram: '',
       endorsements: '',
+      profileImage: '',
+      coverImage: '',
     });
+  };
+
+  // Handle upload profile image
+  const handleUploadProfileImage = async () => {
+    if (!selectedUser && !formData.name) {
+      Alert.alert('Error', 'Please enter a name first');
+      return;
+    }
+
+    setUploadingProfileImage(true);
+    try {
+      const userId = selectedUser?.userId || `admin_temp_${Date.now()}`;
+      const downloadURL = await pickAndUploadImage(userId, 'profile');
+
+      if (downloadURL) {
+        setFormData({ ...formData, profileImage: downloadURL });
+      }
+    } catch (error) {
+      console.error('[ProminentUsers] Error uploading profile image:', error);
+      Alert.alert('Error', 'Failed to upload image');
+    } finally {
+      setUploadingProfileImage(false);
+    }
+  };
+
+  // Handle upload cover image
+  const handleUploadCoverImage = async () => {
+    if (!selectedUser && !formData.name) {
+      Alert.alert('Error', 'Please enter a name first');
+      return;
+    }
+
+    setUploadingCoverImage(true);
+    try {
+      const userId = selectedUser?.userId || `admin_temp_${Date.now()}`;
+      const downloadURL = await pickAndUploadImage(userId, 'cover', [16, 9]);
+
+      if (downloadURL) {
+        setFormData({ ...formData, coverImage: downloadURL });
+      }
+    } catch (error) {
+      console.error('[ProminentUsers] Error uploading cover image:', error);
+      Alert.alert('Error', 'Failed to upload cover image');
+    } finally {
+      setUploadingCoverImage(false);
+    }
   };
 
   // Handle add new user
@@ -185,7 +247,20 @@ export default function ProminentUsersAdmin() {
         twitter: formData.twitter.trim() || undefined,
         instagram: formData.instagram.trim() || undefined,
         endorsements: endorsementsList,
+        profileImageUrl: formData.profileImage || undefined,
       });
+
+      // If we have a cover image, save it separately to the user document
+      if (result.success && formData.coverImage) {
+        try {
+          const userRef = doc(db, 'users', result.userId);
+          await updateDoc(userRef, {
+            'userDetails.coverImage': formData.coverImage,
+          });
+        } catch (e) {
+          console.warn('[ProminentUsers] Could not save cover image:', e);
+        }
+      }
 
       if (result.success) {
         Alert.alert('Success', `Created account for ${formData.name}`);
@@ -210,7 +285,7 @@ export default function ProminentUsersAdmin() {
     setIsSubmitting(true);
     try {
       const userRef = doc(db, 'users', selectedUser.userId);
-      await updateDoc(userRef, {
+      const updateData: Record<string, any> = {
         'userDetails.name': formData.name.trim(),
         'userDetails.location': formData.location.trim() || null,
         'userDetails.description': formData.description.trim() || null,
@@ -218,7 +293,17 @@ export default function ProminentUsersAdmin() {
         'userDetails.socialMedia.twitter': formData.twitter.trim() || null,
         'userDetails.socialMedia.instagram': formData.instagram.trim() || null,
         fullName: formData.name.trim(),
-      });
+      };
+
+      // Add images if provided
+      if (formData.profileImage) {
+        updateData['userDetails.profileImage'] = formData.profileImage;
+      }
+      if (formData.coverImage) {
+        updateData['userDetails.coverImage'] = formData.coverImage;
+      }
+
+      await updateDoc(userRef, updateData);
 
       Alert.alert('Success', `Updated ${formData.name}'s profile`);
       setShowEditModal(false);
@@ -247,14 +332,101 @@ export default function ProminentUsersAdmin() {
             try {
               // Delete user document
               await deleteDoc(doc(db, 'users', user.userId));
-              // Delete endorsement list
-              await deleteDoc(doc(db, 'lists', `${user.userId}_endorsement`));
+              // Delete endorsement list (now in userLists)
+              await deleteDoc(doc(db, 'userLists', `${user.userId}_endorsement`));
 
               Alert.alert('Success', `Deleted ${user.name}`);
               loadCelebrities();
             } catch (error) {
               console.error('[ProminentUsers] Error deleting user:', error);
               Alert.alert('Error', 'Failed to delete user');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle generate claim link
+  const handleGenerateClaimLink = async (user: CelebrityUser) => {
+    try {
+      const result = await generateClaimToken(user.userId);
+
+      if (result.success && result.token) {
+        // Build the claim URL
+        const claimUrl = `https://iendorse.app/claim/${result.token}`;
+
+        // Copy to clipboard
+        await Clipboard.setStringAsync(claimUrl);
+
+        Alert.alert(
+          'Claim Link Generated',
+          `A claim link for ${user.name} has been copied to your clipboard.\n\nShare this link with the person to allow them to claim this account.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', result.error || 'Failed to generate claim link');
+      }
+    } catch (error) {
+      console.error('[ProminentUsers] Error generating claim link:', error);
+      Alert.alert('Error', 'Failed to generate claim link');
+    }
+  };
+
+  // Handle run migration
+  const handleRunMigration = async () => {
+    Alert.alert(
+      'Run Migration',
+      'This will migrate all celebrity lists from the old collection to the unified userLists collection. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Run Migration',
+          onPress: async () => {
+            try {
+              const result = await migrateCelebrityListsToUserLists();
+              if (result.success) {
+                Alert.alert(
+                  'Migration Complete',
+                  `Migrated: ${result.migrated}\nAlready existed: ${result.alreadyMigrated}`
+                );
+              } else {
+                Alert.alert('Migration Failed', result.errors.join('\n'));
+              }
+            } catch (error) {
+              console.error('[ProminentUsers] Migration error:', error);
+              Alert.alert('Error', 'Migration failed');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle normalize accounts (fix missing fields)
+  const handleNormalize = async () => {
+    Alert.alert(
+      'Normalize Accounts',
+      'This will ensure all prominent user accounts have the correct fields (isPublicProfile, accountType) so they appear in user listings and search. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Normalize',
+          onPress: async () => {
+            try {
+              const result = await normalizeCelebrityAccounts();
+              if (result.success) {
+                Alert.alert(
+                  'Normalization Complete',
+                  `Total: ${result.total}\nUpdated: ${result.updated}\nAlready normalized: ${result.alreadyNormalized}`
+                );
+                loadCelebrities(); // Refresh the list
+              } else {
+                Alert.alert('Normalization Failed', result.errors.join('\n'));
+              }
+            } catch (error) {
+              console.error('[ProminentUsers] Normalize error:', error);
+              Alert.alert('Error', 'Normalization failed');
             }
           },
         },
@@ -273,6 +445,8 @@ export default function ProminentUsersAdmin() {
       twitter: user.twitter || '',
       instagram: user.instagram || '',
       endorsements: '',
+      profileImage: user.profileImage || '',
+      coverImage: user.coverImage || '',
     });
     setShowEditModal(true);
   };
@@ -419,7 +593,7 @@ export default function ProminentUsersAdmin() {
           activeOpacity={0.7}
         >
           <User size={16} color="#FFFFFF" />
-          <Text style={styles.actionButtonText}>View Profile</Text>
+          <Text style={styles.actionButtonText}>View</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1 }]}
@@ -428,6 +602,14 @@ export default function ProminentUsersAdmin() {
         >
           <Edit size={16} color={colors.text} />
           <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: '#DBEAFE' }]}
+          onPress={() => handleGenerateClaimLink(user)}
+          activeOpacity={0.7}
+        >
+          <Link2 size={16} color="#3B82F6" />
+          <Text style={[styles.actionButtonText, { color: '#3B82F6' }]}>Claim Link</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: '#FEE2E2' }]}
@@ -468,6 +650,74 @@ export default function ProminentUsersAdmin() {
           </View>
 
           <ScrollView style={styles.modalBody}>
+            {/* Image Upload Section */}
+            <View style={styles.formGroup}>
+              <Text style={[styles.formLabel, { color: colors.text }]}>Profile & Cover Images</Text>
+              <View style={styles.imageUploadRow}>
+                {/* Profile Image */}
+                <View style={styles.imageUploadItem}>
+                  {formData.profileImage ? (
+                    <Image
+                      source={{ uri: formData.profileImage }}
+                      style={styles.previewImageSquare}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={[styles.imagePlaceholderSquare, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                      <User size={32} color={colors.textSecondary} />
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.imageUploadButton, { backgroundColor: colors.primary }]}
+                    onPress={handleUploadProfileImage}
+                    disabled={uploadingProfileImage}
+                  >
+                    {uploadingProfileImage ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Camera size={14} color="#FFFFFF" />
+                        <Text style={styles.imageUploadButtonText}>
+                          {formData.profileImage ? 'Change' : 'Profile'}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Cover Image */}
+                <View style={[styles.imageUploadItem, { flex: 2 }]}>
+                  {formData.coverImage ? (
+                    <Image
+                      source={{ uri: formData.coverImage }}
+                      style={styles.previewImageWide}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={[styles.imagePlaceholderWide, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                      <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>Cover Image</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.imageUploadButton, { backgroundColor: colors.primary }]}
+                    onPress={handleUploadCoverImage}
+                    disabled={uploadingCoverImage}
+                  >
+                    {uploadingCoverImage ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Camera size={14} color="#FFFFFF" />
+                        <Text style={styles.imageUploadButtonText}>
+                          {formData.coverImage ? 'Change' : 'Cover'}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
             <View style={styles.formGroup}>
               <Text style={[styles.formLabel, { color: colors.text }]}>Name *</Text>
               <TextInput
@@ -722,6 +972,22 @@ export default function ProminentUsersAdmin() {
           >
             <Upload size={18} color={colors.text} />
             <Text style={[styles.headerButtonText, { color: colors.text }]}>Import</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B', borderWidth: 1 }]}
+            onPress={handleRunMigration}
+            activeOpacity={0.7}
+          >
+            <Database size={18} color="#D97706" />
+            <Text style={[styles.headerButtonText, { color: '#D97706' }]}>Migrate</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: '#DCFCE7', borderColor: '#22C55E', borderWidth: 1 }]}
+            onPress={handleNormalize}
+            activeOpacity={0.7}
+          >
+            <Check size={18} color="#16A34A" />
+            <Text style={[styles.headerButtonText, { color: '#16A34A' }]}>Normalize</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1048,5 +1314,59 @@ const styles = StyleSheet.create({
   textAreaXL: {
     minHeight: 200,
     textAlignVertical: 'top',
+  },
+  // Image upload styles
+  imageUploadRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  imageUploadItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  previewImageSquare: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  previewImageWide: {
+    width: '100%',
+    height: 80,
+    borderRadius: 8,
+  },
+  imagePlaceholderSquare: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePlaceholderWide: {
+    width: '100%',
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    fontSize: 12,
+  },
+  imageUploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+    marginTop: 8,
+  },
+  imageUploadButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

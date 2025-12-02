@@ -414,42 +414,64 @@ export async function aggregateBusinessTransactions(businessId: string): Promise
 }
 
 /**
- * Get all public user profiles, sorted by endorsement count (highest first)
- * @returns Array of public user profiles with their IDs, sorted by endorsement count
+ * Get all public user profiles, sorted by follower count (highest first)
+ * Celebrity/prominent accounts are just regular individual accounts with isCelebrityAccount=true flag
+ * They should have the same fields (isPublicProfile, accountType) as regular accounts
+ * @returns Array of public user profiles with their IDs, sorted by follower count
  */
-export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number }>> {
+export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number; followerCount?: number }>> {
   try {
-    console.log('[Firebase] Fetching all public users (excluding business accounts)');
+    console.log('[Firebase] Fetching all public individual users');
 
     const usersRef = collection(db, 'users');
-    // Only fetch individual accounts with public profiles (exclude business accounts)
-    const q = query(
+
+    // Single query for all public individual accounts (includes celebrities)
+    // Celebrity accounts are just individual accounts with isCelebrityAccount=true flag
+    const publicUsersQuery = query(
       usersRef,
       where('isPublicProfile', '==', true),
       where('accountType', '==', 'individual')
     );
 
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(publicUsersQuery);
+    console.log(`[Firebase] Found ${querySnapshot.size} public users`);
 
-    const usersWithCounts: Array<{ id: string; profile: UserProfile; endorsementCount: number }> = [];
+    const queryDocs = querySnapshot.docs;
+
+    // First, get all follow records in one query for efficiency
+    const followsRef = collection(db, 'follows');
+    const followsQuery = query(followsRef, where('followedType', '==', 'user'));
+    const followsSnapshot = await getDocs(followsQuery);
+
+    // Build a map of userId -> follower count
+    const followerCountMap = new Map<string, number>();
+    followsSnapshot.forEach((doc) => {
+      const followedId = doc.data().followedId;
+      followerCountMap.set(followedId, (followerCountMap.get(followedId) || 0) + 1);
+    });
+
+    const usersWithCounts: Array<{ id: string; profile: UserProfile; endorsementCount: number; followerCount: number }> = [];
 
     // Fetch endorsement counts for each user
-    for (const userDoc of querySnapshot.docs) {
+    for (const userDoc of queryDocs) {
       const data = userDoc.data();
       const userId = userDoc.id;
 
-      // Get endorsement list count for this user
+      // Get follower count from our pre-fetched map
+      const followerCount = followerCountMap.get(userId) || 0;
+
+      // Get endorsement list count for this user (all lists now in userLists)
       let endorsementCount = 0;
       try {
-        const listsRef = collection(db, 'userLists');
-        const listQuery = query(
-          listsRef,
+        const userListsRef = collection(db, 'userLists');
+        const userListQuery = query(
+          userListsRef,
           where('userId', '==', userId),
           where('isEndorsed', '==', true)
         );
-        const listSnapshot = await getDocs(listQuery);
-        if (!listSnapshot.empty) {
-          const listData = listSnapshot.docs[0].data();
+        const userListSnapshot = await getDocs(userListQuery);
+        if (!userListSnapshot.empty) {
+          const listData = userListSnapshot.docs[0].data();
           endorsementCount = listData.entries?.length || 0;
         }
       } catch (e) {
@@ -472,15 +494,22 @@ export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: 
         isPublicProfile: data.isPublicProfile,
         alignedListPublic: data.alignedListPublic,
         unalignedListPublic: data.unalignedListPublic,
+        isVerified: data.isVerified,
+        isCelebrityAccount: data.isCelebrityAccount,
       };
 
-      usersWithCounts.push({ id: userId, profile, endorsementCount });
+      usersWithCounts.push({ id: userId, profile, endorsementCount, followerCount });
     }
 
-    // Sort by endorsement count (highest first)
-    usersWithCounts.sort((a, b) => b.endorsementCount - a.endorsementCount);
+    // Sort by follower count (highest first), then by endorsement count as tiebreaker
+    usersWithCounts.sort((a, b) => {
+      if (b.followerCount !== a.followerCount) {
+        return b.followerCount - a.followerCount;
+      }
+      return b.endorsementCount - a.endorsementCount;
+    });
 
-    console.log('[Firebase] ✅ Fetched and sorted', usersWithCounts.length, 'public users by endorsement count');
+    console.log('[Firebase] ✅ Fetched and sorted', usersWithCounts.length, 'public users by follower count');
     return usersWithCounts;
   } catch (error) {
     console.error('[Firebase] ❌ Error fetching public users:', error);
