@@ -67,15 +67,10 @@ export async function getTopBrands(limit: number = 50): Promise<RankedItem[]> {
 
     console.log(`[TopRankings] Loaded ${brandsMap.size} brands from database`);
 
-    // Fetch all user lists from Firebase (stored in 'userLists' collection)
+    // Fetch all user lists from Firebase (all lists now in userLists collection)
     const userListsRef = collection(db, 'userLists');
     const userListsQuery = query(userListsRef);
     const userListsSnapshot = await getDocs(userListsQuery);
-
-    // Also fetch celebrity lists from 'lists' collection
-    const celebrityListsRef = collection(db, 'lists');
-    const celebrityListsQuery = query(celebrityListsRef);
-    const celebrityListsSnapshot = await getDocs(celebrityListsQuery);
 
     // Map to track brand scores: brandId -> { score, count, name, etc }
     const brandScores = new Map<string, {
@@ -87,8 +82,10 @@ export async function getTopBrands(limit: number = 50): Promise<RankedItem[]> {
       logoUrl?: string;
     }>();
 
-    // Helper function to process list entries
-    const processListEntries = (listData: any) => {
+    // Process each list
+    userListsSnapshot.forEach((docSnap) => {
+      const listData = docSnap.data();
+
       // Only process lists that have entries
       if (!listData.entries || !Array.isArray(listData.entries)) return;
 
@@ -118,16 +115,6 @@ export async function getTopBrands(limit: number = 50): Promise<RankedItem[]> {
           });
         }
       });
-    };
-
-    // Process userLists (regular users)
-    userListsSnapshot.forEach((doc) => {
-      processListEntries(doc.data());
-    });
-
-    // Process lists (celebrity accounts)
-    celebrityListsSnapshot.forEach((doc) => {
-      processListEntries(doc.data());
     });
 
     // Convert to array and sort by score
@@ -187,15 +174,10 @@ export async function getTopBusinesses(
 
     console.log(`[TopRankings] Loaded ${businessesMap.size} businesses from database`);
 
-    // Fetch all user lists from Firebase (stored in 'userLists' collection)
+    // Fetch all user lists from Firebase (all lists now in userLists collection)
     const userListsRef = collection(db, 'userLists');
     const userListsQuery = query(userListsRef);
     const userListsSnapshot = await getDocs(userListsQuery);
-
-    // Also fetch celebrity lists from 'lists' collection
-    const celebrityListsRef = collection(db, 'lists');
-    const celebrityListsQuery = query(celebrityListsRef);
-    const celebrityListsSnapshot = await getDocs(celebrityListsQuery);
 
     // Map to track business scores: businessId -> { score, count, name, etc }
     const businessScores = new Map<string, {
@@ -208,8 +190,10 @@ export async function getTopBusinesses(
       location?: { latitude: number; longitude: number };
     }>();
 
-    // Helper function to process list entries
-    const processBusinessEntries = (listData: any) => {
+    // Process each list
+    userListsSnapshot.forEach((docSnap) => {
+      const listData = docSnap.data();
+
       // Only process lists that have entries
       if (!listData.entries || !Array.isArray(listData.entries)) return;
 
@@ -240,16 +224,6 @@ export async function getTopBusinesses(
           });
         }
       });
-    };
-
-    // Process userLists (regular users)
-    userListsSnapshot.forEach((doc) => {
-      processBusinessEntries(doc.data());
-    });
-
-    // Process lists (celebrity accounts)
-    celebrityListsSnapshot.forEach((doc) => {
-      processBusinessEntries(doc.data());
     });
 
     // Convert to array

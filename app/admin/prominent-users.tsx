@@ -31,6 +31,8 @@ import {
   Check,
   AlertCircle,
   RefreshCw,
+  Link2,
+  Database,
 } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
@@ -40,7 +42,10 @@ import {
   createCelebrityAccount,
   CelebrityAccountData,
   importCelebrityBatch,
+  generateClaimToken,
+  migrateCelebrityListsToUserLists,
 } from '@/services/firebase/celebrityService';
+import * as Clipboard from 'expo-clipboard';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { UserProfile } from '@/types';
@@ -326,14 +331,70 @@ export default function ProminentUsersAdmin() {
             try {
               // Delete user document
               await deleteDoc(doc(db, 'users', user.userId));
-              // Delete endorsement list
-              await deleteDoc(doc(db, 'lists', `${user.userId}_endorsement`));
+              // Delete endorsement list (now in userLists)
+              await deleteDoc(doc(db, 'userLists', `${user.userId}_endorsement`));
 
               Alert.alert('Success', `Deleted ${user.name}`);
               loadCelebrities();
             } catch (error) {
               console.error('[ProminentUsers] Error deleting user:', error);
               Alert.alert('Error', 'Failed to delete user');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle generate claim link
+  const handleGenerateClaimLink = async (user: CelebrityUser) => {
+    try {
+      const result = await generateClaimToken(user.userId);
+
+      if (result.success && result.token) {
+        // Build the claim URL
+        const claimUrl = `https://iendorse.app/claim/${result.token}`;
+
+        // Copy to clipboard
+        await Clipboard.setStringAsync(claimUrl);
+
+        Alert.alert(
+          'Claim Link Generated',
+          `A claim link for ${user.name} has been copied to your clipboard.\n\nShare this link with the person to allow them to claim this account.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', result.error || 'Failed to generate claim link');
+      }
+    } catch (error) {
+      console.error('[ProminentUsers] Error generating claim link:', error);
+      Alert.alert('Error', 'Failed to generate claim link');
+    }
+  };
+
+  // Handle run migration
+  const handleRunMigration = async () => {
+    Alert.alert(
+      'Run Migration',
+      'This will migrate all celebrity lists from the old collection to the unified userLists collection. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Run Migration',
+          onPress: async () => {
+            try {
+              const result = await migrateCelebrityListsToUserLists();
+              if (result.success) {
+                Alert.alert(
+                  'Migration Complete',
+                  `Migrated: ${result.migrated}\nAlready existed: ${result.alreadyMigrated}`
+                );
+              } else {
+                Alert.alert('Migration Failed', result.errors.join('\n'));
+              }
+            } catch (error) {
+              console.error('[ProminentUsers] Migration error:', error);
+              Alert.alert('Error', 'Migration failed');
             }
           },
         },
@@ -500,7 +561,7 @@ export default function ProminentUsersAdmin() {
           activeOpacity={0.7}
         >
           <User size={16} color="#FFFFFF" />
-          <Text style={styles.actionButtonText}>View Profile</Text>
+          <Text style={styles.actionButtonText}>View</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1 }]}
@@ -509,6 +570,14 @@ export default function ProminentUsersAdmin() {
         >
           <Edit size={16} color={colors.text} />
           <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: '#DBEAFE' }]}
+          onPress={() => handleGenerateClaimLink(user)}
+          activeOpacity={0.7}
+        >
+          <Link2 size={16} color="#3B82F6" />
+          <Text style={[styles.actionButtonText, { color: '#3B82F6' }]}>Claim Link</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: '#FEE2E2' }]}
@@ -871,6 +940,14 @@ export default function ProminentUsersAdmin() {
           >
             <Upload size={18} color={colors.text} />
             <Text style={[styles.headerButtonText, { color: colors.text }]}>Import</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B', borderWidth: 1 }]}
+            onPress={handleRunMigration}
+            activeOpacity={0.7}
+          >
+            <Database size={18} color="#D97706" />
+            <Text style={[styles.headerButtonText, { color: '#D97706' }]}>Migrate</Text>
           </TouchableOpacity>
         </View>
       </View>

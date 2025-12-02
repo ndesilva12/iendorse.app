@@ -453,11 +453,9 @@ export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: 
       // Get follower count from our pre-fetched map
       const followerCount = followerCountMap.get(userId) || 0;
 
-      // Get endorsement list count for this user
-      // Check both userLists (regular users) and lists (celebrity accounts) collections
+      // Get endorsement list count for this user (all lists now in userLists)
       let endorsementCount = 0;
       try {
-        // First check userLists collection (regular users)
         const userListsRef = collection(db, 'userLists');
         const userListQuery = query(
           userListsRef,
@@ -468,21 +466,6 @@ export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: 
         if (!userListSnapshot.empty) {
           const listData = userListSnapshot.docs[0].data();
           endorsementCount = listData.entries?.length || 0;
-        }
-
-        // If no count from userLists, check lists collection (celebrity accounts)
-        if (endorsementCount === 0) {
-          const listsRef = collection(db, 'lists');
-          const listQuery = query(
-            listsRef,
-            where('userId', '==', userId),
-            where('isEndorsed', '==', true)
-          );
-          const listSnapshot = await getDocs(listQuery);
-          if (!listSnapshot.empty) {
-            const listData = listSnapshot.docs[0].data();
-            endorsementCount = listData.entries?.length || 0;
-          }
         }
       } catch (e) {
         console.warn('[Firebase] Could not fetch endorsement count for user', userId);
