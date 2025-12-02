@@ -208,6 +208,18 @@ export default function AdminDashboard() {
             </Text>
           </TouchableOpacity>
 
+          {/* Prominent Users Management */}
+          <TouchableOpacity
+            style={[styles.card, styles.highlightCard]}
+            onPress={() => router.push('/admin/prominent-users')}
+          >
+            <Text style={styles.cardIcon}>⭐</Text>
+            <Text style={styles.cardTitle}>Prominent Users</Text>
+            <Text style={styles.cardDescription}>
+              Manage celebrity and notable user accounts. Create profiles, generate claim links, and normalize accounts.
+            </Text>
+          </TouchableOpacity>
+
           {/* Brand Requests */}
           <TouchableOpacity
             style={[styles.card, styles.highlightCard]}
