@@ -12,6 +12,7 @@ import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, query, whe
 import { db } from '@/firebase';
 import { UserProfile, SocialMedia } from '@/types';
 import { UserList, ListEntry, BrandListEntry } from '@/types/library';
+import { deleteAllFollowsForUser } from './followService';
 
 /**
  * Remove undefined fields from an object (Firebase doesn't accept undefined)
@@ -894,12 +895,14 @@ export async function deleteAllCelebrityAccounts(): Promise<{
   success: boolean;
   deletedUsers: number;
   deletedLists: number;
+  deletedFollows: number;
   errors: string[];
 }> {
   const results = {
     success: true,
     deletedUsers: 0,
     deletedLists: 0,
+    deletedFollows: 0,
     errors: [] as string[],
   };
 
@@ -919,6 +922,11 @@ export async function deleteAllCelebrityAccounts(): Promise<{
       const userName = userData.userDetails?.name || userData.fullName || userId;
 
       try {
+        // Delete all follow relationships for this user
+        const followResult = await deleteAllFollowsForUser(userId);
+        results.deletedFollows += followResult.deleted;
+        console.log(`[CelebrityService] Deleted ${followResult.deleted} follow relationships for ${userName}`);
+
         // Delete the user's endorsement list
         const listId = `${userId}_endorsement`;
         const listRef = doc(db, 'userLists', listId);

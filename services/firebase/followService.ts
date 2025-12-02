@@ -232,3 +232,126 @@ export async function getFollowers(
     return [];
   }
 }
+
+/**
+ * Delete all follow relationships for a user (when user is deleted)
+ * This removes:
+ * - All follows where this user is following others
+ * - All follows where others are following this user
+ */
+export async function deleteAllFollowsForUser(userId: string): Promise<{ deleted: number; errors: string[] }> {
+  const result = { deleted: 0, errors: [] as string[] };
+
+  if (!userId) {
+    result.errors.push('User ID is required');
+    return result;
+  }
+
+  try {
+    const followsRef = collection(db, 'follows');
+    const batch = writeBatch(db);
+    let batchCount = 0;
+    const MAX_BATCH_SIZE = 500; // Firestore limit
+
+    // Find all follows where this user is the follower
+    const followingQuery = query(followsRef, where('followerId', '==', userId));
+    const followingSnapshot = await getDocs(followingQuery);
+
+    for (const docSnapshot of followingSnapshot.docs) {
+      batch.delete(docSnapshot.ref);
+      batchCount++;
+      result.deleted++;
+
+      // Commit batch if we hit the limit
+      if (batchCount >= MAX_BATCH_SIZE) {
+        await batch.commit();
+        batchCount = 0;
+      }
+    }
+
+    // Find all follows where this user is being followed
+    const followersQuery = query(
+      followsRef,
+      where('followedId', '==', userId),
+      where('followedType', '==', 'user')
+    );
+    const followersSnapshot = await getDocs(followersQuery);
+
+    for (const docSnapshot of followersSnapshot.docs) {
+      batch.delete(docSnapshot.ref);
+      batchCount++;
+      result.deleted++;
+
+      if (batchCount >= MAX_BATCH_SIZE) {
+        await batch.commit();
+        batchCount = 0;
+      }
+    }
+
+    // Commit any remaining deletes
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+
+    console.log(`[followService] Deleted ${result.deleted} follow relationships for user ${userId}`);
+    return result;
+  } catch (error) {
+    console.error('[followService] Error deleting follows for user:', error);
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    return result;
+  }
+}
+
+/**
+ * Delete all follow relationships for an entity (brand or business)
+ * This removes all follows where this entity is being followed
+ */
+export async function deleteAllFollowsForEntity(
+  entityId: string,
+  entityType: 'brand' | 'business'
+): Promise<{ deleted: number; errors: string[] }> {
+  const result = { deleted: 0, errors: [] as string[] };
+
+  if (!entityId) {
+    result.errors.push('Entity ID is required');
+    return result;
+  }
+
+  try {
+    const followsRef = collection(db, 'follows');
+    const batch = writeBatch(db);
+    let batchCount = 0;
+    const MAX_BATCH_SIZE = 500;
+
+    // Find all follows where this entity is being followed
+    const followersQuery = query(
+      followsRef,
+      where('followedId', '==', entityId),
+      where('followedType', '==', entityType)
+    );
+    const followersSnapshot = await getDocs(followersQuery);
+
+    for (const docSnapshot of followersSnapshot.docs) {
+      batch.delete(docSnapshot.ref);
+      batchCount++;
+      result.deleted++;
+
+      if (batchCount >= MAX_BATCH_SIZE) {
+        await batch.commit();
+        batchCount = 0;
+      }
+    }
+
+    // Commit any remaining deletes
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+
+    console.log(`[followService] Deleted ${result.deleted} follow relationships for ${entityType} ${entityId}`);
+    return result;
+  } catch (error) {
+    console.error(`[followService] Error deleting follows for ${entityType}:`, error);
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    return result;
+  }
+}

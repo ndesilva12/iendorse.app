@@ -51,6 +51,7 @@ import * as Clipboard from 'expo-clipboard';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { UserProfile } from '@/types';
+import { deleteAllFollowsForUser } from '@/services/firebase/followService';
 import { pickAndUploadImage } from '@/lib/imageUpload';
 import { Camera } from 'lucide-react-native';
 
@@ -442,15 +443,20 @@ export default function ProminentUsersAdmin() {
     if (!confirmed) return;
 
     try {
+      // Delete all follow relationships for this user
+      const followResult = await deleteAllFollowsForUser(user.userId);
+      console.log(`[ProminentUsers] Deleted ${followResult.deleted} follow relationships for ${user.name}`);
+
       // Delete user document
       await deleteDoc(doc(db, 'users', user.userId));
       // Delete endorsement list (now in userLists)
       await deleteDoc(doc(db, 'userLists', `${user.userId}_endorsement`));
 
+      const message = `Deleted ${user.name} and ${followResult.deleted} follow relationship(s)`;
       if (Platform.OS === 'web') {
-        window.alert(`Deleted ${user.name}`);
+        window.alert(message);
       } else {
-        Alert.alert('Success', `Deleted ${user.name}`);
+        Alert.alert('Success', message);
       }
       loadCelebrities();
     } catch (error) {
@@ -571,7 +577,7 @@ export default function ProminentUsersAdmin() {
     try {
       const result = await deleteAllCelebrityAccounts();
       if (result.success) {
-        const msg = `Deleted ${result.deletedUsers} users and ${result.deletedLists} lists`;
+        const msg = `Deleted ${result.deletedUsers} users, ${result.deletedLists} lists, and ${result.deletedFollows} follow relationships`;
         if (Platform.OS === 'web') {
           window.alert(msg);
         } else {

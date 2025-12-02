@@ -23,6 +23,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, query, where, setDoc } 
 import { db } from '../../firebase';
 import { getUserLists, deleteList, removeEntryFromList, addEntryToList } from '@/services/firebase/listService';
 import { UserList, ListEntry } from '@/types/library';
+import { deleteAllFollowsForUser, deleteAllFollowsForEntity } from '@/services/firebase/followService';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import { pickAndUploadImage } from '@/lib/imageUpload';
 import { Image } from 'react-native';
@@ -611,6 +612,12 @@ export default function BusinessesManagement() {
 
     try {
       console.log('[Admin Businesses] Deleting business:', business.userId);
+
+      // Delete all follow relationships for this business (as a user and as a business entity)
+      const userFollowResult = await deleteAllFollowsForUser(business.userId);
+      const businessFollowResult = await deleteAllFollowsForEntity(business.userId, 'business');
+      const totalDeletedFollows = userFollowResult.deleted + businessFollowResult.deleted;
+      console.log(`[Admin Businesses] ✅ Deleted ${totalDeletedFollows} follow relationships`);
 
       // Delete the user document (which includes the business account)
       const userRef = doc(db, 'users', business.userId);
