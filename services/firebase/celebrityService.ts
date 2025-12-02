@@ -11,7 +11,7 @@
 import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { UserProfile, SocialMedia } from '@/types';
-import { UserList, ListEntry } from '@/types/library';
+import { UserList, ListEntry, BrandListEntry } from '@/types/library';
 
 /**
  * Remove undefined fields from an object (Firebase doesn't accept undefined)
@@ -159,21 +159,64 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
       updatedAt: serverTimestamp(),
     });
 
-    // Normalize and create the endorsement list in userLists (same as regular users)
+    // Create endorsement list entries - EXACTLY like regular users
+    // For each endorsement, create a brand if it doesn't exist, then create a proper BrandListEntry
     const normalizedEndorsements = normalizeEndorsements(data.endorsements);
+    const entries: ListEntry[] = [];
+
+    for (let index = 0; index < normalizedEndorsements.length; index++) {
+      const endorsement = normalizedEndorsements[index];
+
+      // Generate a brand ID from the business name
+      const brandId = endorsement.businessName
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '-')
+        .trim();
+
+      // Check if brand exists, create if not
+      const brandRef = doc(db, 'brands', brandId);
+      const existingBrand = await getDoc(brandRef);
+
+      if (!existingBrand.exists()) {
+        // Create the brand in the brands collection
+        const brandData = removeUndefined({
+          name: endorsement.businessName,
+          category: endorsement.category || 'Business',
+          description: `${endorsement.businessName}`,
+          website: null,
+          exampleImageUrl: null,
+        });
+
+        await setDoc(brandRef, {
+          ...brandData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: 'celebrity-import',
+        });
+
+        console.log(`[CelebrityService] Created brand: ${brandId} (${endorsement.businessName})`);
+      }
+
+      // Create proper BrandListEntry (same as regular users)
+      const entry: BrandListEntry = {
+        id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: 'brand',
+        brandId: brandId,
+        brandName: endorsement.businessName,
+        brandCategory: endorsement.category || 'Business',
+        createdAt: new Date(),
+      };
+
+      entries.push(entry);
+
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    // Create the endorsement list (same structure as regular users)
     const listId = `${userId}_endorsement`;
     const listRef = doc(db, 'userLists', listId);
-
-    const entries: ListEntry[] = normalizedEndorsements.map((endorsement, index) => ({
-      id: `${listId}_entry_${index}`,
-      brandId: endorsement.placeId || `manual_${endorsement.businessName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-      brandName: endorsement.businessName,
-      category: endorsement.category || 'Business',
-      type: 'external' as const, // External business (not in our brand database)
-      order: index,
-      addedAt: new Date(),
-      notes: endorsement.notes,
-    }));
 
     const endorsementList: Partial<UserList> = {
       id: listId,
