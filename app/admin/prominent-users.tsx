@@ -44,6 +44,8 @@ import {
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { UserProfile } from '@/types';
+import { pickAndUploadImage } from '@/lib/imageUpload';
+import { Camera } from 'lucide-react-native';
 
 interface CelebrityUser {
   userId: string;
@@ -56,6 +58,7 @@ interface CelebrityUser {
   twitter?: string;
   instagram?: string;
   profileImage?: string;
+  coverImage?: string;
 }
 
 export default function ProminentUsersAdmin() {
@@ -86,7 +89,11 @@ export default function ProminentUsersAdmin() {
     twitter: '',
     instagram: '',
     endorsements: '',
+    profileImage: '',
+    coverImage: '',
   });
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [uploadingCoverImage, setUploadingCoverImage] = useState(false);
 
   // Import state
   const [importData, setImportData] = useState('');
@@ -112,6 +119,7 @@ export default function ProminentUsersAdmin() {
               twitter: userData?.userDetails?.socialMedia?.twitter,
               instagram: userData?.userDetails?.socialMedia?.instagram,
               profileImage: (userData?.userDetails as any)?.profileImage,
+              coverImage: (userData?.userDetails as any)?.coverImage,
             };
           } catch {
             return celeb;
@@ -160,7 +168,55 @@ export default function ProminentUsersAdmin() {
       twitter: '',
       instagram: '',
       endorsements: '',
+      profileImage: '',
+      coverImage: '',
     });
+  };
+
+  // Handle upload profile image
+  const handleUploadProfileImage = async () => {
+    if (!selectedUser && !formData.name) {
+      Alert.alert('Error', 'Please enter a name first');
+      return;
+    }
+
+    setUploadingProfileImage(true);
+    try {
+      const userId = selectedUser?.userId || `admin_temp_${Date.now()}`;
+      const downloadURL = await pickAndUploadImage(userId, 'profile');
+
+      if (downloadURL) {
+        setFormData({ ...formData, profileImage: downloadURL });
+      }
+    } catch (error) {
+      console.error('[ProminentUsers] Error uploading profile image:', error);
+      Alert.alert('Error', 'Failed to upload image');
+    } finally {
+      setUploadingProfileImage(false);
+    }
+  };
+
+  // Handle upload cover image
+  const handleUploadCoverImage = async () => {
+    if (!selectedUser && !formData.name) {
+      Alert.alert('Error', 'Please enter a name first');
+      return;
+    }
+
+    setUploadingCoverImage(true);
+    try {
+      const userId = selectedUser?.userId || `admin_temp_${Date.now()}`;
+      const downloadURL = await pickAndUploadImage(userId, 'cover', [16, 9]);
+
+      if (downloadURL) {
+        setFormData({ ...formData, coverImage: downloadURL });
+      }
+    } catch (error) {
+      console.error('[ProminentUsers] Error uploading cover image:', error);
+      Alert.alert('Error', 'Failed to upload cover image');
+    } finally {
+      setUploadingCoverImage(false);
+    }
   };
 
   // Handle add new user
@@ -185,7 +241,20 @@ export default function ProminentUsersAdmin() {
         twitter: formData.twitter.trim() || undefined,
         instagram: formData.instagram.trim() || undefined,
         endorsements: endorsementsList,
+        profileImageUrl: formData.profileImage || undefined,
       });
+
+      // If we have a cover image, save it separately to the user document
+      if (result.success && formData.coverImage) {
+        try {
+          const userRef = doc(db, 'users', result.userId);
+          await updateDoc(userRef, {
+            'userDetails.coverImage': formData.coverImage,
+          });
+        } catch (e) {
+          console.warn('[ProminentUsers] Could not save cover image:', e);
+        }
+      }
 
       if (result.success) {
         Alert.alert('Success', `Created account for ${formData.name}`);
@@ -210,7 +279,7 @@ export default function ProminentUsersAdmin() {
     setIsSubmitting(true);
     try {
       const userRef = doc(db, 'users', selectedUser.userId);
-      await updateDoc(userRef, {
+      const updateData: Record<string, any> = {
         'userDetails.name': formData.name.trim(),
         'userDetails.location': formData.location.trim() || null,
         'userDetails.description': formData.description.trim() || null,
@@ -218,7 +287,17 @@ export default function ProminentUsersAdmin() {
         'userDetails.socialMedia.twitter': formData.twitter.trim() || null,
         'userDetails.socialMedia.instagram': formData.instagram.trim() || null,
         fullName: formData.name.trim(),
-      });
+      };
+
+      // Add images if provided
+      if (formData.profileImage) {
+        updateData['userDetails.profileImage'] = formData.profileImage;
+      }
+      if (formData.coverImage) {
+        updateData['userDetails.coverImage'] = formData.coverImage;
+      }
+
+      await updateDoc(userRef, updateData);
 
       Alert.alert('Success', `Updated ${formData.name}'s profile`);
       setShowEditModal(false);
@@ -273,6 +352,8 @@ export default function ProminentUsersAdmin() {
       twitter: user.twitter || '',
       instagram: user.instagram || '',
       endorsements: '',
+      profileImage: user.profileImage || '',
+      coverImage: user.coverImage || '',
     });
     setShowEditModal(true);
   };
@@ -468,6 +549,74 @@ export default function ProminentUsersAdmin() {
           </View>
 
           <ScrollView style={styles.modalBody}>
+            {/* Image Upload Section */}
+            <View style={styles.formGroup}>
+              <Text style={[styles.formLabel, { color: colors.text }]}>Profile & Cover Images</Text>
+              <View style={styles.imageUploadRow}>
+                {/* Profile Image */}
+                <View style={styles.imageUploadItem}>
+                  {formData.profileImage ? (
+                    <Image
+                      source={{ uri: formData.profileImage }}
+                      style={styles.previewImageSquare}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={[styles.imagePlaceholderSquare, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                      <User size={32} color={colors.textSecondary} />
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.imageUploadButton, { backgroundColor: colors.primary }]}
+                    onPress={handleUploadProfileImage}
+                    disabled={uploadingProfileImage}
+                  >
+                    {uploadingProfileImage ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Camera size={14} color="#FFFFFF" />
+                        <Text style={styles.imageUploadButtonText}>
+                          {formData.profileImage ? 'Change' : 'Profile'}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Cover Image */}
+                <View style={[styles.imageUploadItem, { flex: 2 }]}>
+                  {formData.coverImage ? (
+                    <Image
+                      source={{ uri: formData.coverImage }}
+                      style={styles.previewImageWide}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={[styles.imagePlaceholderWide, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                      <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>Cover Image</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.imageUploadButton, { backgroundColor: colors.primary }]}
+                    onPress={handleUploadCoverImage}
+                    disabled={uploadingCoverImage}
+                  >
+                    {uploadingCoverImage ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Camera size={14} color="#FFFFFF" />
+                        <Text style={styles.imageUploadButtonText}>
+                          {formData.coverImage ? 'Change' : 'Cover'}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
             <View style={styles.formGroup}>
               <Text style={[styles.formLabel, { color: colors.text }]}>Name *</Text>
               <TextInput
@@ -1048,5 +1197,59 @@ const styles = StyleSheet.create({
   textAreaXL: {
     minHeight: 200,
     textAlignVertical: 'top',
+  },
+  // Image upload styles
+  imageUploadRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  imageUploadItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  previewImageSquare: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  previewImageWide: {
+    width: '100%',
+    height: 80,
+    borderRadius: 8,
+  },
+  imagePlaceholderSquare: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePlaceholderWide: {
+    width: '100%',
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    fontSize: 12,
+  },
+  imageUploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+    marginTop: 8,
+  },
+  imageUploadButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

@@ -439,18 +439,35 @@ export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: 
       const userId = userDoc.id;
 
       // Get endorsement list count for this user
+      // Check both userLists (regular users) and lists (celebrity accounts) collections
       let endorsementCount = 0;
       try {
-        const listsRef = collection(db, 'userLists');
-        const listQuery = query(
-          listsRef,
+        // First check userLists collection (regular users)
+        const userListsRef = collection(db, 'userLists');
+        const userListQuery = query(
+          userListsRef,
           where('userId', '==', userId),
           where('isEndorsed', '==', true)
         );
-        const listSnapshot = await getDocs(listQuery);
-        if (!listSnapshot.empty) {
-          const listData = listSnapshot.docs[0].data();
+        const userListSnapshot = await getDocs(userListQuery);
+        if (!userListSnapshot.empty) {
+          const listData = userListSnapshot.docs[0].data();
           endorsementCount = listData.entries?.length || 0;
+        }
+
+        // If no count from userLists, check lists collection (celebrity accounts)
+        if (endorsementCount === 0) {
+          const listsRef = collection(db, 'lists');
+          const listQuery = query(
+            listsRef,
+            where('userId', '==', userId),
+            where('isEndorsed', '==', true)
+          );
+          const listSnapshot = await getDocs(listQuery);
+          if (!listSnapshot.empty) {
+            const listData = listSnapshot.docs[0].data();
+            endorsementCount = listData.entries?.length || 0;
+          }
         }
       } catch (e) {
         console.warn('[Firebase] Could not fetch endorsement count for user', userId);
@@ -472,6 +489,8 @@ export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: 
         isPublicProfile: data.isPublicProfile,
         alignedListPublic: data.alignedListPublic,
         unalignedListPublic: data.unalignedListPublic,
+        isVerified: data.isVerified,
+        isCelebrityAccount: data.isCelebrityAccount,
       };
 
       usersWithCounts.push({ id: userId, profile, endorsementCount });

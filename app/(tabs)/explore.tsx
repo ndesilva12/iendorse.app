@@ -1859,19 +1859,14 @@ export default function SearchScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.placeResultLogo}>
-                    {place.photoReference ? (
-                      <Image
-                        source={{ uri: getPlacePhotoUrl(place.photoReference) }}
-                        style={styles.placeResultLogoImage}
-                        contentFit="cover"
-                        transition={200}
-                        cachePolicy="memory-disk"
-                      />
-                    ) : (
-                      <View style={[styles.placeResultLogoImage, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Globe size={24} color={colors.textSecondary} />
-                      </View>
-                    )}
+                    {/* Use app icon for all search results - photos load on detail page */}
+                    <Image
+                      source={require('@/assets/images/endorsing1.png')}
+                      style={styles.placeResultLogoImage}
+                      contentFit="cover"
+                      transition={200}
+                      cachePolicy="memory-disk"
+                    />
                   </View>
                   <View style={styles.placeResultText}>
                     <Text style={[styles.placeResultName, { color: colors.text }]} numberOfLines={2}>

@@ -21,12 +21,17 @@ import { lightColors, darkColors } from '@/constants/colors';
 import { useUser as useUserContext } from '@/contexts/UserContext';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 
+const ADMIN_EMAIL = 'normancdesilva@gmail.com';
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { isDarkMode, profile, setBusinessInfo } = useUserContext();
   const colors = isDarkMode ? darkColors : lightColors;
   const { user } = useUser();
   const { signOut } = useAuth();
+
+  // Check if current user is admin
+  const isAdmin = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL;
   const { width: windowWidth } = useWindowDimensions();
 
   // On larger screens (web), constrain content to 50% width in the center
@@ -389,30 +394,32 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Admin Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Users size={24} color={colors.primary} strokeWidth={2} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Admin
-            </Text>
-          </View>
+        {/* Admin Section - Only visible to admin */}
+        {isAdmin && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Users size={24} color={colors.primary} strokeWidth={2} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Admin
+              </Text>
+            </View>
 
-          <View style={[styles.card, { backgroundColor: colors.backgroundSecondary }]}>
-            {/* Prominent Users */}
-            <TouchableOpacity
-              style={styles.actionRow}
-              onPress={() => router.push('/admin/prominent-users')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.actionLeft}>
-                <Users size={22} color={colors.primary} strokeWidth={2} />
-                <Text style={[styles.actionText, { color: colors.text }]}>Manage Prominent Users</Text>
-              </View>
-              <ExternalLink size={18} color={colors.textSecondary} strokeWidth={2} />
-            </TouchableOpacity>
+            <View style={[styles.card, { backgroundColor: colors.backgroundSecondary }]}>
+              {/* Prominent Users */}
+              <TouchableOpacity
+                style={styles.actionRow}
+                onPress={() => router.push('/admin/prominent-users')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionLeft}>
+                  <Users size={22} color={colors.primary} strokeWidth={2} />
+                  <Text style={[styles.actionText, { color: colors.text }]}>Manage Prominent Users</Text>
+                </View>
+                <ExternalLink size={18} color={colors.textSecondary} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Legal Section */}
         <View style={styles.section}>
