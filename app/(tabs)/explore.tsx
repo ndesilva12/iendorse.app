@@ -18,6 +18,7 @@ import {
   Share as RNShare,
   Dimensions,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import MenuButton from '@/components/MenuButton';
@@ -372,8 +373,10 @@ export default function SearchScreen() {
   const [results, setResults] = useState<Product[]>([]);
   const [firebaseBusinesses, setFirebaseBusinesses] = useState<BusinessUser[]>([]);
   const [publicUsers, setPublicUsers] = useState<Array<{ id: string; profile: UserProfile }>>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [followingItems, setFollowingItems] = useState<FollowingItem[]>([]);
   const [topBusinessItems, setTopBusinessItems] = useState<TopBusinessItem[]>([]);
+  const [loadingBusinesses, setLoadingBusinesses] = useState(true);
   const [activeTab, setActiveTab] = useState<'topBusinesses' | 'topUsers'>('topUsers');
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
@@ -402,6 +405,7 @@ export default function SearchScreen() {
   // Fetch Firebase businesses and public users on mount
   useEffect(() => {
     const fetchData = async () => {
+      setLoadingUsers(true);
       try {
         const businesses = await getAllUserBusinesses();
         setFirebaseBusinesses(businesses);
@@ -410,17 +414,17 @@ export default function SearchScreen() {
         setPublicUsers(users);
       } catch (error) {
         console.error('Error fetching data:', error);
+      } finally {
+        setLoadingUsers(false);
       }
     };
     fetchData();
   }, []);
 
-  // Fetch top businesses (combined brands and businesses) on mount and when tab changes
+  // Fetch top businesses (combined brands and businesses) on mount
   useEffect(() => {
     const fetchTopBusinessItems = async () => {
-      // Always fetch on mount, then only when topBusinesses tab is active
-      if (activeTab !== 'topBusinesses') return;
-
+      setLoadingBusinesses(true);
       console.log('[Search] Fetching top businesses...');
       try {
         // Fetch both top brands and top businesses
@@ -447,10 +451,12 @@ export default function SearchScreen() {
         setTopBusinessItems(combined);
       } catch (error) {
         console.error('Error fetching top businesses:', error);
+      } finally {
+        setLoadingBusinesses(false);
       }
     };
     fetchTopBusinessItems();
-  }, [activeTab]);
+  }, []);
 
   // Fetch all following items when tab changes or user logs in
   useEffect(() => {
@@ -1676,15 +1682,22 @@ export default function SearchScreen() {
             contentContainerStyle={[styles.userListContainer, { paddingBottom: 100 }]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
-                  <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
+              loadingBusinesses ? (
+                <View style={styles.loadingState}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
                 </View>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>No Endorsements Yet</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  Be the first to endorse a business or brand!
-                </Text>
-              </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+                    <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No Endorsements Yet</Text>
+                  <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                    Be the first to endorse a business or brand!
+                  </Text>
+                </View>
+              )
             }
           />
         ) : (
@@ -1696,15 +1709,22 @@ export default function SearchScreen() {
             contentContainerStyle={[styles.userListContainer, { paddingBottom: 100 }]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
-                  <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
+              loadingUsers ? (
+                <View style={styles.loadingState}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
                 </View>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>No Users Yet</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  Be one of the first to make your profile public!
-                </Text>
-              </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+                    <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No Users Yet</Text>
+                  <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                    Be one of the first to make your profile public!
+                  </Text>
+                </View>
+              )
             }
           />
         )
@@ -2528,6 +2548,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingHorizontal: 32,
     paddingTop: 24,
+  },
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 15,
+    fontWeight: '500' as const,
   },
   emptyIconContainer: {
     width: 96,
