@@ -374,9 +374,13 @@ export default function SearchScreen() {
   const [firebaseBusinesses, setFirebaseBusinesses] = useState<BusinessUser[]>([]);
   const [publicUsers, setPublicUsers] = useState<Array<{ id: string; profile: UserProfile }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingMoreUsers, setLoadingMoreUsers] = useState(false);
+  const [showAllUsers, setShowAllUsers] = useState(false);
   const [followingItems, setFollowingItems] = useState<FollowingItem[]>([]);
   const [topBusinessItems, setTopBusinessItems] = useState<TopBusinessItem[]>([]);
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
+  const [loadingMoreBusinesses, setLoadingMoreBusinesses] = useState(false);
+  const [showAllBusinesses, setShowAllBusinesses] = useState(false);
   const [activeTab, setActiveTab] = useState<'topBusinesses' | 'topUsers'>('topUsers');
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
@@ -402,7 +406,7 @@ export default function SearchScreen() {
   const [loadingPlaces, setLoadingPlaces] = useState(false);
   const [placesSearchDebounce, setPlacesSearchDebounce] = useState<NodeJS.Timeout | null>(null);
 
-  // Fetch Firebase businesses and public users on mount
+  // Fetch Firebase businesses and public users on mount (limited to 10 initially)
   useEffect(() => {
     const fetchData = async () => {
       setLoadingUsers(true);
@@ -410,7 +414,7 @@ export default function SearchScreen() {
         const businesses = await getAllUserBusinesses();
         setFirebaseBusinesses(businesses);
 
-        const users = await getAllPublicUsers();
+        const users = await getAllPublicUsers(10);
         setPublicUsers(users);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -421,16 +425,30 @@ export default function SearchScreen() {
     fetchData();
   }, []);
 
-  // Fetch top businesses (combined brands and businesses) on mount
+  // Load more users when "Show More" is clicked
+  const loadMoreUsers = async () => {
+    setLoadingMoreUsers(true);
+    try {
+      const users = await getAllPublicUsers(50);
+      setPublicUsers(users);
+      setShowAllUsers(true);
+    } catch (error) {
+      console.error('Error loading more users:', error);
+    } finally {
+      setLoadingMoreUsers(false);
+    }
+  };
+
+  // Fetch top businesses (combined brands and businesses) on mount (limited to 10 initially)
   useEffect(() => {
     const fetchTopBusinessItems = async () => {
       setLoadingBusinesses(true);
       console.log('[Search] Fetching top businesses...');
       try {
-        // Fetch both top brands and top businesses
+        // Fetch both top brands and top businesses (5 each for initial 10 total)
         const [topBrands, topBusinessesList] = await Promise.all([
-          getTopBrands(25),
-          getTopBusinesses(25),
+          getTopBrands(5),
+          getTopBusinesses(5),
         ]);
 
         console.log('[Search] Got top brands:', topBrands.length, 'top businesses:', topBusinessesList.length);
@@ -457,6 +475,35 @@ export default function SearchScreen() {
     };
     fetchTopBusinessItems();
   }, []);
+
+  // Load more businesses when "Show More" is clicked
+  const loadMoreBusinesses = async () => {
+    setLoadingMoreBusinesses(true);
+    try {
+      const [topBrands, topBusinessesList] = await Promise.all([
+        getTopBrands(25),
+        getTopBusinesses(25),
+      ]);
+
+      const combined: TopBusinessItem[] = [
+        ...topBrands.map(brand => ({
+          ...brand,
+          type: 'brand' as const,
+        })),
+        ...topBusinessesList.map(business => ({
+          ...business,
+          type: 'business' as const,
+        })),
+      ].sort((a, b) => b.score - a.score);
+
+      setTopBusinessItems(combined);
+      setShowAllBusinesses(true);
+    } catch (error) {
+      console.error('Error loading more businesses:', error);
+    } finally {
+      setLoadingMoreBusinesses(false);
+    }
+  };
 
   // Fetch all following items when tab changes or user logs in
   useEffect(() => {
@@ -1699,6 +1746,21 @@ export default function SearchScreen() {
                 </View>
               )
             }
+            ListFooterComponent={
+              !showAllBusinesses && topBusinessItems.length > 0 ? (
+                <TouchableOpacity
+                  style={[styles.showMoreButton, { backgroundColor: colors.backgroundSecondary }]}
+                  onPress={loadMoreBusinesses}
+                  disabled={loadingMoreBusinesses}
+                >
+                  {loadingMoreBusinesses ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Text style={[styles.showMoreText, { color: colors.primary }]}>Show More</Text>
+                  )}
+                </TouchableOpacity>
+              ) : null
+            }
           />
         ) : (
           <FlatList
@@ -1725,6 +1787,21 @@ export default function SearchScreen() {
                   </Text>
                 </View>
               )
+            }
+            ListFooterComponent={
+              !showAllUsers && publicUsers.length > 0 ? (
+                <TouchableOpacity
+                  style={[styles.showMoreButton, { backgroundColor: colors.backgroundSecondary }]}
+                  onPress={loadMoreUsers}
+                  disabled={loadingMoreUsers}
+                >
+                  {loadingMoreUsers ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Text style={[styles.showMoreText, { color: colors.primary }]}>Show More</Text>
+                  )}
+                </TouchableOpacity>
+              ) : null
             }
           />
         )
@@ -2559,6 +2636,19 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 15,
     fontWeight: '500' as const,
+  },
+  showMoreButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    borderRadius: 12,
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
   },
   emptyIconContainer: {
     width: 96,

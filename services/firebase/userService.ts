@@ -419,7 +419,7 @@ export async function aggregateBusinessTransactions(businessId: string): Promise
  * They should have the same fields (isPublicProfile, accountType) as regular accounts
  * @returns Array of public user profiles with their IDs, sorted by follower count
  */
-export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number; followerCount?: number }>> {
+export async function getAllPublicUsers(limitCount?: number): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number; followerCount?: number }>> {
   try {
     console.log('[Firebase] Fetching all public individual users');
 
@@ -450,16 +450,26 @@ export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: 
       followerCountMap.set(followedId, (followerCountMap.get(followedId) || 0) + 1);
     });
 
-    const usersWithCounts: Array<{ id: string; profile: UserProfile; endorsementCount: number; followerCount: number }> = [];
+    // First pass: build users with follower counts (no endorsement query yet)
+    const usersWithFollowers: Array<{ id: string; data: any; followerCount: number }> = [];
 
-    // Fetch endorsement counts for each user
     for (const userDoc of queryDocs) {
       const data = userDoc.data();
       const userId = userDoc.id;
-
-      // Get follower count from our pre-fetched map
       const followerCount = followerCountMap.get(userId) || 0;
+      usersWithFollowers.push({ id: userId, data, followerCount });
+    }
 
+    // Sort by follower count first
+    usersWithFollowers.sort((a, b) => b.followerCount - a.followerCount);
+
+    // Apply limit if specified (before expensive endorsement count queries)
+    const usersToProcess = limitCount ? usersWithFollowers.slice(0, limitCount) : usersWithFollowers;
+
+    const usersWithCounts: Array<{ id: string; profile: UserProfile; endorsementCount: number; followerCount: number }> = [];
+
+    // Fetch endorsement counts only for users we'll return
+    for (const { id: userId, data, followerCount } of usersToProcess) {
       // Get endorsement list count for this user (all lists now in userLists)
       let endorsementCount = 0;
       try {
