@@ -167,35 +167,75 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
     for (let index = 0; index < normalizedEndorsements.length; index++) {
       const endorsement = normalizedEndorsements[index];
 
-      // Generate a brand ID from the business name
-      const brandId = endorsement.businessName
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .replace(/\s+/g, '-')
-        .trim();
+      // Search for existing brand by NAME (case-insensitive) to prevent duplicates
+      let brandId: string | null = null;
+      let existingBrandData: any = null;
 
-      // Check if brand exists, create if not
-      const brandRef = doc(db, 'brands', brandId);
-      const existingBrand = await getDoc(brandRef);
+      // First, search the brands collection for a matching name
+      const brandsRef = collection(db, 'brands');
+      const brandNameLower = endorsement.businessName.toLowerCase().trim();
 
-      if (!existingBrand.exists()) {
-        // Create the brand in the brands collection
-        const brandData = removeUndefined({
-          name: endorsement.businessName,
-          category: endorsement.category || 'Business',
-          description: `${endorsement.businessName}`,
-          website: null,
-          exampleImageUrl: null,
-        });
+      // Query for exact name match (Firestore is case-sensitive, so we also store lowercase)
+      const brandQuery = query(brandsRef, where('nameLower', '==', brandNameLower));
+      const brandQuerySnapshot = await getDocs(brandQuery);
 
-        await setDoc(brandRef, {
-          ...brandData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: 'celebrity-import',
-        });
+      if (!brandQuerySnapshot.empty) {
+        // Found existing brand by name
+        const existingBrandDoc = brandQuerySnapshot.docs[0];
+        brandId = existingBrandDoc.id;
+        existingBrandData = existingBrandDoc.data();
+        console.log(`[CelebrityService] Found existing brand by name: ${brandId} (${endorsement.businessName})`);
+      } else {
+        // No match by nameLower - try searching by original name field
+        const brandQueryByName = query(brandsRef, where('name', '==', endorsement.businessName));
+        const brandQueryByNameSnapshot = await getDocs(brandQueryByName);
 
-        console.log(`[CelebrityService] Created brand: ${brandId} (${endorsement.businessName})`);
+        if (!brandQueryByNameSnapshot.empty) {
+          const existingBrandDoc = brandQueryByNameSnapshot.docs[0];
+          brandId = existingBrandDoc.id;
+          existingBrandData = existingBrandDoc.data();
+          console.log(`[CelebrityService] Found existing brand by exact name: ${brandId} (${endorsement.businessName})`);
+        }
+      }
+
+      // If no existing brand found, create a new one
+      if (!brandId) {
+        // Generate a brand ID from the business name
+        brandId = endorsement.businessName
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, '')
+          .replace(/\s+/g, '-')
+          .trim();
+
+        // Ensure the ID doesn't already exist (edge case)
+        const brandRef = doc(db, 'brands', brandId);
+        const existingByIdDoc = await getDoc(brandRef);
+
+        if (existingByIdDoc.exists()) {
+          // ID exists but name didn't match - use the existing brand
+          brandId = existingByIdDoc.id;
+          existingBrandData = existingByIdDoc.data();
+          console.log(`[CelebrityService] Found existing brand by ID: ${brandId}`);
+        } else {
+          // Create the brand in the brands collection
+          const brandData = removeUndefined({
+            name: endorsement.businessName,
+            nameLower: brandNameLower, // Store lowercase for case-insensitive matching
+            category: endorsement.category || 'Business',
+            description: `${endorsement.businessName}`,
+            website: null,
+            exampleImageUrl: null,
+          });
+
+          await setDoc(brandRef, {
+            ...brandData,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdBy: 'celebrity-import',
+          });
+
+          console.log(`[CelebrityService] Created new brand: ${brandId} (${endorsement.businessName})`);
+        }
       }
 
       // Create proper BrandListEntry (same as regular users)
@@ -203,8 +243,8 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
         id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         type: 'brand',
         brandId: brandId,
-        brandName: endorsement.businessName,
-        brandCategory: endorsement.category || 'Business',
+        brandName: existingBrandData?.name || endorsement.businessName,
+        brandCategory: existingBrandData?.category || endorsement.category || 'Business',
         createdAt: new Date(),
       };
 
