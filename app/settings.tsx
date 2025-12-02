@@ -16,12 +16,10 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, Lock, Download, Shield, FileText, ExternalLink, Trash2, Building2, ChevronDown, ChevronUp, Users } from 'lucide-react-native';
+import { ChevronLeft, Lock, Download, Shield, FileText, ExternalLink, Trash2, Building2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser as useUserContext } from '@/contexts/UserContext';
 import { useUser, useAuth } from '@clerk/clerk-expo';
-
-const ADMIN_EMAIL = 'normancdesilva@gmail.com';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -29,9 +27,6 @@ export default function SettingsScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
   const { user } = useUser();
   const { signOut } = useAuth();
-
-  // Check if current user is admin
-  const isAdmin = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL;
   const { width: windowWidth } = useWindowDimensions();
 
   // On larger screens (web), constrain content to 50% width in the center
@@ -393,33 +388,6 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Admin Section - Only visible to admin */}
-        {isAdmin && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Users size={24} color={colors.primary} strokeWidth={2} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Admin
-              </Text>
-            </View>
-
-            <View style={[styles.card, { backgroundColor: colors.backgroundSecondary }]}>
-              {/* Prominent Users */}
-              <TouchableOpacity
-                style={styles.actionRow}
-                onPress={() => router.push('/admin/prominent-users')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.actionLeft}>
-                  <Users size={22} color={colors.primary} strokeWidth={2} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Manage Prominent Users</Text>
-                </View>
-                <ExternalLink size={18} color={colors.textSecondary} strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         {/* Legal Section */}
         <View style={styles.section}>
