@@ -414,10 +414,10 @@ export async function aggregateBusinessTransactions(businessId: string): Promise
 }
 
 /**
- * Get all public user profiles, sorted by endorsement count (highest first)
- * @returns Array of public user profiles with their IDs, sorted by endorsement count
+ * Get all public user profiles, sorted by follower count (highest first)
+ * @returns Array of public user profiles with their IDs, sorted by follower count
  */
-export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number }>> {
+export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number; followerCount?: number }>> {
   try {
     console.log('[Firebase] Fetching all public users (excluding business accounts)');
 
@@ -431,12 +431,27 @@ export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: 
 
     const querySnapshot = await getDocs(q);
 
-    const usersWithCounts: Array<{ id: string; profile: UserProfile; endorsementCount: number }> = [];
+    // First, get all follow records in one query for efficiency
+    const followsRef = collection(db, 'follows');
+    const followsQuery = query(followsRef, where('followedType', '==', 'user'));
+    const followsSnapshot = await getDocs(followsQuery);
+
+    // Build a map of userId -> follower count
+    const followerCountMap = new Map<string, number>();
+    followsSnapshot.forEach((doc) => {
+      const followedId = doc.data().followedId;
+      followerCountMap.set(followedId, (followerCountMap.get(followedId) || 0) + 1);
+    });
+
+    const usersWithCounts: Array<{ id: string; profile: UserProfile; endorsementCount: number; followerCount: number }> = [];
 
     // Fetch endorsement counts for each user
     for (const userDoc of querySnapshot.docs) {
       const data = userDoc.data();
       const userId = userDoc.id;
+
+      // Get follower count from our pre-fetched map
+      const followerCount = followerCountMap.get(userId) || 0;
 
       // Get endorsement list count for this user
       // Check both userLists (regular users) and lists (celebrity accounts) collections
@@ -493,13 +508,18 @@ export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: 
         isCelebrityAccount: data.isCelebrityAccount,
       };
 
-      usersWithCounts.push({ id: userId, profile, endorsementCount });
+      usersWithCounts.push({ id: userId, profile, endorsementCount, followerCount });
     }
 
-    // Sort by endorsement count (highest first)
-    usersWithCounts.sort((a, b) => b.endorsementCount - a.endorsementCount);
+    // Sort by follower count (highest first), then by endorsement count as tiebreaker
+    usersWithCounts.sort((a, b) => {
+      if (b.followerCount !== a.followerCount) {
+        return b.followerCount - a.followerCount;
+      }
+      return b.endorsementCount - a.endorsementCount;
+    });
 
-    console.log('[Firebase] ✅ Fetched and sorted', usersWithCounts.length, 'public users by endorsement count');
+    console.log('[Firebase] ✅ Fetched and sorted', usersWithCounts.length, 'public users by follower count');
     return usersWithCounts;
   } catch (error) {
     console.error('[Firebase] ❌ Error fetching public users:', error);
