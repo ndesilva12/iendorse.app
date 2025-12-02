@@ -668,9 +668,6 @@ export default function OnboardingScreen() {
         {/* Footer for Business Claim Step */}
         <View style={[styles.footer, { paddingBottom: 32 + insets.bottom, backgroundColor: colors.backgroundSecondary, borderTopColor: colors.border }, Platform.OS === 'web' && styles.footerWeb]}>
           <View style={[styles.footerContent, Platform.OS === 'web' && styles.footerContentWeb]}>
-            <Text style={[styles.selectedCount, { color: colors.textSecondary }]}>
-              {selectedPlace ? 'Ready to submit your claim' : 'Search and select your business above'}
-            </Text>
             <TouchableOpacity
               style={[
                 styles.continueButton,
@@ -684,7 +681,7 @@ export default function OnboardingScreen() {
               {isSubmittingClaim ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={[styles.continueButtonText, { color: colors.white }]}>Submit Claim & Continue</Text>
+                <Text style={[styles.continueButtonText, { color: colors.white, textAlign: 'center' }]}>Submit Claim & Continue</Text>
               )}
             </TouchableOpacity>
           </View>
