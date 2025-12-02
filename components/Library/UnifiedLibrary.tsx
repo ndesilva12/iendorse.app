@@ -4171,8 +4171,11 @@ export default function UnifiedLibrary({
   const renderLibraryOverview = () => {
     // Determine if viewing own profile
     const isOwnProfile = !viewingUserId || currentUserId === viewingUserId;
-    // Use "Endorsements" for own profile, user name for others
-    const endorsementTitle = isOwnProfile ? 'Endorsements' : (endorsementList?.name || 'Endorsements');
+    // Use "Endorsements (count)" for own profile, user name for others
+    const endorsementCount = endorsementList?.entries?.length || 0;
+    const endorsementTitle = isOwnProfile
+      ? `Endorsements (${endorsementCount})`
+      : (endorsementList?.name || 'Endorsements');
 
     return (
       <>

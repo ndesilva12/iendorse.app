@@ -374,7 +374,7 @@ export default function SearchScreen() {
   const [publicUsers, setPublicUsers] = useState<Array<{ id: string; profile: UserProfile }>>([]);
   const [followingItems, setFollowingItems] = useState<FollowingItem[]>([]);
   const [topBusinessItems, setTopBusinessItems] = useState<TopBusinessItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'topBusinesses' | 'topUsers'>('topBusinesses');
+  const [activeTab, setActiveTab] = useState<'topBusinesses' | 'topUsers'>('topUsers');
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
   const [scannedInfo, setScannedInfo] = useState<{productName: string; brandName: string; imageUrl?: string; notInDatabase: boolean} | null>(null);
@@ -1415,23 +1415,6 @@ export default function SearchScreen() {
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'topBusinesses' && styles.activeTab,
-            activeTab === 'topBusinesses' && { borderBottomColor: colors.primary }
-          ]}
-          onPress={() => setActiveTab('topBusinesses')}
-          activeOpacity={0.7}
-        >
-          <Text style={[
-            styles.tabText,
-            { color: activeTab === 'topBusinesses' ? colors.primary : colors.textSecondary },
-            activeTab === 'topBusinesses' && styles.activeTabText
-          ]}>
-            Top Businesses
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tab,
             activeTab === 'topUsers' && styles.activeTab,
             activeTab === 'topUsers' && { borderBottomColor: colors.primary }
           ]}
@@ -1444,6 +1427,23 @@ export default function SearchScreen() {
             activeTab === 'topUsers' && styles.activeTabText
           ]}>
             Top Users
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'topBusinesses' && styles.activeTab,
+            activeTab === 'topBusinesses' && { borderBottomColor: colors.primary }
+          ]}
+          onPress={() => setActiveTab('topBusinesses')}
+          activeOpacity={0.7}
+        >
+          <Text style={[
+            styles.tabText,
+            { color: activeTab === 'topBusinesses' ? colors.primary : colors.textSecondary },
+            activeTab === 'topBusinesses' && styles.activeTabText
+          ]}>
+            Top Businesses
           </Text>
         </TouchableOpacity>
       </View>
@@ -2940,7 +2940,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   userCardContent: {
     flexDirection: 'row',
