@@ -320,32 +320,43 @@ export default function ProminentUsersAdmin() {
   };
 
   // Handle delete user
-  const handleDeleteUser = (user: CelebrityUser) => {
-    Alert.alert(
-      'Delete User',
-      `Are you sure you want to delete ${user.name}? This will remove their profile and endorsement list.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Delete user document
-              await deleteDoc(doc(db, 'users', user.userId));
-              // Delete endorsement list (now in userLists)
-              await deleteDoc(doc(db, 'userLists', `${user.userId}_endorsement`));
+  const handleDeleteUser = async (user: CelebrityUser) => {
+    // Use window.confirm on web, Alert.alert on mobile
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm(`Are you sure you want to delete ${user.name}? This will remove their profile and endorsement list.`)
+      : await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Delete User',
+            `Are you sure you want to delete ${user.name}? This will remove their profile and endorsement list.`,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
 
-              Alert.alert('Success', `Deleted ${user.name}`);
-              loadCelebrities();
-            } catch (error) {
-              console.error('[ProminentUsers] Error deleting user:', error);
-              Alert.alert('Error', 'Failed to delete user');
-            }
-          },
-        },
-      ]
-    );
+    if (!confirmed) return;
+
+    try {
+      // Delete user document
+      await deleteDoc(doc(db, 'users', user.userId));
+      // Delete endorsement list (now in userLists)
+      await deleteDoc(doc(db, 'userLists', `${user.userId}_endorsement`));
+
+      if (Platform.OS === 'web') {
+        window.alert(`Deleted ${user.name}`);
+      } else {
+        Alert.alert('Success', `Deleted ${user.name}`);
+      }
+      loadCelebrities();
+    } catch (error) {
+      console.error('[ProminentUsers] Error deleting user:', error);
+      if (Platform.OS === 'web') {
+        window.alert('Failed to delete user');
+      } else {
+        Alert.alert('Error', 'Failed to delete user');
+      }
+    }
   };
 
   // Handle generate claim link
@@ -437,34 +448,48 @@ export default function ProminentUsersAdmin() {
 
   // Handle delete all celebrity accounts
   const handleDeleteAll = async () => {
-    Alert.alert(
-      'Delete All Prominent Users',
-      'This will DELETE all prominent user accounts and their endorsement lists. This cannot be undone. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await deleteAllCelebrityAccounts();
-              if (result.success) {
-                Alert.alert(
-                  'Deletion Complete',
-                  `Deleted ${result.deletedUsers} users and ${result.deletedLists} lists`
-                );
-                loadCelebrities(); // Refresh the list
-              } else {
-                Alert.alert('Deletion Failed', result.errors.join('\n'));
-              }
-            } catch (error) {
-              console.error('[ProminentUsers] Delete all error:', error);
-              Alert.alert('Error', 'Deletion failed');
-            }
-          },
-        },
-      ]
-    );
+    // Use window.confirm on web, Alert.alert on mobile
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm('This will DELETE all prominent user accounts and their endorsement lists. This cannot be undone. Are you sure?')
+      : await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Delete All Prominent Users',
+            'This will DELETE all prominent user accounts and their endorsement lists. This cannot be undone. Are you sure?',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Delete All', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
+
+    if (!confirmed) return;
+
+    try {
+      const result = await deleteAllCelebrityAccounts();
+      if (result.success) {
+        const msg = `Deleted ${result.deletedUsers} users and ${result.deletedLists} lists`;
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert('Deletion Complete', msg);
+        }
+        loadCelebrities(); // Refresh the list
+      } else {
+        const errMsg = result.errors.join('\n');
+        if (Platform.OS === 'web') {
+          window.alert('Deletion Failed: ' + errMsg);
+        } else {
+          Alert.alert('Deletion Failed', errMsg);
+        }
+      }
+    } catch (error) {
+      console.error('[ProminentUsers] Delete all error:', error);
+      if (Platform.OS === 'web') {
+        window.alert('Deletion failed');
+      } else {
+        Alert.alert('Error', 'Deletion failed');
+      }
+    }
   };
 
   // Open edit modal with user data
