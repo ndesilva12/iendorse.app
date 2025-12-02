@@ -45,6 +45,7 @@ import {
   generateClaimToken,
   migrateCelebrityListsToUserLists,
   normalizeCelebrityAccounts,
+  deleteAllCelebrityAccounts,
 } from '@/services/firebase/celebrityService';
 import * as Clipboard from 'expo-clipboard';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -427,6 +428,38 @@ export default function ProminentUsersAdmin() {
             } catch (error) {
               console.error('[ProminentUsers] Normalize error:', error);
               Alert.alert('Error', 'Normalization failed');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle delete all celebrity accounts
+  const handleDeleteAll = async () => {
+    Alert.alert(
+      'Delete All Prominent Users',
+      'This will DELETE all prominent user accounts and their endorsement lists. This cannot be undone. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await deleteAllCelebrityAccounts();
+              if (result.success) {
+                Alert.alert(
+                  'Deletion Complete',
+                  `Deleted ${result.deletedUsers} users and ${result.deletedLists} lists`
+                );
+                loadCelebrities(); // Refresh the list
+              } else {
+                Alert.alert('Deletion Failed', result.errors.join('\n'));
+              }
+            } catch (error) {
+              console.error('[ProminentUsers] Delete all error:', error);
+              Alert.alert('Error', 'Deletion failed');
             }
           },
         },
@@ -988,6 +1021,14 @@ export default function ProminentUsersAdmin() {
           >
             <Check size={18} color="#16A34A" />
             <Text style={[styles.headerButtonText, { color: '#16A34A' }]}>Normalize</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: '#FEE2E2', borderColor: '#EF4444', borderWidth: 1 }]}
+            onPress={handleDeleteAll}
+            activeOpacity={0.7}
+          >
+            <Trash2 size={18} color="#DC2626" />
+            <Text style={[styles.headerButtonText, { color: '#DC2626' }]}>Delete All</Text>
           </TouchableOpacity>
         </View>
       </View>
