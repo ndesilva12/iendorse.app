@@ -415,53 +415,28 @@ export async function aggregateBusinessTransactions(businessId: string): Promise
 
 /**
  * Get all public user profiles, sorted by follower count (highest first)
- * Includes both regular public users and celebrity/prominent user accounts
+ * Celebrity/prominent accounts are just regular individual accounts with isCelebrityAccount=true flag
+ * They should have the same fields (isPublicProfile, accountType) as regular accounts
  * @returns Array of public user profiles with their IDs, sorted by follower count
  */
 export async function getAllPublicUsers(): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number; followerCount?: number }>> {
   try {
-    console.log('[Firebase] Fetching all public users (excluding business accounts)');
+    console.log('[Firebase] Fetching all public individual users');
 
     const usersRef = collection(db, 'users');
 
-    // Query 1: Regular public individual accounts
+    // Single query for all public individual accounts (includes celebrities)
+    // Celebrity accounts are just individual accounts with isCelebrityAccount=true flag
     const publicUsersQuery = query(
       usersRef,
       where('isPublicProfile', '==', true),
       where('accountType', '==', 'individual')
     );
 
-    // Query 2: Celebrity/prominent user accounts (may not have all fields set)
-    const celebrityQuery = query(
-      usersRef,
-      where('isCelebrityAccount', '==', true)
-    );
+    const querySnapshot = await getDocs(publicUsersQuery);
+    console.log(`[Firebase] Found ${querySnapshot.size} public users`);
 
-    // Run both queries in parallel
-    const [publicSnapshot, celebritySnapshot] = await Promise.all([
-      getDocs(publicUsersQuery),
-      getDocs(celebrityQuery),
-    ]);
-
-    // Merge results, avoiding duplicates (use a Map keyed by userId)
-    const userDocsMap = new Map<string, any>();
-
-    publicSnapshot.forEach((doc) => {
-      userDocsMap.set(doc.id, doc);
-    });
-
-    celebritySnapshot.forEach((doc) => {
-      // Only add if not already in map (celebrity might also be in public query)
-      // Also skip if account is deactivated/claimed (isActive === false) or is a business
-      const data = doc.data();
-      if (!userDocsMap.has(doc.id) && data.isActive !== false && data.accountType !== 'business') {
-        userDocsMap.set(doc.id, doc);
-      }
-    });
-
-    console.log(`[Firebase] Found ${publicSnapshot.size} public users + ${celebritySnapshot.size} celebrity accounts (${userDocsMap.size} unique)`);
-
-    const queryDocs = Array.from(userDocsMap.values());
+    const queryDocs = querySnapshot.docs;
 
     // First, get all follow records in one query for efficiency
     const followsRef = collection(db, 'follows');

@@ -44,6 +44,7 @@ import {
   importCelebrityBatch,
   generateClaimToken,
   migrateCelebrityListsToUserLists,
+  normalizeCelebrityAccounts,
 } from '@/services/firebase/celebrityService';
 import * as Clipboard from 'expo-clipboard';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -395,6 +396,37 @@ export default function ProminentUsersAdmin() {
             } catch (error) {
               console.error('[ProminentUsers] Migration error:', error);
               Alert.alert('Error', 'Migration failed');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle normalize accounts (fix missing fields)
+  const handleNormalize = async () => {
+    Alert.alert(
+      'Normalize Accounts',
+      'This will ensure all prominent user accounts have the correct fields (isPublicProfile, accountType) so they appear in user listings and search. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Normalize',
+          onPress: async () => {
+            try {
+              const result = await normalizeCelebrityAccounts();
+              if (result.success) {
+                Alert.alert(
+                  'Normalization Complete',
+                  `Total: ${result.total}\nUpdated: ${result.updated}\nAlready normalized: ${result.alreadyNormalized}`
+                );
+                loadCelebrities(); // Refresh the list
+              } else {
+                Alert.alert('Normalization Failed', result.errors.join('\n'));
+              }
+            } catch (error) {
+              console.error('[ProminentUsers] Normalize error:', error);
+              Alert.alert('Error', 'Normalization failed');
             }
           },
         },
@@ -948,6 +980,14 @@ export default function ProminentUsersAdmin() {
           >
             <Database size={18} color="#D97706" />
             <Text style={[styles.headerButtonText, { color: '#D97706' }]}>Migrate</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: '#DCFCE7', borderColor: '#22C55E', borderWidth: 1 }]}
+            onPress={handleNormalize}
+            activeOpacity={0.7}
+          >
+            <Check size={18} color="#16A34A" />
+            <Text style={[styles.headerButtonText, { color: '#16A34A' }]}>Normalize</Text>
           </TouchableOpacity>
         </View>
       </View>

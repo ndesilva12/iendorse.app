@@ -693,3 +693,84 @@ export async function getClaimInfo(claimToken: string): Promise<{
     };
   }
 }
+
+/**
+ * Normalize all celebrity accounts to ensure they have the same fields as regular accounts
+ * This fixes any celebrity accounts that might be missing isPublicProfile or accountType
+ * After running this, celebrity accounts will be found by the same queries as regular accounts
+ */
+export async function normalizeCelebrityAccounts(): Promise<{
+  success: boolean;
+  total: number;
+  updated: number;
+  alreadyNormalized: number;
+  errors: string[];
+}> {
+  const results = {
+    success: true,
+    total: 0,
+    updated: 0,
+    alreadyNormalized: 0,
+    errors: [] as string[],
+  };
+
+  try {
+    console.log('[CelebrityService] Starting normalization of celebrity accounts...');
+
+    // Get all celebrity accounts
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('isCelebrityAccount', '==', true));
+    const querySnapshot = await getDocs(q);
+
+    results.total = querySnapshot.size;
+    console.log(`[CelebrityService] Found ${results.total} celebrity accounts to check`);
+
+    for (const userDoc of querySnapshot.docs) {
+      const userId = userDoc.id;
+      const userData = userDoc.data();
+
+      // Check if account needs normalization
+      const needsUpdate =
+        userData.isPublicProfile !== true ||
+        userData.accountType !== 'individual' ||
+        userData.alignedListPublic !== true ||
+        userData.unalignedListPublic !== true;
+
+      if (!needsUpdate) {
+        results.alreadyNormalized++;
+        continue;
+      }
+
+      // Skip deactivated/claimed accounts
+      if (userData.isActive === false) {
+        console.log(`[CelebrityService] Skipping deactivated account: ${userId}`);
+        continue;
+      }
+
+      try {
+        const userRef = doc(db, 'users', userId);
+        await setDoc(userRef, {
+          isPublicProfile: true,
+          accountType: 'individual',
+          alignedListPublic: true,
+          unalignedListPublic: true,
+        }, { merge: true });
+
+        results.updated++;
+        console.log(`[CelebrityService] Normalized account: ${userId} (${userData.userDetails?.name || userData.fullName})`);
+      } catch (err) {
+        const errorMsg = `Failed to update ${userId}: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        results.errors.push(errorMsg);
+        console.error(`[CelebrityService] ${errorMsg}`);
+      }
+    }
+
+    console.log(`[CelebrityService] Normalization complete: ${results.updated} updated, ${results.alreadyNormalized} already normalized`);
+    return results;
+  } catch (error) {
+    console.error('[CelebrityService] Normalization error:', error);
+    results.success = false;
+    results.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    return results;
+  }
+}
