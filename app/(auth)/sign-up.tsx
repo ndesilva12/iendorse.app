@@ -772,7 +772,7 @@ const styles = StyleSheet.create({
   },
   taglineContainer: {
     alignItems: 'center',
-    marginTop: 0,
+    marginTop: -25,
     marginBottom: 32,
     paddingHorizontal: 8,
   },

@@ -445,15 +445,15 @@ export default function SearchScreen() {
       setLoadingBusinesses(true);
       console.log('[Search] Fetching top businesses...');
       try {
-        // Fetch both top brands and top businesses (5 each for initial 10 total)
+        // Fetch from both pools, then combine and take true top 10
         const [topBrands, topBusinessesList] = await Promise.all([
-          getTopBrands(5),
-          getTopBusinesses(5),
+          getTopBrands(15),
+          getTopBusinesses(15),
         ]);
 
         console.log('[Search] Got top brands:', topBrands.length, 'top businesses:', topBusinessesList.length);
 
-        // Combine and sort by score
+        // Combine, sort by score, and take top 10
         const combined: TopBusinessItem[] = [
           ...topBrands.map(brand => ({
             ...brand,
@@ -463,7 +463,7 @@ export default function SearchScreen() {
             ...business,
             type: 'business' as const,
           })),
-        ].sort((a, b) => b.score - a.score);
+        ].sort((a, b) => b.score - a.score).slice(0, 10);
 
         console.log('[Search] Combined top items:', combined.length);
         setTopBusinessItems(combined);
