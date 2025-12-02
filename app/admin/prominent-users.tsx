@@ -48,7 +48,7 @@ import {
   deleteAllCelebrityAccounts,
 } from '@/services/firebase/celebrityService';
 import * as Clipboard from 'expo-clipboard';
-import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { UserProfile } from '@/types';
 import { pickAndUploadImage } from '@/lib/imageUpload';
@@ -279,12 +279,13 @@ export default function ProminentUsersAdmin() {
     }
   };
 
-  // Handle edit user
+  // Handle edit user (including endorsements)
   const handleEditUser = async () => {
     if (!selectedUser) return;
 
     setIsSubmitting(true);
     try {
+      // Update user profile
       const userRef = doc(db, 'users', selectedUser.userId);
       const updateData: Record<string, any> = {
         'userDetails.name': formData.name.trim(),
@@ -306,14 +307,117 @@ export default function ProminentUsersAdmin() {
 
       await updateDoc(userRef, updateData);
 
-      Alert.alert('Success', `Updated ${formData.name}'s profile`);
+      // Update endorsement list if endorsements field has content
+      if (formData.endorsements.trim()) {
+        const endorsementNames = formData.endorsements
+          .split('\n')
+          .map((e) => e.trim())
+          .filter((e) => e.length > 0);
+
+        // Build new entries array
+        const entries: any[] = [];
+        const brandsRef = collection(db, 'brands');
+
+        for (const brandName of endorsementNames) {
+          const brandNameLower = brandName.toLowerCase().trim();
+
+          // Search for existing brand
+          let brandId: string | null = null;
+          let existingBrandData: any = null;
+
+          // Try nameLower first
+          const brandQuery = query(brandsRef, where('nameLower', '==', brandNameLower));
+          const brandQuerySnapshot = await getDocs(brandQuery);
+
+          if (!brandQuerySnapshot.empty) {
+            const existingBrandDoc = brandQuerySnapshot.docs[0];
+            brandId = existingBrandDoc.id;
+            existingBrandData = existingBrandDoc.data();
+          } else {
+            // Try exact name match
+            const brandQueryByName = query(brandsRef, where('name', '==', brandName));
+            const brandQueryByNameSnapshot = await getDocs(brandQueryByName);
+
+            if (!brandQueryByNameSnapshot.empty) {
+              const existingBrandDoc = brandQueryByNameSnapshot.docs[0];
+              brandId = existingBrandDoc.id;
+              existingBrandData = existingBrandDoc.data();
+            }
+          }
+
+          // Create brand if not found
+          if (!brandId) {
+            brandId = brandName
+              .toLowerCase()
+              .replace(/[^a-z0-9\s]/g, '')
+              .replace(/\s+/g, '-')
+              .trim();
+
+            const brandRef = doc(db, 'brands', brandId);
+            const existingByIdDoc = await getDoc(brandRef);
+
+            if (existingByIdDoc.exists()) {
+              existingBrandData = existingByIdDoc.data();
+            } else {
+              // Create new brand
+              await setDoc(brandRef, {
+                name: brandName,
+                nameLower: brandNameLower,
+                category: 'Business',
+                description: brandName,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                createdBy: 'admin-edit',
+              });
+            }
+          }
+
+          entries.push({
+            id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: 'brand',
+            brandId: brandId,
+            brandName: existingBrandData?.name || brandName,
+            brandCategory: existingBrandData?.category || 'Business',
+            createdAt: new Date(),
+          });
+
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 30));
+        }
+
+        // Update the endorsement list
+        const listRef = doc(db, 'userLists', `${selectedUser.userId}_endorsement`);
+        await setDoc(listRef, {
+          id: `${selectedUser.userId}_endorsement`,
+          userId: selectedUser.userId,
+          name: formData.name.trim(),
+          description: `${formData.name.trim()}'s endorsed businesses`,
+          creatorName: formData.name.trim(),
+          creatorImage: formData.profileImage || null,
+          entries,
+          isPublic: true,
+          isEndorsed: true,
+          order: 0,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+
+      if (Platform.OS === 'web') {
+        window.alert(`Updated ${formData.name}'s profile`);
+      } else {
+        Alert.alert('Success', `Updated ${formData.name}'s profile`);
+      }
       setShowEditModal(false);
       setSelectedUser(null);
       resetForm();
       loadCelebrities();
     } catch (error) {
       console.error('[ProminentUsers] Error updating user:', error);
-      Alert.alert('Error', 'Failed to update profile');
+      if (Platform.OS === 'web') {
+        window.alert('Failed to update profile');
+      } else {
+        Alert.alert('Error', 'Failed to update profile');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -492,9 +596,25 @@ export default function ProminentUsersAdmin() {
     }
   };
 
-  // Open edit modal with user data
-  const openEditModal = (user: CelebrityUser) => {
+  // Open edit modal with user data (including endorsements)
+  const openEditModal = async (user: CelebrityUser) => {
     setSelectedUser(user);
+
+    // Load existing endorsements from userLists
+    let existingEndorsements = '';
+    try {
+      const listRef = doc(db, 'userLists', `${user.userId}_endorsement`);
+      const listDoc = await getDoc(listRef);
+      if (listDoc.exists()) {
+        const listData = listDoc.data();
+        const entries = listData.entries || [];
+        // Convert entries to newline-separated brand names
+        existingEndorsements = entries.map((entry: any) => entry.brandName || entry.name || '').filter(Boolean).join('\n');
+      }
+    } catch (error) {
+      console.error('[ProminentUsers] Error loading endorsements:', error);
+    }
+
     setFormData({
       name: user.name,
       location: user.location || '',
@@ -502,7 +622,7 @@ export default function ProminentUsersAdmin() {
       website: user.website || '',
       twitter: user.twitter || '',
       instagram: user.instagram || '',
-      endorsements: '',
+      endorsements: existingEndorsements,
       profileImage: user.profileImage || '',
       coverImage: user.coverImage || '',
     });
