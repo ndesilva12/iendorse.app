@@ -59,6 +59,7 @@ interface BrandData {
   youtubeUrl?: string;
   status?: 'auto-created' | 'in-progress' | 'verified';
   createdFrom?: string[]; // Which values reference this brand
+  createdBy?: string; // Source of creation (e.g., 'celebrity-import', 'admin-edit')
   affiliates?: Affiliate[];
   partnerships?: Partnership[];
   ownership?: Ownership[];
@@ -79,6 +80,7 @@ export default function IncompleteBrandsManagement() {
   const [editingBrand, setEditingBrand] = useState<BrandData | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'auto-created' | 'in-progress' | 'verified'>('auto-created');
+  const [filterSource, setFilterSource] = useState<'all' | 'prominent-import'>('all');
   const [valueReferences, setValueReferences] = useState<Record<string, ValueReference[]>>({});
 
   // Form state - Basic info
@@ -205,6 +207,7 @@ export default function IncompleteBrandsManagement() {
           tiktokUrl: data.tiktokUrl || '',
           youtubeUrl: data.youtubeUrl || '',
           status: status as any,
+          createdBy: data.createdBy || '',
           affiliates: data.affiliates || [],
           partnerships: data.partnerships || [],
           ownership: data.ownership || [],
@@ -371,10 +374,22 @@ export default function IncompleteBrandsManagement() {
     );
   };
 
+  // Count brands from prominent user import
+  const prominentImportCount = brands.filter(b =>
+    b.createdBy === 'celebrity-import' || b.createdBy === 'admin-edit'
+  ).length;
+
   const filteredBrands = brands.filter(brand => {
     // Status filter
     if (filterStatus !== 'all' && brand.status !== filterStatus) {
       return false;
+    }
+
+    // Source filter (prominent user import)
+    if (filterSource === 'prominent-import') {
+      if (brand.createdBy !== 'celebrity-import' && brand.createdBy !== 'admin-edit') {
+        return false;
+      }
     }
 
     // Search filter
@@ -459,9 +474,30 @@ export default function IncompleteBrandsManagement() {
           onChangeText={setSearchQuery}
         />
 
+        {/* Source Filter */}
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Source:</Text>
+          <TouchableOpacity
+            style={[styles.filterButton, filterSource === 'all' && styles.filterButtonActive]}
+            onPress={() => setFilterSource('all')}
+          >
+            <Text style={[styles.filterButtonText, filterSource === 'all' && styles.filterButtonTextActive]}>
+              All Sources
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, filterSource === 'prominent-import' && styles.filterButtonActive, filterSource === 'prominent-import' && { backgroundColor: '#9333ea', borderColor: '#9333ea' }]}
+            onPress={() => setFilterSource('prominent-import')}
+          >
+            <Text style={[styles.filterButtonText, filterSource === 'prominent-import' && styles.filterButtonTextActive]}>
+              ⭐ Prominent User Import ({prominentImportCount})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Status Filter */}
         <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Filter:</Text>
+          <Text style={styles.filterLabel}>Status:</Text>
           <TouchableOpacity
             style={[styles.filterButton, filterStatus === 'all' && styles.filterButtonActive]}
             onPress={() => setFilterStatus('all')}
@@ -521,6 +557,16 @@ export default function IncompleteBrandsManagement() {
 
               {/* Brand Details */}
               <View style={styles.brandDetails}>
+                {brand.createdBy && (
+                  <>
+                    <Text style={styles.detailLabel}>Source:</Text>
+                    <Text style={[styles.detailValue, { color: '#9333ea', fontWeight: '600' }]}>
+                      {brand.createdBy === 'celebrity-import' ? '⭐ Prominent User Import' :
+                       brand.createdBy === 'admin-edit' ? '⭐ Admin Edit' : brand.createdBy}
+                    </Text>
+                  </>
+                )}
+
                 <Text style={styles.detailLabel}>Description:</Text>
                 <Text style={styles.detailValue}>
                   {brand.description || <Text style={styles.emptyValue}>Not set</Text>}
