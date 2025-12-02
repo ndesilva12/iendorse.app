@@ -120,6 +120,30 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Businesses collection - OPEN ACCESS
+    // Business profiles and data (Clerk handles authentication)
+    match /businesses/{businessId} {
+      allow read, write: if true;
+    }
+
+    // Admin collection - OPEN ACCESS
+    // Admin flags, migration status, API stats (admin panel controls access)
+    match /admin/{docId} {
+      allow read, write: if true;
+    }
+
+    // Lists collection (legacy) - OPEN ACCESS
+    // Legacy celebrity lists before migration to userLists
+    match /lists/{listId} {
+      allow read, write: if true;
+    }
+
+    // Custom Fields collection - OPEN ACCESS
+    // Custom field definitions for various entities
+    match /customFields/{fieldId} {
+      allow read, write: if true;
+    }
+
     // Deny all other collections
     match /{document=**} {
       allow read, write: if false;
