@@ -94,11 +94,12 @@ export async function getTopBrands(limit: number = 50): Promise<RankedItem[]> {
         // Only count brand entries
         if (entry.type !== 'brand' || !entry.brandId) return;
 
+        // Skip brands that don't exist in the database (deleted brands)
+        const brandDetails = brandsMap.get(entry.brandId);
+        if (!brandDetails) return;
+
         const position = index + 1; // Position is 1-indexed
         const weight = getPositionWeight(position);
-
-        // Look up brand details from the brands collection first, then fall back to entry data
-        const brandDetails = brandsMap.get(entry.brandId);
 
         const existing = brandScores.get(entry.brandId);
         if (existing) {
@@ -108,10 +109,10 @@ export async function getTopBrands(limit: number = 50): Promise<RankedItem[]> {
           brandScores.set(entry.brandId, {
             score: weight,
             count: 1,
-            name: brandDetails?.name || entry.brandName || 'Unknown Brand',
-            category: brandDetails?.category || entry.brandCategory,
-            website: brandDetails?.website || entry.website,
-            logoUrl: brandDetails?.logoUrl || entry.logoUrl,
+            name: brandDetails.name,
+            category: brandDetails.category,
+            website: brandDetails.website,
+            logoUrl: brandDetails.logoUrl,
           });
         }
       });
@@ -202,11 +203,12 @@ export async function getTopBusinesses(
         // Only count business entries
         if (entry.type !== 'business' || !entry.businessId) return;
 
+        // Skip businesses that don't exist in the database (deleted businesses)
+        const businessDetails = businessesMap.get(entry.businessId);
+        if (!businessDetails) return;
+
         const position = index + 1; // Position is 1-indexed
         const weight = getPositionWeight(position);
-
-        // Look up business details from the users collection first, then fall back to entry data
-        const businessDetails = businessesMap.get(entry.businessId);
 
         const existing = businessScores.get(entry.businessId);
         if (existing) {
@@ -216,11 +218,11 @@ export async function getTopBusinesses(
           businessScores.set(entry.businessId, {
             score: weight,
             count: 1,
-            name: businessDetails?.name || (entry as any).businessName || 'Unknown Business',
-            category: businessDetails?.category || (entry as any).businessCategory,
-            website: businessDetails?.website || (entry as any).website,
-            logoUrl: businessDetails?.logoUrl || (entry as any).logoUrl,
-            location: businessDetails?.location || (entry as any).location,
+            name: businessDetails.name,
+            category: businessDetails.category,
+            website: businessDetails.website,
+            logoUrl: businessDetails.logoUrl,
+            location: businessDetails.location,
           });
         }
       });

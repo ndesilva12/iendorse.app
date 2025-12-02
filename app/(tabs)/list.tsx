@@ -97,6 +97,7 @@ import { calculateBrandScore, calculateSimilarityScore, normalizeBrandScores, no
 import { getAllUserBusinesses, isBusinessWithinRange, BusinessUser } from '@/services/firebase/businessService';
 import { followEntity, unfollowEntity, isFollowing, getFollowingCount, getFollowersCount, getFollowing, getFollowers, Follow } from '@/services/firebase/followService';
 import { getUserProfile } from '@/services/firebase/userService';
+import { getBrandById } from '@/services/firebase/dataService';
 import BusinessMapView from '@/components/BusinessMapView';
 import { UserList, ListEntry, ValueListMode } from '@/types/library';
 import { getUserLists, createList, deleteList, addEntryToList, removeEntryFromList, updateListMetadata, reorderListEntries, getEndorsementList, ensureEndorsementList } from '@/services/firebase/listService';
@@ -504,18 +505,29 @@ export default function HomeScreen() {
               });
             }
           } else if (follow.followedType === 'brand') {
-            // For brands, we'd need to get brand data
-            followingData.push({
-              id: follow.followedId,
-              name: follow.followedId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-              type: 'brand',
-            });
+            // Check if brand exists in database
+            const brand = await getBrandById(follow.followedId);
+            if (brand) {
+              followingData.push({
+                id: follow.followedId,
+                name: brand.name || follow.followedId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                type: 'brand',
+              });
+            }
           } else if (follow.followedType === 'business') {
-            followingData.push({
-              id: follow.followedId,
-              name: follow.followedId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-              type: 'business',
-            });
+            // Check if business exists (businesses are users with accountType='business')
+            const businessProfile = await getUserProfile(follow.followedId);
+            if (businessProfile && businessProfile.accountType === 'business') {
+              followingData.push({
+                id: follow.followedId,
+                name: businessProfile.businessInfo?.name || 'Unknown Business',
+                profileImage: businessProfile.businessInfo?.logoUrl,
+                location: businessProfile.businessInfo?.location ?
+                  `${businessProfile.businessInfo.location.city || ''}, ${businessProfile.businessInfo.location.state || ''}`.replace(/^, |, $/g, '') :
+                  undefined,
+                type: 'business',
+              });
+            }
           }
         }
         setFollowingList(followingData);
