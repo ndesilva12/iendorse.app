@@ -13,6 +13,27 @@ import { db } from '@/firebase';
 import { UserProfile, SocialMedia } from '@/types';
 import { UserList, ListEntry } from '@/types/library';
 
+/**
+ * Remove undefined fields from an object (Firebase doesn't accept undefined)
+ */
+function removeUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: Record<string, any> = {};
+  for (const key in obj) {
+    if (obj[key] !== undefined) {
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key]) && !(obj[key] instanceof Date)) {
+        result[key] = removeUndefined(obj[key]);
+      } else if (Array.isArray(obj[key])) {
+        result[key] = obj[key].map((item: any) =>
+          typeof item === 'object' && item !== null ? removeUndefined(item) : item
+        );
+      } else {
+        result[key] = obj[key];
+      }
+    }
+  }
+  return result as Partial<T>;
+}
+
 export interface CelebrityEndorsement {
   businessName: string;
   category?: string;
@@ -126,11 +147,14 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
       (userProfile.userDetails as any).profileImage = data.profileImageUrl;
     }
 
-    // Create user document
-    await setDoc(userRef, {
+    // Create user document (remove undefined fields)
+    const userDoc = removeUndefined({
       ...userProfile,
       email,
       fullName: data.name,
+    });
+    await setDoc(userRef, {
+      ...userDoc,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -157,15 +181,17 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
       name: data.name, // List name is the celebrity's name
       description: `${data.name}'s endorsed businesses`,
       creatorName: data.name,
-      creatorImage: data.profileImageUrl,
+      creatorImage: data.profileImageUrl || null, // Use null instead of undefined
       entries,
       isPublic: true,
       isEndorsed: true, // This is their endorsement list
       order: 0,
     };
 
+    // Remove undefined fields before saving
+    const listDoc = removeUndefined(endorsementList);
     await setDoc(listRef, {
-      ...endorsementList,
+      ...listDoc,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
