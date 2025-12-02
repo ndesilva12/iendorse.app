@@ -83,6 +83,14 @@ export default function IncompleteBrandsManagement() {
   const [filterSource, setFilterSource] = useState<'all' | 'prominent-import'>('all');
   const [valueReferences, setValueReferences] = useState<Record<string, ValueReference[]>>({});
 
+  // Replace brand state
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+  const [replacingBrand, setReplacingBrand] = useState<BrandData | null>(null);
+  const [replaceSearchQuery, setReplaceSearchQuery] = useState('');
+  const [replaceSearchResults, setReplaceSearchResults] = useState<BrandData[]>([]);
+  const [selectedReplacementBrand, setSelectedReplacementBrand] = useState<BrandData | null>(null);
+  const [isReplacing, setIsReplacing] = useState(false);
+
   // Form state - Basic info
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState('');
@@ -374,6 +382,100 @@ export default function IncompleteBrandsManagement() {
     );
   };
 
+  // Open replace modal
+  const openReplaceModal = (brand: BrandData) => {
+    setReplacingBrand(brand);
+    setReplaceSearchQuery('');
+    setReplaceSearchResults([]);
+    setSelectedReplacementBrand(null);
+    setShowReplaceModal(true);
+  };
+
+  // Search for replacement brands
+  const searchForReplacement = (query: string) => {
+    setReplaceSearchQuery(query);
+    if (!query.trim()) {
+      setReplaceSearchResults([]);
+      return;
+    }
+
+    // Filter brands that could be replacements (excluding the brand being replaced)
+    const results = brands.filter(b =>
+      b.id !== replacingBrand?.id &&
+      (b.name.toLowerCase().includes(query.toLowerCase()) ||
+       b.id.toLowerCase().includes(query.toLowerCase()))
+    ).slice(0, 10); // Limit to 10 results
+
+    setReplaceSearchResults(results);
+  };
+
+  // Handle replacing brand in all endorsement lists
+  const handleReplaceBrand = async () => {
+    if (!replacingBrand || !selectedReplacementBrand) return;
+
+    setIsReplacing(true);
+    try {
+      // Find all userLists that contain the stub brand
+      const listsRef = collection(db, 'userLists');
+      const listsSnapshot = await getDocs(listsRef);
+
+      let updatedCount = 0;
+
+      for (const listDoc of listsSnapshot.docs) {
+        const listData = listDoc.data();
+        const entries = listData.entries || [];
+
+        // Check if any entry references the stub brand
+        const hasStubBrand = entries.some((entry: any) =>
+          entry.brandId === replacingBrand.id
+        );
+
+        if (hasStubBrand) {
+          // Update entries to use the replacement brand
+          const updatedEntries = entries.map((entry: any) => {
+            if (entry.brandId === replacingBrand.id) {
+              return {
+                ...entry,
+                brandId: selectedReplacementBrand.id,
+                brandName: selectedReplacementBrand.name,
+                brandCategory: selectedReplacementBrand.category,
+              };
+            }
+            return entry;
+          });
+
+          // Update the list document
+          await updateDoc(doc(db, 'userLists', listDoc.id), {
+            entries: updatedEntries,
+          });
+          updatedCount++;
+        }
+      }
+
+      // Delete the stub brand
+      await deleteDoc(doc(db, 'brands', replacingBrand.id));
+
+      // Clear cache
+      await AsyncStorage.removeItem('@brands_cache');
+      await AsyncStorage.removeItem('@data_cache_timestamp');
+
+      Alert.alert(
+        'Success',
+        `Replaced "${replacingBrand.name}" with "${selectedReplacementBrand.name}" in ${updatedCount} list(s) and deleted the stub brand.`
+      );
+
+      setShowReplaceModal(false);
+      setReplacingBrand(null);
+      setSelectedReplacementBrand(null);
+      loadData();
+    } catch (error) {
+      console.error('Error replacing brand:', error);
+      Alert.alert('Error', 'Failed to replace brand');
+    } finally {
+      setIsReplacing(false);
+    }
+  };
+
   // Count brands from prominent user import
   const prominentImportCount = brands.filter(b =>
     b.createdBy === 'celebrity-import' || b.createdBy === 'admin-edit'
@@ -602,6 +704,14 @@ export default function IncompleteBrandsManagement() {
                 >
                   <Edit2 size={16} color="#007bff" strokeWidth={2} />
                   <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.replaceButton]}
+                  onPress={() => openReplaceModal(brand)}
+                >
+                  <ExternalLink size={16} color="#9333ea" strokeWidth={2} />
+                  <Text style={[styles.actionButtonText, { color: '#9333ea' }]}>Replace</Text>
                 </TouchableOpacity>
 
                 {brand.status !== 'verified' && (
@@ -927,6 +1037,127 @@ export default function IncompleteBrandsManagement() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
                     <Text style={styles.saveButtonText}>Save Changes</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Replace Brand Modal */}
+      <Modal
+        visible={showReplaceModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowReplaceModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowReplaceModal(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Replace Brand</Text>
+                  <TouchableOpacity onPress={() => setShowReplaceModal(false)}>
+                    <X size={24} color="#333" strokeWidth={2} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modalBody}>
+                  {/* Current brand info */}
+                  <View style={styles.replaceSection}>
+                    <Text style={styles.replaceSectionTitle}>Replacing:</Text>
+                    <View style={styles.replaceBrandCard}>
+                      <Text style={styles.replaceBrandName}>{replacingBrand?.name}</Text>
+                      <Text style={styles.replaceBrandId}>ID: {replacingBrand?.id}</Text>
+                      {replacingBrand?.createdBy && (
+                        <Text style={styles.replaceBrandSource}>
+                          Source: {replacingBrand.createdBy === 'celebrity-import' ? '⭐ Prominent User Import' : replacingBrand.createdBy}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Search for replacement */}
+                  <View style={styles.replaceSection}>
+                    <Text style={styles.replaceSectionTitle}>Search for replacement brand:</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Type brand name to search..."
+                      value={replaceSearchQuery}
+                      onChangeText={searchForReplacement}
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  {/* Search results */}
+                  {replaceSearchResults.length > 0 && (
+                    <View style={styles.replaceSection}>
+                      <Text style={styles.replaceSectionTitle}>Select replacement:</Text>
+                      <ScrollView style={{ maxHeight: 200 }}>
+                        {replaceSearchResults.map((brand) => (
+                          <TouchableOpacity
+                            key={brand.id}
+                            style={[
+                              styles.replaceResultItem,
+                              selectedReplacementBrand?.id === brand.id && styles.replaceResultItemSelected
+                            ]}
+                            onPress={() => setSelectedReplacementBrand(brand)}
+                          >
+                            <View>
+                              <Text style={styles.replaceResultName}>{brand.name}</Text>
+                              <Text style={styles.replaceResultId}>ID: {brand.id}</Text>
+                              {brand.website && (
+                                <Text style={styles.replaceResultDetail}>{brand.website}</Text>
+                              )}
+                            </View>
+                            {selectedReplacementBrand?.id === brand.id && (
+                              <CheckCircle size={20} color="#28a745" strokeWidth={2} />
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  {/* Selected replacement confirmation */}
+                  {selectedReplacementBrand && (
+                    <View style={[styles.replaceSection, styles.replaceConfirmation]}>
+                      <Text style={styles.replaceSectionTitle}>✓ Will replace with:</Text>
+                      <View style={[styles.replaceBrandCard, { borderColor: '#28a745' }]}>
+                        <Text style={[styles.replaceBrandName, { color: '#28a745' }]}>
+                          {selectedReplacementBrand.name}
+                        </Text>
+                        <Text style={styles.replaceBrandId}>ID: {selectedReplacementBrand.id}</Text>
+                      </View>
+                      <Text style={styles.replaceWarning}>
+                        This will update all endorsement lists using "{replacingBrand?.name}" to use "{selectedReplacementBrand.name}" instead, then delete the stub brand.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.modalFooter}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => setShowReplaceModal(false)}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.saveButton,
+                      { backgroundColor: '#9333ea' },
+                      (!selectedReplacementBrand || isReplacing) && { opacity: 0.5 }
+                    ]}
+                    onPress={handleReplaceBrand}
+                    disabled={!selectedReplacementBrand || isReplacing}
+                  >
+                    {isReplacing ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>Replace & Delete Stub</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1311,5 +1542,83 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     fontWeight: '600',
+  },
+  // Replace button styles
+  replaceButton: {
+    backgroundColor: '#f3e8ff',
+    borderColor: '#d8b4fe',
+  },
+  // Replace modal styles
+  replaceSection: {
+    marginBottom: 16,
+  },
+  replaceSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  replaceBrandCard: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  replaceBrandName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+  },
+  replaceBrandId: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  replaceBrandSource: {
+    fontSize: 12,
+    color: '#9333ea',
+    marginTop: 4,
+  },
+  replaceResultItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    marginBottom: 8,
+  },
+  replaceResultItemSelected: {
+    borderColor: '#28a745',
+    backgroundColor: '#d4edda',
+  },
+  replaceResultName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  replaceResultId: {
+    fontSize: 11,
+    color: '#666',
+  },
+  replaceResultDetail: {
+    fontSize: 11,
+    color: '#007bff',
+    marginTop: 2,
+  },
+  replaceConfirmation: {
+    backgroundColor: '#d4edda',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  replaceWarning: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });
