@@ -847,6 +847,51 @@ export const handleBackdateEntry = async (
 };
 
 /**
+ * Add bonus days to ALL endorsement items for a user
+ * Used for referral rewards - adds days to totalDaysEndorsed
+ * Does NOT add to top 5/10 days (bonus days are not position-based)
+ */
+export const addBonusDaysToAllEndorsements = async (
+  userId: string,
+  bonusDays: number
+): Promise<number> => {
+  try {
+    const q = query(
+      collection(db, ENDORSEMENT_HISTORY_COLLECTION),
+      where('userId', '==', userId)
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      console.log('[EndorsementHistory] No endorsement history found for user:', userId);
+      return 0;
+    }
+
+    let updatedCount = 0;
+
+    // Update each endorsement history record
+    for (const docSnapshot of snapshot.docs) {
+      const data = docSnapshot.data();
+      const currentTotalDays = data.totalDaysEndorsed || 0;
+
+      await updateDoc(docSnapshot.ref, {
+        totalDaysEndorsed: currentTotalDays + bonusDays,
+        updatedAt: serverTimestamp(),
+      });
+
+      updatedCount++;
+    }
+
+    console.log(`[EndorsementHistory] Added ${bonusDays} bonus days to ${updatedCount} endorsement items for user:`, userId);
+    return updatedCount;
+  } catch (error) {
+    console.error('[EndorsementHistory] Error adding bonus days:', error);
+    throw error;
+  }
+};
+
+/**
  * Admin function to directly update endorsement metrics
  * Used for manual adjustments in the admin panel
  */

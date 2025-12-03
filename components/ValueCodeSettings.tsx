@@ -19,6 +19,7 @@ interface DiscountTier {
   discount: number;
   type: EndorsementType;
   minDays: number;
+  minFollowers: number;
 }
 
 export default function ValueCodeSettings() {
@@ -42,6 +43,7 @@ export default function ValueCodeSettings() {
     discount: businessInfo.customerDiscountPercent || 5,
     type: businessInfo.endorsementType || 'any',
     minDays: businessInfo.endorsementMinDays || 0,
+    minFollowers: businessInfo.endorsementMinFollowers || 0,
   });
   const [showTier1TypeDropdown, setShowTier1TypeDropdown] = useState(false);
 
@@ -53,6 +55,7 @@ export default function ValueCodeSettings() {
     discount: businessInfo.tier2Discount || 10,
     type: businessInfo.tier2Type || 'top10',
     minDays: businessInfo.tier2MinDays || 0,
+    minFollowers: businessInfo.tier2MinFollowers || 0,
   });
   const [showTier2TypeDropdown, setShowTier2TypeDropdown] = useState(false);
 
@@ -64,6 +67,7 @@ export default function ValueCodeSettings() {
     discount: businessInfo.tier3Discount || 15,
     type: businessInfo.tier3Type || 'top5',
     minDays: businessInfo.tier3MinDays || 0,
+    minFollowers: businessInfo.tier3MinFollowers || 0,
   });
   const [showTier3TypeDropdown, setShowTier3TypeDropdown] = useState(false);
 
@@ -114,6 +118,12 @@ export default function ValueCodeSettings() {
     await setBusinessInfo({ endorsementMinDays: clamped });
   };
 
+  const handleTier1MinFollowersChange = async (newFollowers: number) => {
+    const clamped = Math.max(0, Math.min(100000, newFollowers));
+    setTier1({ ...tier1, minFollowers: clamped });
+    await setBusinessInfo({ endorsementMinFollowers: clamped });
+  };
+
   // Tier 2 handlers
   const handleEnableTier2 = async () => {
     setTier2Enabled(true);
@@ -121,6 +131,7 @@ export default function ValueCodeSettings() {
       tier2Discount: tier2.discount,
       tier2Type: tier2.type,
       tier2MinDays: tier2.minDays,
+      tier2MinFollowers: tier2.minFollowers,
     });
   };
 
@@ -130,6 +141,7 @@ export default function ValueCodeSettings() {
       tier2Discount: 0,
       tier2Type: null,
       tier2MinDays: 0,
+      tier2MinFollowers: 0,
     });
   };
 
@@ -151,6 +163,12 @@ export default function ValueCodeSettings() {
     await setBusinessInfo({ tier2MinDays: clamped });
   };
 
+  const handleTier2MinFollowersChange = async (newFollowers: number) => {
+    const clamped = Math.max(0, Math.min(100000, newFollowers));
+    setTier2({ ...tier2, minFollowers: clamped });
+    await setBusinessInfo({ tier2MinFollowers: clamped });
+  };
+
   // Tier 3 handlers
   const handleEnableTier3 = async () => {
     setTier3Enabled(true);
@@ -158,6 +176,7 @@ export default function ValueCodeSettings() {
       tier3Discount: tier3.discount,
       tier3Type: tier3.type,
       tier3MinDays: tier3.minDays,
+      tier3MinFollowers: tier3.minFollowers,
     });
   };
 
@@ -167,6 +186,7 @@ export default function ValueCodeSettings() {
       tier3Discount: 0,
       tier3Type: null,
       tier3MinDays: 0,
+      tier3MinFollowers: 0,
     });
   };
 
@@ -187,6 +207,12 @@ export default function ValueCodeSettings() {
     const clamped = Math.max(0, Math.min(365, newDays));
     setTier3({ ...tier3, minDays: clamped });
     await setBusinessInfo({ tier3MinDays: clamped });
+  };
+
+  const handleTier3MinFollowersChange = async (newFollowers: number) => {
+    const clamped = Math.max(0, Math.min(100000, newFollowers));
+    setTier3({ ...tier3, minFollowers: clamped });
+    await setBusinessInfo({ tier3MinFollowers: clamped });
   };
 
   // Custom discount handlers
@@ -280,6 +306,7 @@ export default function ValueCodeSettings() {
     onDiscountChange: (v: number) => void,
     onTypeChange: (t: EndorsementType) => void,
     onMinDaysChange: (d: number) => void,
+    onMinFollowersChange: (f: number) => void,
     onRemove?: () => void,
     isBaseTier: boolean = false
   ) => (
@@ -306,9 +333,17 @@ export default function ValueCodeSettings() {
           >
             <Minus size={16} color={colors.text} strokeWidth={2} />
           </TouchableOpacity>
-          <Text style={[styles.counterValue, { color: colors.primary }]}>
-            {tier.discount.toFixed(1)}%
-          </Text>
+          <TextInput
+            style={[styles.editableCounterInput, { color: colors.primary, borderColor: colors.border }]}
+            value={tier.discount.toFixed(1)}
+            onChangeText={(text) => {
+              const num = parseFloat(text.replace('%', ''));
+              if (!isNaN(num)) onDiscountChange(num);
+            }}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+          <Text style={[styles.percentSign, { color: colors.primary }]}>%</Text>
           <TouchableOpacity
             style={[styles.smallButton, { borderColor: colors.border }]}
             onPress={() => onDiscountChange(tier.discount + 0.5)}
@@ -339,9 +374,16 @@ export default function ValueCodeSettings() {
             >
               <Minus size={14} color={colors.text} strokeWidth={2} />
             </TouchableOpacity>
-            <Text style={[styles.counterValueSmall, { color: colors.primary }]}>
-              {tier.minDays}
-            </Text>
+            <TextInput
+              style={[styles.editableCounterInputSmall, { color: colors.primary, borderColor: colors.border }]}
+              value={String(tier.minDays)}
+              onChangeText={(text) => {
+                const num = parseInt(text, 10);
+                if (!isNaN(num)) onMinDaysChange(num);
+              }}
+              keyboardType="number-pad"
+              selectTextOnFocus
+            />
             <TouchableOpacity
               style={[styles.smallButtonCompact, { borderColor: colors.border }]}
               onPress={() => onMinDaysChange(tier.minDays + 1)}
@@ -351,6 +393,40 @@ export default function ValueCodeSettings() {
             </TouchableOpacity>
           </View>
         </View>
+      </View>
+
+      {/* Min Followers Row */}
+      <View style={[styles.tierOptionsRow, { marginTop: 12 }]}>
+        <View style={styles.optionGroup}>
+          <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Min Followers</Text>
+          <View style={styles.inlineCounterSmall}>
+            <TouchableOpacity
+              style={[styles.smallButtonCompact, { borderColor: colors.border }]}
+              onPress={() => onMinFollowersChange(tier.minFollowers - 1)}
+              activeOpacity={0.7}
+            >
+              <Minus size={14} color={colors.text} strokeWidth={2} />
+            </TouchableOpacity>
+            <TextInput
+              style={[styles.editableCounterInputSmall, { color: colors.primary, borderColor: colors.border }]}
+              value={String(tier.minFollowers)}
+              onChangeText={(text) => {
+                const num = parseInt(text, 10);
+                if (!isNaN(num)) onMinFollowersChange(num);
+              }}
+              keyboardType="number-pad"
+              selectTextOnFocus
+            />
+            <TouchableOpacity
+              style={[styles.smallButtonCompact, { borderColor: colors.border }]}
+              onPress={() => onMinFollowersChange(tier.minFollowers + 1)}
+              activeOpacity={0.7}
+            >
+              <Plus size={14} color={colors.text} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.optionGroup} />
       </View>
     </View>
   );
@@ -406,6 +482,7 @@ export default function ValueCodeSettings() {
                 handleTier1DiscountChange,
                 handleTier1TypeChange,
                 handleTier1MinDaysChange,
+                handleTier1MinFollowersChange,
                 undefined,
                 true
               )}
@@ -420,6 +497,7 @@ export default function ValueCodeSettings() {
                   handleTier2DiscountChange,
                   handleTier2TypeChange,
                   handleTier2MinDaysChange,
+                  handleTier2MinFollowersChange,
                   handleDisableTier2
                 )
               ) : (
@@ -446,6 +524,7 @@ export default function ValueCodeSettings() {
                     handleTier3DiscountChange,
                     handleTier3TypeChange,
                     handleTier3MinDaysChange,
+                    handleTier3MinFollowersChange,
                     handleDisableTier3
                   )
                 ) : (
@@ -682,6 +761,31 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     minWidth: 36,
     textAlign: 'center',
+  },
+  // Editable counter inputs
+  editableCounterInput: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    minWidth: 50,
+    textAlign: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    borderWidth: 1,
+    borderRadius: 6,
+  },
+  editableCounterInputSmall: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    minWidth: 40,
+    textAlign: 'center',
+    paddingVertical: 3,
+    paddingHorizontal: 2,
+    borderWidth: 1,
+    borderRadius: 4,
+  },
+  percentSign: {
+    fontSize: 18,
+    fontWeight: '700' as const,
   },
   // Dropdown
   dropdown: {
