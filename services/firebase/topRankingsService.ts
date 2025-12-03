@@ -61,7 +61,7 @@ export async function getTopBrands(limit: number = 50): Promise<RankedItem[]> {
         name: brandData.name || brandData.brand || 'Unknown Brand',
         category: brandData.category,
         website: brandData.website,
-        logoUrl: brandData.logoUrl || brandData.logo,
+        logoUrl: brandData.exampleImageUrl || brandData.logoUrl || brandData.logo,
       });
     });
 
