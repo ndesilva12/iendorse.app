@@ -250,6 +250,8 @@ interface UnifiedLibraryProps {
   onSectionChange?: (section: LibrarySectionType) => void;
   // Show only endorsement section (hides section selector)
   endorsementOnly?: boolean;
+  // Open add endorsement modal on mount
+  initialShowAddModal?: boolean;
 }
 
 export default function UnifiedLibrary({
@@ -272,6 +274,7 @@ export default function UnifiedLibrary({
   externalSelectedSection,
   onSectionChange,
   endorsementOnly = false,
+  initialShowAddModal = false,
 }: UnifiedLibraryProps) {
   const colors = (isDarkMode ? darkColors : lightColors) || lightColors;
   const library = useLibrary();
@@ -339,6 +342,10 @@ export default function UnifiedLibrary({
   const endorsementList = propsEndorsementList !== undefined ? propsEndorsementList : library.state.endorsementList;
   const userLists = propsUserLists !== undefined ? propsUserLists : library.state.userLists;
 
+  // IMPORTANT: For action menu checks (endorse/unendorse), always use the CURRENT user's list
+  // not the viewed user's list when viewing someone else's profile
+  const currentUserEndorsementList = library.state.endorsementList;
+
   // Reorder mode state
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [reorderingListId, setReorderingListId] = useState<string | null>(null);
@@ -354,7 +361,7 @@ export default function UnifiedLibrary({
   const [showEndorsedActionMenu, setShowEndorsedActionMenu] = useState(false);
 
   // Add to endorsement search modal state
-  const [showAddEndorsementModal, setShowAddEndorsementModal] = useState(false);
+  const [showAddEndorsementModal, setShowAddEndorsementModal] = useState(initialShowAddModal);
   const [addSearchQuery, setAddSearchQuery] = useState('');
   const [allBusinesses, setAllBusinesses] = useState<BusinessUser[]>([]);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
@@ -1580,7 +1587,9 @@ export default function UnifiedLibrary({
   const getActionModalOptions = () => {
     if (!selectedItemForOptions) return [];
 
-    const isEndorsed = endorsementList?.entries?.some(e => {
+    // IMPORTANT: Check against the CURRENT USER's endorsement list, not the viewed user's list
+    // This ensures "Endorse/Unendorse" reflects the current user's actual endorsement status
+    const isEndorsed = currentUserEndorsementList?.entries?.some(e => {
       const entryId = selectedItemForOptions.brandId || selectedItemForOptions.businessId || selectedItemForOptions.valueId || (selectedItemForOptions as any).placeId;
       const endorsedId = e?.brandId || e?.businessId || e?.valueId || (e as any)?.placeId;
       return endorsedId === entryId;

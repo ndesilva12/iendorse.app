@@ -112,10 +112,10 @@ export default function OnboardingScreen() {
   // OR an existing business user who already has values selected
   useEffect(() => {
     if (!isLoading && profile?.causes?.length > 0) {
-      // User has completed values selection - they should go to home
+      // User has completed values selection - they should go to browse tab
       // Business users don't NEED businessInfo to use the app
-      console.log('[Onboarding] User already has causes, redirecting to home');
-      router.replace('/(tabs)/list');
+      console.log('[Onboarding] User already has causes, redirecting to browse');
+      router.replace('/(tabs)/browse');
       return;
     }
   }, [isLoading, profile?.causes?.length]);

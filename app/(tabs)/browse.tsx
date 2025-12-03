@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { ChevronDown, ChevronUp, Heart, Building2, Users, Globe, Shield, User as UserIcon, Tag, Trophy, Target, MapPin, Plus, UserPlus, UserMinus, Share2 } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Heart, Building2, Users, Globe, Shield, User as UserIcon, Tag, Trophy, Target, MapPin, Plus, UserPlus, UserMinus, Share2, Search } from 'lucide-react-native';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import * as Location from 'expo-location';
 import MenuButton from '@/components/MenuButton';
@@ -645,6 +645,17 @@ export default function BrowseScreen() {
           </View>
         )}
 
+        {/* Local section - Search/Add button */}
+        {selectedSection === 'local' && (
+          <TouchableOpacity
+            style={[styles.searchIconButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.push({ pathname: '/(tabs)/list', params: { openAddModal: 'true' } })}
+            activeOpacity={0.7}
+          >
+            <Search size={18} color="#FFFFFF" strokeWidth={2.5} />
+          </TouchableOpacity>
+        )}
+
         {/* Values section - Update Values button */}
         {selectedSection === 'values' && (
           <TouchableOpacity
@@ -1134,6 +1145,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600' as const,
+  },
+  searchIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Brand card styles (matching Local list style)
