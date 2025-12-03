@@ -250,19 +250,8 @@ export default function ProminentUsersAdmin() {
         instagram: formData.instagram.trim() || undefined,
         endorsements: endorsementsList,
         profileImageUrl: formData.profileImage || undefined,
+        coverImageUrl: formData.coverImage || undefined,
       });
-
-      // If we have a cover image, save it separately to the user document
-      if (result.success && formData.coverImage) {
-        try {
-          const userRef = doc(db, 'users', result.userId);
-          await updateDoc(userRef, {
-            'userDetails.coverImage': formData.coverImage,
-          });
-        } catch (e) {
-          console.warn('[ProminentUsers] Could not save cover image:', e);
-        }
-      }
 
       if (result.success) {
         Alert.alert('Success', `Created account for ${formData.name}`);
