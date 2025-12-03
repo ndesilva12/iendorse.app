@@ -9,11 +9,7 @@ import {
   TextInput,
   ScrollView,
   Platform,
-  Dimensions,
 } from 'react-native';
-
-const { width: screenWidth } = Dimensions.get('window');
-const isLargeScreen = screenWidth >= 768;
 import { Plus, Minus, ChevronDown, X, Trash2 } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
@@ -258,51 +254,6 @@ export default function ValueCodeSettings() {
     }
   };
 
-  const renderTypeDropdown = (
-    currentType: EndorsementType,
-    isOpen: boolean,
-    onToggle: () => void,
-    onChange: (type: EndorsementType) => void,
-    zIndex: number
-  ) => (
-    <View style={[styles.optionGroup, styles.optionGroupType, styles.dropdownOptionGroup, { zIndex: isOpen ? 1000 : 1 }]}>
-      <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Type</Text>
-      <TouchableOpacity
-        style={[styles.dropdown, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-        onPress={onToggle}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.dropdownText, { color: colors.text }]}>
-          {getTypeLabel(currentType)}
-        </Text>
-        <ChevronDown size={16} color={colors.textSecondary} strokeWidth={2} />
-      </TouchableOpacity>
-      {isOpen && (
-        <View style={[styles.dropdownList, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-          {(['any', 'top10', 'top5'] as EndorsementType[]).map((type) => (
-            <TouchableOpacity
-              key={type}
-              style={[
-                styles.dropdownItem,
-                { borderBottomColor: colors.border },
-                currentType === type && { backgroundColor: colors.primary }
-              ]}
-              onPress={() => onChange(type)}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.dropdownItemText,
-                { color: currentType === type ? '#FFFFFF' : colors.text }
-              ]}>
-                {getTypeLabel(type)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-
   const renderTierCard = (
     tierNum: number,
     tier: DiscountTier,
@@ -335,19 +286,19 @@ export default function ValueCodeSettings() {
         )}
       </View>
 
-      {/* Discount Percentage */}
-      <View style={[styles.tierRow, isLargeScreen && styles.tierRowLarge]}>
-        <Text style={[styles.tierRowLabel, { color: colors.textSecondary }]}>Discount</Text>
-        <View style={[styles.inlineCounter, isLargeScreen && styles.inlineCounterLarge]}>
+      {/* Row 1: Discount Percentage */}
+      <View style={styles.tierRowCentered}>
+        <Text style={[styles.tierRowLabelCentered, { color: colors.textSecondary }]}>Discount</Text>
+        <View style={styles.inlineCounter}>
           <TouchableOpacity
-            style={[styles.smallButton, isLargeScreen && styles.smallButtonLarge, { borderColor: colors.border }]}
+            style={[styles.smallButton, { borderColor: colors.border }]}
             onPress={() => onDiscountChange(tier.discount - 0.5)}
             activeOpacity={0.7}
           >
-            <Minus size={isLargeScreen ? 14 : 16} color={colors.text} strokeWidth={2} />
+            <Minus size={16} color={colors.text} strokeWidth={2} />
           </TouchableOpacity>
           <TextInput
-            style={[styles.editableCounterInput, isLargeScreen && styles.editableCounterInputLarge, { color: colors.primary, borderColor: colors.border }]}
+            style={[styles.editableCounterInput, { color: colors.primary, borderColor: colors.border }]}
             value={tier.discount.toFixed(1)}
             onChangeText={(text) => {
               const num = parseFloat(text.replace('%', ''));
@@ -356,89 +307,116 @@ export default function ValueCodeSettings() {
             keyboardType="decimal-pad"
             selectTextOnFocus
           />
-          <Text style={[styles.percentSign, isLargeScreen && styles.percentSignLarge, { color: colors.primary }]}>%</Text>
+          <Text style={[styles.percentSign, { color: colors.primary }]}>%</Text>
           <TouchableOpacity
-            style={[styles.smallButton, isLargeScreen && styles.smallButtonLarge, { borderColor: colors.border }]}
+            style={[styles.smallButton, { borderColor: colors.border }]}
             onPress={() => onDiscountChange(tier.discount + 0.5)}
             activeOpacity={0.7}
           >
-            <Plus size={isLargeScreen ? 14 : 16} color={colors.text} strokeWidth={2} />
+            <Plus size={16} color={colors.text} strokeWidth={2} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Type and Min Days Row */}
-      <View style={[styles.tierOptionsRow, isLargeScreen && styles.tierOptionsRowLarge, Platform.OS === 'web' ? { overflow: 'visible' } : {}]}>
-        {renderTypeDropdown(
-          tier.type,
-          showTypeDropdown,
-          () => setShowTypeDropdown(!showTypeDropdown),
-          onTypeChange,
-          100
-        )}
-
-        <View style={[styles.optionGroup, styles.optionGroupRight, isLargeScreen && styles.optionGroupLarge]}>
-          <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Min Days</Text>
-          <View style={[styles.inlineCounterSmall, isLargeScreen && styles.inlineCounterSmallLarge]}>
-            <TouchableOpacity
-              style={[styles.smallButtonCompact, isLargeScreen && styles.smallButtonCompactLarge, { borderColor: colors.border }]}
-              onPress={() => onMinDaysChange(tier.minDays - 1)}
-              activeOpacity={0.7}
-            >
-              <Minus size={isLargeScreen ? 12 : 14} color={colors.text} strokeWidth={2} />
-            </TouchableOpacity>
-            <TextInput
-              style={[styles.editableCounterInputSmall, isLargeScreen && styles.editableCounterInputSmallLarge, { color: colors.primary, borderColor: colors.border }]}
-              value={String(tier.minDays)}
-              onChangeText={(text) => {
-                const num = parseInt(text, 10);
-                if (!isNaN(num)) onMinDaysChange(num);
-              }}
-              keyboardType="number-pad"
-              selectTextOnFocus
-            />
-            <TouchableOpacity
-              style={[styles.smallButtonCompact, isLargeScreen && styles.smallButtonCompactLarge, { borderColor: colors.border }]}
-              onPress={() => onMinDaysChange(tier.minDays + 1)}
-              activeOpacity={0.7}
-            >
-              <Plus size={isLargeScreen ? 12 : 14} color={colors.text} strokeWidth={2} />
-            </TouchableOpacity>
-          </View>
+      {/* Row 2: Type Dropdown */}
+      <View style={[styles.tierRowCentered, Platform.OS === 'web' ? { overflow: 'visible', zIndex: showTypeDropdown ? 1000 : 1 } : {}]}>
+        <Text style={[styles.tierRowLabelCentered, { color: colors.textSecondary }]}>Type</Text>
+        <View style={[styles.dropdownOptionGroup, { zIndex: showTypeDropdown ? 1000 : 1 }]}>
+          <TouchableOpacity
+            style={[styles.dropdownCentered, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+            onPress={() => setShowTypeDropdown(!showTypeDropdown)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.dropdownText, { color: colors.text }]}>
+              {getTypeLabel(tier.type)}
+            </Text>
+            <ChevronDown size={16} color={colors.textSecondary} strokeWidth={2} />
+          </TouchableOpacity>
+          {showTypeDropdown && (
+            <View style={[styles.dropdownListCentered, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+              {(['any', 'top10', 'top5'] as EndorsementType[]).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.dropdownItem,
+                    { borderBottomColor: colors.border },
+                    tier.type === type && { backgroundColor: colors.primary }
+                  ]}
+                  onPress={() => onTypeChange(type)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.dropdownItemText,
+                    { color: tier.type === type ? '#FFFFFF' : colors.text }
+                  ]}>
+                    {getTypeLabel(type)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       </View>
 
-      {/* Min Followers Row */}
-      <View style={[styles.tierOptionsRow, isLargeScreen && styles.tierOptionsRowLarge, { marginTop: 12 }]}>
-        <View style={[styles.optionGroupType]} />
-        <View style={[styles.optionGroup, styles.optionGroupRight, isLargeScreen && styles.optionGroupLarge]}>
-          <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Min Followers</Text>
-          <View style={[styles.inlineCounterSmall, isLargeScreen && styles.inlineCounterSmallLarge]}>
-            <TouchableOpacity
-              style={[styles.smallButtonCompact, isLargeScreen && styles.smallButtonCompactLarge, { borderColor: colors.border }]}
-              onPress={() => onMinFollowersChange(tier.minFollowers - 1)}
-              activeOpacity={0.7}
-            >
-              <Minus size={isLargeScreen ? 12 : 14} color={colors.text} strokeWidth={2} />
-            </TouchableOpacity>
-            <TextInput
-              style={[styles.editableCounterInputSmall, isLargeScreen && styles.editableCounterInputSmallLarge, { color: colors.primary, borderColor: colors.border }]}
-              value={String(tier.minFollowers)}
-              onChangeText={(text) => {
-                const num = parseInt(text, 10);
-                if (!isNaN(num)) onMinFollowersChange(num);
-              }}
-              keyboardType="number-pad"
-              selectTextOnFocus
-            />
-            <TouchableOpacity
-              style={[styles.smallButtonCompact, isLargeScreen && styles.smallButtonCompactLarge, { borderColor: colors.border }]}
-              onPress={() => onMinFollowersChange(tier.minFollowers + 1)}
-              activeOpacity={0.7}
-            >
-              <Plus size={isLargeScreen ? 12 : 14} color={colors.text} strokeWidth={2} />
-            </TouchableOpacity>
-          </View>
+      {/* Row 3: Min Days */}
+      <View style={styles.tierRowCentered}>
+        <Text style={[styles.tierRowLabelCentered, { color: colors.textSecondary }]}>Min Days</Text>
+        <View style={styles.inlineCounter}>
+          <TouchableOpacity
+            style={[styles.smallButton, { borderColor: colors.border }]}
+            onPress={() => onMinDaysChange(tier.minDays - 1)}
+            activeOpacity={0.7}
+          >
+            <Minus size={16} color={colors.text} strokeWidth={2} />
+          </TouchableOpacity>
+          <TextInput
+            style={[styles.editableCounterInput, { color: colors.primary, borderColor: colors.border }]}
+            value={String(tier.minDays)}
+            onChangeText={(text) => {
+              const num = parseInt(text, 10);
+              if (!isNaN(num)) onMinDaysChange(num);
+            }}
+            keyboardType="number-pad"
+            selectTextOnFocus
+          />
+          <TouchableOpacity
+            style={[styles.smallButton, { borderColor: colors.border }]}
+            onPress={() => onMinDaysChange(tier.minDays + 1)}
+            activeOpacity={0.7}
+          >
+            <Plus size={16} color={colors.text} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Row 4: Min Followers */}
+      <View style={styles.tierRowCentered}>
+        <Text style={[styles.tierRowLabelCentered, { color: colors.textSecondary }]}>Min Followers</Text>
+        <View style={styles.inlineCounter}>
+          <TouchableOpacity
+            style={[styles.smallButton, { borderColor: colors.border }]}
+            onPress={() => onMinFollowersChange(tier.minFollowers - 1)}
+            activeOpacity={0.7}
+          >
+            <Minus size={16} color={colors.text} strokeWidth={2} />
+          </TouchableOpacity>
+          <TextInput
+            style={[styles.editableCounterInput, { color: colors.primary, borderColor: colors.border }]}
+            value={String(tier.minFollowers)}
+            onChangeText={(text) => {
+              const num = parseInt(text, 10);
+              if (!isNaN(num)) onMinFollowersChange(num);
+            }}
+            keyboardType="number-pad"
+            selectTextOnFocus
+          />
+          <TouchableOpacity
+            style={[styles.smallButton, { borderColor: colors.border }]}
+            onPress={() => onMinFollowersChange(tier.minFollowers + 1)}
+            activeOpacity={0.7}
+          >
+            <Plus size={16} color={colors.text} strokeWidth={2} />
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -711,6 +689,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700' as const,
   },
+  // Centered single-column layout for tier rows
+  tierRowCentered: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    paddingHorizontal: 4,
+  },
+  tierRowLabelCentered: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    minWidth: 90,
+  },
   tierRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -751,7 +742,7 @@ const styles = StyleSheet.create({
   inlineCounter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   inlineCounterSmall: {
     flexDirection: 'row',
@@ -759,8 +750,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   smallButton: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
@@ -790,11 +781,10 @@ const styles = StyleSheet.create({
   editableCounterInput: {
     fontSize: 16,
     fontWeight: '700' as const,
-    minWidth: 44,
-    maxWidth: 50,
+    minWidth: 48,
     textAlign: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
     borderWidth: 1,
     borderRadius: 6,
   },
@@ -824,13 +814,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minHeight: 40,
   },
+  dropdownCentered: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 38,
+    minWidth: 110,
+  },
   dropdownText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500' as const,
   },
   dropdownList: {
     position: 'absolute',
     top: 62,
+    left: 0,
+    right: 0,
+    borderRadius: 8,
+    borderWidth: 1,
+    zIndex: 9999,
+    elevation: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  dropdownListCentered: {
+    position: 'absolute',
+    top: 42,
     left: 0,
     right: 0,
     borderRadius: 8,
@@ -894,57 +909,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
   },
-  // Large screen styles for dropdown z-index fix
+  // Dropdown option group for z-index handling
   dropdownOptionGroup: {
     ...(Platform.OS === 'web' ? { overflow: 'visible' } : {}),
     position: 'relative',
-  },
-  // Large screen (desktop) styles - smaller inputs aligned right
-  tierRowLarge: {
-    justifyContent: 'flex-end',
-    gap: 16,
-  },
-  tierOptionsRowLarge: {
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  optionGroupLarge: {
-    flex: 0,
-    minWidth: 110,
-    maxWidth: 130,
-    alignItems: 'flex-end',
-  },
-  inlineCounterLarge: {
-    gap: 3,
-  },
-  inlineCounterSmallLarge: {
-    gap: 3,
-  },
-  smallButtonLarge: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-  },
-  smallButtonCompactLarge: {
-    width: 24,
-    height: 24,
-    borderRadius: 5,
-  },
-  editableCounterInputLarge: {
-    fontSize: 14,
-    minWidth: 38,
-    maxWidth: 44,
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  editableCounterInputSmallLarge: {
-    fontSize: 13,
-    minWidth: 34,
-    maxWidth: 40,
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  percentSignLarge: {
-    fontSize: 14,
   },
 });
