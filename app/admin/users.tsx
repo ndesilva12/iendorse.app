@@ -26,7 +26,7 @@ import { getCustomFields, CustomField } from '@/services/firebase/customFieldsSe
 import { getUserLists, deleteList, removeEntryFromList, addEntryToList, updateEntryInList, getEndorsementList, createList, ensureEndorsementList } from '@/services/firebase/listService';
 import { UserList, ListEntry } from '@/types/library';
 import { getFollowing, getFollowers, followEntity, unfollowEntity, Follow, FollowableType } from '@/services/firebase/followService';
-import { getCumulativeDays } from '@/services/firebase/endorsementHistoryService';
+import { getCumulativeDays, updateEndorsementMetrics, handleBackdateEntry } from '@/services/firebase/endorsementHistoryService';
 import { makeAllProfilesPublic } from '@/services/firebase/userService';
 import { Picker } from '@react-native-picker/picker';
 import { pickAndUploadImage } from '@/lib/imageUpload';
@@ -172,6 +172,8 @@ export default function UsersManagement() {
   const [newEndorsementName, setNewEndorsementName] = useState('');
   const [endorsementMetrics, setEndorsementMetrics] = useState<Record<string, { totalDaysEndorsed: number; totalDaysInTop5: number; totalDaysInTop10: number }>>({});
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [editingMetricsEntityId, setEditingMetricsEntityId] = useState<string | null>(null);
+  const [editingMetricsValues, setEditingMetricsValues] = useState<{ top5: string; top10: string }>({ top5: '', top10: '' });
 
   // Impersonation state
   const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
@@ -707,6 +709,57 @@ export default function UsersManagement() {
     }
   };
 
+  // Handle updating endorsement metrics (top 5/10 days)
+  const handleUpdateMetrics = async (entityId: string, entityType: 'brand' | 'business' | 'place') => {
+    if (!editingUser) return;
+
+    const top5 = parseInt(editingMetricsValues.top5, 10);
+    const top10 = parseInt(editingMetricsValues.top10, 10);
+
+    if (isNaN(top5) || isNaN(top10) || top5 < 0 || top10 < 0) {
+      if (Platform.OS === 'web') {
+        window.alert('Please enter valid non-negative numbers for days.');
+      } else {
+        Alert.alert('Error', 'Please enter valid non-negative numbers for days.');
+      }
+      return;
+    }
+
+    if (top5 > top10) {
+      if (Platform.OS === 'web') {
+        window.alert('Top 5 days cannot exceed top 10 days (top 5 is a subset of top 10).');
+      } else {
+        Alert.alert('Error', 'Top 5 days cannot exceed top 10 days (top 5 is a subset of top 10).');
+      }
+      return;
+    }
+
+    try {
+      await updateEndorsementMetrics(editingUser.userId, entityType, entityId, {
+        totalDaysInTop5: top5,
+        totalDaysInTop10: top10,
+      });
+
+      // Reload metrics
+      await loadUserEndorsements(editingUser.userId);
+      setEditingMetricsEntityId(null);
+      setEditingMetricsValues({ top5: '', top10: '' });
+
+      if (Platform.OS === 'web') {
+        window.alert('Metrics updated successfully');
+      } else {
+        Alert.alert('Success', 'Metrics updated successfully');
+      }
+    } catch (error: any) {
+      console.error('[Admin] Error updating metrics:', error);
+      if (Platform.OS === 'web') {
+        window.alert(error?.message || 'Error updating metrics');
+      } else {
+        Alert.alert('Error', error?.message || 'Could not update metrics');
+      }
+    }
+  };
+
   const handleDeleteList = async (listId: string, listName: string) => {
     if (!editingUser) return;
 
@@ -862,7 +915,7 @@ export default function UsersManagement() {
   };
 
   // Handle updating entry's createdAt date
-  const handleUpdateEntryDate = async (listId: string, entryId: string, newDateString: string) => {
+  const handleUpdateEntryDate = async (listId: string, entryId: string, newDateString: string, entry?: ListEntry) => {
     if (!editingUser) return;
 
     try {
@@ -876,16 +929,61 @@ export default function UsersManagement() {
         return;
       }
 
+      // Check if this is backdating (new date is earlier than today)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isBackdating = newDate < today;
+
       await updateEntryInList(listId, entryId, { createdAt: newDate });
+
+      // If backdating an endorsement entry, update the endorsement history
+      // so that backdated days don't count as top 5/10
+      if (isBackdating && entry) {
+        const entryAny = entry as any;
+        let entityType: 'brand' | 'business' | 'place' | undefined;
+        let entityId: string | undefined;
+        let entityName: string = 'Unknown';
+
+        if (entry.type === 'brand' && entryAny.brandId) {
+          entityType = 'brand';
+          entityId = entryAny.brandId;
+          entityName = entryAny.brandName || entryAny.name || 'Unknown Brand';
+        } else if (entry.type === 'business' && entryAny.businessId) {
+          entityType = 'business';
+          entityId = entryAny.businessId;
+          entityName = entryAny.businessName || entryAny.name || 'Unknown Business';
+        } else if (entry.type === 'place' && entryAny.placeId) {
+          entityType = 'place';
+          entityId = entryAny.placeId;
+          entityName = entryAny.placeName || entryAny.name || 'Unknown Place';
+        }
+
+        if (entityType && entityId) {
+          try {
+            await handleBackdateEntry(
+              editingUser.userId,
+              entityType,
+              entityId,
+              entityName,
+              newDate
+            );
+            console.log('[Admin] Updated endorsement history for backdating');
+          } catch (historyError) {
+            console.error('[Admin] Error updating endorsement history:', historyError);
+            // Don't fail the whole operation if history update fails
+          }
+        }
+      }
+
       await loadUserLists(editingUser.userId);
 
       setEditingEntryDateId(null);
       setEditingEntryDateValue('');
 
       if (Platform.OS === 'web') {
-        window.alert('Entry date updated successfully');
+        window.alert('Entry date updated successfully' + (isBackdating ? ' (backdated days will not count for top 5/10 ranking)' : ''));
       } else {
-        Alert.alert('Success', 'Entry date updated successfully');
+        Alert.alert('Success', 'Entry date updated successfully' + (isBackdating ? ' (backdated days will not count for top 5/10 ranking)' : ''));
       }
     } catch (error) {
       console.error('[Admin] Error updating entry date:', error);
@@ -2016,6 +2114,8 @@ export default function UsersManagement() {
                           const daysInTop5 = metrics?.totalDaysInTop5 ?? 0;
                           const daysInTop10 = metrics?.totalDaysInTop10 ?? 0;
 
+                          const isEditingThisMetrics = editingMetricsEntityId === entityId;
+
                           return (
                             <View key={entryId} style={styles.endorsementRow}>
                               <View style={styles.endorsementInfo}>
@@ -2024,17 +2124,77 @@ export default function UsersManagement() {
                                   <Text style={styles.endorsementName}>{entryName}</Text>
                                   <Text style={styles.endorsementType}>({entryType})</Text>
                                 </View>
-                                <View style={styles.endorsementMetricsRow}>
-                                  <Text style={styles.endorsementDays}>
-                                    📅 {daysEndorsed} {daysEndorsed === 1 ? 'day' : 'days'} total
-                                  </Text>
-                                  <Text style={[styles.endorsementDays, { color: '#FFD700' }]}>
-                                    🏆 {daysInTop5}d top 5
-                                  </Text>
-                                  <Text style={[styles.endorsementDays, { color: '#C0C0C0' }]}>
-                                    🥈 {daysInTop10}d top 10
-                                  </Text>
-                                </View>
+
+                                {isEditingThisMetrics && entityId ? (
+                                  <View style={styles.metricsEditContainer}>
+                                    <Text style={styles.endorsementDays}>
+                                      📅 {daysEndorsed} {daysEndorsed === 1 ? 'day' : 'days'} total
+                                    </Text>
+                                    <View style={styles.metricsEditRow}>
+                                      <Text style={styles.metricsEditLabel}>🏆 Top 5 days:</Text>
+                                      <TextInput
+                                        style={styles.metricsEditInput}
+                                        value={editingMetricsValues.top5}
+                                        onChangeText={(text) => setEditingMetricsValues(prev => ({ ...prev, top5: text }))}
+                                        keyboardType="numeric"
+                                        placeholder={String(daysInTop5)}
+                                      />
+                                    </View>
+                                    <View style={styles.metricsEditRow}>
+                                      <Text style={styles.metricsEditLabel}>🥈 Top 10 days:</Text>
+                                      <TextInput
+                                        style={styles.metricsEditInput}
+                                        value={editingMetricsValues.top10}
+                                        onChangeText={(text) => setEditingMetricsValues(prev => ({ ...prev, top10: text }))}
+                                        keyboardType="numeric"
+                                        placeholder={String(daysInTop10)}
+                                      />
+                                    </View>
+                                    <View style={styles.metricsEditButtons}>
+                                      <TouchableOpacity
+                                        style={styles.metricsSaveButton}
+                                        onPress={() => handleUpdateMetrics(entityId, entryType as 'brand' | 'business' | 'place')}
+                                      >
+                                        <Text style={styles.metricsSaveButtonText}>Save</Text>
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        style={styles.metricsCancelButton}
+                                        onPress={() => {
+                                          setEditingMetricsEntityId(null);
+                                          setEditingMetricsValues({ top5: '', top10: '' });
+                                        }}
+                                      >
+                                        <Text style={styles.metricsCancelButtonText}>Cancel</Text>
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                ) : (
+                                  <View style={styles.endorsementMetricsRow}>
+                                    <Text style={styles.endorsementDays}>
+                                      📅 {daysEndorsed} {daysEndorsed === 1 ? 'day' : 'days'} total
+                                    </Text>
+                                    <Text style={[styles.endorsementDays, { color: '#FFD700' }]}>
+                                      🏆 {daysInTop5}d top 5
+                                    </Text>
+                                    <Text style={[styles.endorsementDays, { color: '#C0C0C0' }]}>
+                                      🥈 {daysInTop10}d top 10
+                                    </Text>
+                                    {entityId && (
+                                      <TouchableOpacity
+                                        style={styles.metricsEditButton}
+                                        onPress={() => {
+                                          setEditingMetricsEntityId(entityId);
+                                          setEditingMetricsValues({
+                                            top5: String(daysInTop5),
+                                            top10: String(daysInTop10),
+                                          });
+                                        }}
+                                      >
+                                        <Text style={styles.metricsEditButtonText}>Edit</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+                                )}
                               </View>
                               <TouchableOpacity
                                 style={styles.removeEndorsementButton}
@@ -2167,7 +2327,7 @@ export default function UsersManagement() {
                                             />
                                             <TouchableOpacity
                                               style={styles.saveDateButton}
-                                              onPress={() => handleUpdateEntryDate(list.id, entryId, editingEntryDateValue)}
+                                              onPress={() => handleUpdateEntryDate(list.id, entryId, editingEntryDateValue, entry)}
                                             >
                                               <Text style={styles.saveDateButtonText}>Save</Text>
                                             </TouchableOpacity>
@@ -3264,6 +3424,74 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 4,
     flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  metricsEditButton: {
+    backgroundColor: '#6c757d',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  metricsEditButtonText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  metricsEditContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  metricsEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  metricsEditLabel: {
+    fontSize: 12,
+    color: '#495057',
+    minWidth: 100,
+  },
+  metricsEditInput: {
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 12,
+    width: 60,
+    textAlign: 'center',
+    backgroundColor: '#fff',
+  },
+  metricsEditButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  metricsSaveButton: {
+    backgroundColor: '#28a745',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  metricsSaveButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  metricsCancelButton: {
+    backgroundColor: '#6c757d',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  metricsCancelButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   removeEndorsementButton: {
     backgroundColor: '#dc3545',
