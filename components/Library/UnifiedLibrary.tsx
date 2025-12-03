@@ -592,15 +592,29 @@ export default function UnifiedLibrary({
       await Promise.all(
         entries.map(async (entry) => {
           try {
-            const entityId = entry.type === 'brand'
-              ? (entry as any).brandId
-              : (entry as any).businessId;
+            // Get entity ID based on entry type
+            let entityId: string | undefined;
+            let entityType: 'brand' | 'business' | 'place';
+
+            if (entry.type === 'brand') {
+              entityId = (entry as any).brandId;
+              entityType = 'brand';
+            } else if (entry.type === 'business') {
+              entityId = (entry as any).businessId;
+              entityType = 'business';
+            } else if (entry.type === 'place') {
+              entityId = (entry as any).placeId;
+              entityType = 'place';
+            } else if (entry.type === 'pending_business') {
+              // For pending businesses, use the entry ID itself
+              entityId = entry.id;
+              entityType = 'business';
+            }
 
             if (!entityId) return;
 
             // Try to get cumulative days from history service if user is logged in
             if (currentUserId) {
-              const entityType = entry.type === 'brand' ? 'brand' : 'business';
               const result = await getCumulativeDays(currentUserId, entityType, entityId);
               // Use history days if available, otherwise fall back to createdAt calculation
               if (result.totalDaysEndorsed > 0) {
@@ -614,9 +628,16 @@ export default function UnifiedLibrary({
           } catch (error) {
             console.error('[UnifiedLibrary] Error fetching cumulative days:', error);
             // Fallback on error: calculate from createdAt
-            const entityId = entry.type === 'brand'
-              ? (entry as any).brandId
-              : (entry as any).businessId;
+            let entityId: string | undefined;
+            if (entry.type === 'brand') {
+              entityId = (entry as any).brandId;
+            } else if (entry.type === 'business') {
+              entityId = (entry as any).businessId;
+            } else if (entry.type === 'place') {
+              entityId = (entry as any).placeId;
+            } else if (entry.type === 'pending_business') {
+              entityId = entry.id;
+            }
             if (entityId) {
               daysMap[entityId] = calculateDaysFromCreatedAt(entry.createdAt);
             }
@@ -1681,10 +1702,17 @@ export default function UnifiedLibrary({
 
   // Helper function to get cumulative days endorsed for an entry
   const getCumulativeDaysForEntry = (entry: ListEntry): number => {
-    const entityId = entry.type === 'brand'
-      ? (entry as any).brandId
-      : (entry as any).businessId;
-    return cumulativeDaysMap[entityId] || 0;
+    let entityId: string | undefined;
+    if (entry.type === 'brand') {
+      entityId = (entry as any).brandId;
+    } else if (entry.type === 'business') {
+      entityId = (entry as any).businessId;
+    } else if (entry.type === 'place') {
+      entityId = (entry as any).placeId;
+    } else if (entry.type === 'pending_business') {
+      entityId = entry.id;
+    }
+    return entityId ? (cumulativeDaysMap[entityId] || 0) : 0;
   };
 
   // Helper function to get card background color based on position
