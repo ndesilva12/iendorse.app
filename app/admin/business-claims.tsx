@@ -30,6 +30,7 @@ import {
   BusinessClaim,
 } from '@/services/firebase/businessClaimService';
 import { getPlaceDetails } from '@/services/firebase/placesService';
+import { isGooglePlacesPhotoUrl } from '@/lib/logo';
 
 // Admin email whitelist
 const ADMIN_EMAILS = [
@@ -101,6 +102,11 @@ export default function BusinessClaimsAdmin() {
         console.log('[BusinessClaimsAdmin] Place details:', JSON.stringify(placeDetails, null, 2));
 
         console.log('[BusinessClaimsAdmin] Converting claim to business account...');
+        // Don't use Google Places photos as they can expire/show error images
+        // Let the display logic use logo.dev based on website instead
+        const photoUrl = placeDetails?.photoReferences?.[0] || '';
+        const safePhotoUrl = isGooglePlacesPhotoUrl(photoUrl) ? '' : photoUrl;
+
         await convertClaimToBusinessAccount(selectedClaim.id, {
           name: selectedClaim.placeName,
           address: selectedClaim.placeAddress,
@@ -108,7 +114,7 @@ export default function BusinessClaimsAdmin() {
           phone: placeDetails?.phone || selectedClaim.businessPhone,
           website: placeDetails?.website || '',
           location: placeDetails?.location,
-          photoUrl: placeDetails?.photoReferences?.[0] || '',
+          photoUrl: safePhotoUrl,
         });
         conversionSuccess = true;
         console.log('[BusinessClaimsAdmin] Account automatically converted to business');
@@ -274,6 +280,10 @@ export default function BusinessClaimsAdmin() {
       const placeDetails = await getPlaceDetails(selectedClaim.placeId);
 
       console.log('[BusinessClaimsAdmin] Manual conversion - getting place details...');
+      // Don't use Google Places photos as they can expire/show error images
+      const photoUrl = placeDetails?.photoReferences?.[0] || '';
+      const safePhotoUrl = isGooglePlacesPhotoUrl(photoUrl) ? '' : photoUrl;
+
       await convertClaimToBusinessAccount(selectedClaim.id, {
         name: selectedClaim.placeName,
         address: selectedClaim.placeAddress,
@@ -281,7 +291,7 @@ export default function BusinessClaimsAdmin() {
         phone: placeDetails?.phone || selectedClaim.businessPhone,
         website: placeDetails?.website || '',
         location: placeDetails?.location,
-        photoUrl: placeDetails?.photoReferences?.[0] || '',
+        photoUrl: safePhotoUrl,
       });
       console.log('[BusinessClaimsAdmin] Manual conversion successful');
 

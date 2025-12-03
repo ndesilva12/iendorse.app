@@ -8,7 +8,12 @@ import {
   Alert,
   TextInput,
   ScrollView,
+  Platform,
+  Dimensions,
 } from 'react-native';
+
+const { width: screenWidth } = Dimensions.get('window');
+const isLargeScreen = screenWidth >= 768;
 import { Plus, Minus, ChevronDown, X, Trash2 } from 'lucide-react-native';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
@@ -260,7 +265,7 @@ export default function ValueCodeSettings() {
     onChange: (type: EndorsementType) => void,
     zIndex: number
   ) => (
-    <View style={[styles.optionGroup, { zIndex }]}>
+    <View style={[styles.optionGroup, styles.dropdownOptionGroup, { zIndex: isOpen ? 1000 : 1 }]}>
       <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Type</Text>
       <TouchableOpacity
         style={[styles.dropdown, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
@@ -310,7 +315,15 @@ export default function ValueCodeSettings() {
     onRemove?: () => void,
     isBaseTier: boolean = false
   ) => (
-    <View style={[styles.tierCard, { backgroundColor: colors.background, borderColor: colors.border, zIndex: showTypeDropdown ? 1000 - tierNum : 1 }]}>
+    <View style={[
+      styles.tierCard,
+      {
+        backgroundColor: colors.background,
+        borderColor: colors.border,
+        zIndex: showTypeDropdown ? 1000 - tierNum : 1,
+        ...(Platform.OS === 'web' ? { overflow: 'visible' } : {}),
+      }
+    ]}>
       <View style={styles.tierHeader}>
         <Text style={[styles.tierTitle, { color: colors.text }]}>
           {isBaseTier ? 'Base Endorsement Discount' : `Tier ${tierNum}`}
@@ -323,18 +336,18 @@ export default function ValueCodeSettings() {
       </View>
 
       {/* Discount Percentage */}
-      <View style={styles.tierRow}>
+      <View style={[styles.tierRow, isLargeScreen && styles.tierRowLarge]}>
         <Text style={[styles.tierRowLabel, { color: colors.textSecondary }]}>Discount</Text>
-        <View style={styles.inlineCounter}>
+        <View style={[styles.inlineCounter, isLargeScreen && styles.inlineCounterLarge]}>
           <TouchableOpacity
-            style={[styles.smallButton, { borderColor: colors.border }]}
+            style={[styles.smallButton, isLargeScreen && styles.smallButtonLarge, { borderColor: colors.border }]}
             onPress={() => onDiscountChange(tier.discount - 0.5)}
             activeOpacity={0.7}
           >
-            <Minus size={16} color={colors.text} strokeWidth={2} />
+            <Minus size={isLargeScreen ? 14 : 16} color={colors.text} strokeWidth={2} />
           </TouchableOpacity>
           <TextInput
-            style={[styles.editableCounterInput, { color: colors.primary, borderColor: colors.border }]}
+            style={[styles.editableCounterInput, isLargeScreen && styles.editableCounterInputLarge, { color: colors.primary, borderColor: colors.border }]}
             value={tier.discount.toFixed(1)}
             onChangeText={(text) => {
               const num = parseFloat(text.replace('%', ''));
@@ -343,19 +356,19 @@ export default function ValueCodeSettings() {
             keyboardType="decimal-pad"
             selectTextOnFocus
           />
-          <Text style={[styles.percentSign, { color: colors.primary }]}>%</Text>
+          <Text style={[styles.percentSign, isLargeScreen && styles.percentSignLarge, { color: colors.primary }]}>%</Text>
           <TouchableOpacity
-            style={[styles.smallButton, { borderColor: colors.border }]}
+            style={[styles.smallButton, isLargeScreen && styles.smallButtonLarge, { borderColor: colors.border }]}
             onPress={() => onDiscountChange(tier.discount + 0.5)}
             activeOpacity={0.7}
           >
-            <Plus size={16} color={colors.text} strokeWidth={2} />
+            <Plus size={isLargeScreen ? 14 : 16} color={colors.text} strokeWidth={2} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Type and Min Days Row */}
-      <View style={styles.tierOptionsRow}>
+      <View style={[styles.tierOptionsRow, isLargeScreen && styles.tierOptionsRowLarge, Platform.OS === 'web' ? { overflow: 'visible' } : {}]}>
         {renderTypeDropdown(
           tier.type,
           showTypeDropdown,
@@ -364,18 +377,18 @@ export default function ValueCodeSettings() {
           100
         )}
 
-        <View style={styles.optionGroup}>
+        <View style={[styles.optionGroup, isLargeScreen && styles.optionGroupLarge]}>
           <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Min Days</Text>
-          <View style={styles.inlineCounterSmall}>
+          <View style={[styles.inlineCounterSmall, isLargeScreen && styles.inlineCounterSmallLarge]}>
             <TouchableOpacity
-              style={[styles.smallButtonCompact, { borderColor: colors.border }]}
+              style={[styles.smallButtonCompact, isLargeScreen && styles.smallButtonCompactLarge, { borderColor: colors.border }]}
               onPress={() => onMinDaysChange(tier.minDays - 1)}
               activeOpacity={0.7}
             >
-              <Minus size={14} color={colors.text} strokeWidth={2} />
+              <Minus size={isLargeScreen ? 12 : 14} color={colors.text} strokeWidth={2} />
             </TouchableOpacity>
             <TextInput
-              style={[styles.editableCounterInputSmall, { color: colors.primary, borderColor: colors.border }]}
+              style={[styles.editableCounterInputSmall, isLargeScreen && styles.editableCounterInputSmallLarge, { color: colors.primary, borderColor: colors.border }]}
               value={String(tier.minDays)}
               onChangeText={(text) => {
                 const num = parseInt(text, 10);
@@ -385,30 +398,30 @@ export default function ValueCodeSettings() {
               selectTextOnFocus
             />
             <TouchableOpacity
-              style={[styles.smallButtonCompact, { borderColor: colors.border }]}
+              style={[styles.smallButtonCompact, isLargeScreen && styles.smallButtonCompactLarge, { borderColor: colors.border }]}
               onPress={() => onMinDaysChange(tier.minDays + 1)}
               activeOpacity={0.7}
             >
-              <Plus size={14} color={colors.text} strokeWidth={2} />
+              <Plus size={isLargeScreen ? 12 : 14} color={colors.text} strokeWidth={2} />
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
       {/* Min Followers Row */}
-      <View style={[styles.tierOptionsRow, { marginTop: 12 }]}>
-        <View style={styles.optionGroup}>
+      <View style={[styles.tierOptionsRow, isLargeScreen && styles.tierOptionsRowLarge, { marginTop: 12 }]}>
+        <View style={[styles.optionGroup, isLargeScreen && styles.optionGroupLarge]}>
           <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Min Followers</Text>
-          <View style={styles.inlineCounterSmall}>
+          <View style={[styles.inlineCounterSmall, isLargeScreen && styles.inlineCounterSmallLarge]}>
             <TouchableOpacity
-              style={[styles.smallButtonCompact, { borderColor: colors.border }]}
+              style={[styles.smallButtonCompact, isLargeScreen && styles.smallButtonCompactLarge, { borderColor: colors.border }]}
               onPress={() => onMinFollowersChange(tier.minFollowers - 1)}
               activeOpacity={0.7}
             >
-              <Minus size={14} color={colors.text} strokeWidth={2} />
+              <Minus size={isLargeScreen ? 12 : 14} color={colors.text} strokeWidth={2} />
             </TouchableOpacity>
             <TextInput
-              style={[styles.editableCounterInputSmall, { color: colors.primary, borderColor: colors.border }]}
+              style={[styles.editableCounterInputSmall, isLargeScreen && styles.editableCounterInputSmallLarge, { color: colors.primary, borderColor: colors.border }]}
               value={String(tier.minFollowers)}
               onChangeText={(text) => {
                 const num = parseInt(text, 10);
@@ -418,15 +431,15 @@ export default function ValueCodeSettings() {
               selectTextOnFocus
             />
             <TouchableOpacity
-              style={[styles.smallButtonCompact, { borderColor: colors.border }]}
+              style={[styles.smallButtonCompact, isLargeScreen && styles.smallButtonCompactLarge, { borderColor: colors.border }]}
               onPress={() => onMinFollowersChange(tier.minFollowers + 1)}
               activeOpacity={0.7}
             >
-              <Plus size={14} color={colors.text} strokeWidth={2} />
+              <Plus size={isLargeScreen ? 12 : 14} color={colors.text} strokeWidth={2} />
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.optionGroup} />
+        <View style={[styles.optionGroup, isLargeScreen && styles.optionGroupLarge]} />
       </View>
     </View>
   );
@@ -638,6 +651,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     padding: 16,
+    ...(Platform.OS === 'web' ? { overflow: 'visible' } : {}),
   },
   settingRow: {
     flexDirection: 'row',
@@ -808,12 +822,12 @@ const styles = StyleSheet.create({
     right: 0,
     borderRadius: 8,
     borderWidth: 1,
-    zIndex: 100,
-    elevation: 5,
+    zIndex: 9999,
+    elevation: 9999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   dropdownItem: {
     paddingVertical: 10,
@@ -866,5 +880,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+  },
+  // Large screen styles for dropdown z-index fix
+  dropdownOptionGroup: {
+    ...(Platform.OS === 'web' ? { overflow: 'visible' } : {}),
+    position: 'relative',
+  },
+  // Large screen (desktop) styles - smaller inputs aligned right
+  tierRowLarge: {
+    justifyContent: 'flex-end',
+    gap: 16,
+  },
+  tierOptionsRowLarge: {
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  optionGroupLarge: {
+    flex: 0,
+    minWidth: 120,
+    maxWidth: 140,
+  },
+  inlineCounterLarge: {
+    gap: 4,
+  },
+  inlineCounterSmallLarge: {
+    gap: 3,
+  },
+  smallButtonLarge: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+  },
+  smallButtonCompactLarge: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+  },
+  editableCounterInputLarge: {
+    fontSize: 14,
+    minWidth: 40,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+  },
+  editableCounterInputSmallLarge: {
+    fontSize: 13,
+    minWidth: 32,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+  },
+  percentSignLarge: {
+    fontSize: 14,
   },
 });
