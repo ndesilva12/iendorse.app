@@ -8,9 +8,11 @@ import {
   Platform,
   StatusBar,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { ChevronDown, ChevronUp, Heart, Building2, Users, Globe, Shield, User as UserIcon, Tag, Trophy, Target, MapPin, Plus, UserPlus, UserMinus, Share2 } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Heart, Building2, Users, Globe, Shield, User as UserIcon, Tag, Trophy, Target, MapPin, Plus, UserPlus, UserMinus, Share2, Search, X } from 'lucide-react-native';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import * as Location from 'expo-location';
 import MenuButton from '@/components/MenuButton';
@@ -29,6 +31,7 @@ import { addEntryToList, removeEntryFromList } from '@/services/firebase/listSer
 import ItemOptionsModal from '@/components/ItemOptionsModal';
 import { useReferralCode } from '@/hooks/useReferralCode';
 import { appendReferralTracking } from '@/services/firebase/referralService';
+import { searchPlaces, PlaceSearchResult, formatCategory } from '@/services/firebase/placesService';
 
 // ===== Types =====
 type BrowseSection = 'global' | 'local' | 'values';
@@ -131,6 +134,13 @@ export default function BrowseScreen() {
   // Local section state
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [userBusinesses, setUserBusinesses] = useState<BusinessUser[]>([]);
+
+  // Local search state
+  const [showLocalSearch, setShowLocalSearch] = useState(false);
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const [localSearchResults, setLocalSearchResults] = useState<PlaceSearchResult[]>([]);
+  const [loadingLocalSearch, setLoadingLocalSearch] = useState(false);
+  const localSearchDebounce = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch user businesses
   const fetchUserBusinesses = useCallback(async () => {
@@ -351,6 +361,49 @@ export default function BrowseScreen() {
       Alert.alert('Share', 'Share functionality coming soon');
     }
   };
+
+  // Handle local search
+  const handleLocalSearch = useCallback((text: string) => {
+    setLocalSearchQuery(text);
+
+    // Clear existing timeout
+    if (localSearchDebounce.current) {
+      clearTimeout(localSearchDebounce.current);
+    }
+
+    if (!text.trim() || text.trim().length < 2) {
+      setLocalSearchResults([]);
+      setLoadingLocalSearch(false);
+      return;
+    }
+
+    // Debounce the search
+    setLoadingLocalSearch(true);
+    localSearchDebounce.current = setTimeout(async () => {
+      try {
+        const locationParam = userLocation
+          ? { lat: userLocation.latitude, lng: userLocation.longitude }
+          : undefined;
+        const places = await searchPlaces(text.trim(), locationParam);
+        setLocalSearchResults(places);
+      } catch (error) {
+        console.error('[Browse] Error searching places:', error);
+        setLocalSearchResults([]);
+      } finally {
+        setLoadingLocalSearch(false);
+      }
+    }, 500);
+  }, [userLocation]);
+
+  // Handle closing local search
+  const handleCloseLocalSearch = useCallback(() => {
+    setShowLocalSearch(false);
+    setLocalSearchQuery('');
+    setLocalSearchResults([]);
+    if (localSearchDebounce.current) {
+      clearTimeout(localSearchDebounce.current);
+    }
+  }, []);
 
   // Check if brand is endorsed
   const isBrandEndorsed = (brandId: string): boolean => {
@@ -645,6 +698,17 @@ export default function BrowseScreen() {
           </View>
         )}
 
+        {/* Local section - Search/Add button */}
+        {selectedSection === 'local' && !showLocalSearch && (
+          <TouchableOpacity
+            style={[styles.searchIconButton, { backgroundColor: colors.primary }]}
+            onPress={() => setShowLocalSearch(true)}
+            activeOpacity={0.7}
+          >
+            <Search size={18} color="#FFFFFF" strokeWidth={2.5} />
+          </TouchableOpacity>
+        )}
+
         {/* Values section - Update Values button */}
         {selectedSection === 'values' && (
           <TouchableOpacity
@@ -758,13 +822,112 @@ export default function BrowseScreen() {
   // Render Local content
   const renderLocalContent = () => {
     return (
-      <LocalBusinessView
-        userBusinesses={userBusinesses}
-        userLocation={userLocation}
-        userCauses={profile.causes || []}
-        isDarkMode={isDarkMode}
-        onRequestLocation={requestLocation}
-      />
+      <View>
+        {/* Search Bar - shown when search is active */}
+        {showLocalSearch && (
+          <View style={[styles.localSearchContainer, { backgroundColor: colors.background }]}>
+            <View style={[styles.localSearchBar, { backgroundColor: colors.backgroundSecondary, borderColor: 'transparent' }]}>
+              <Search size={20} color={colors.primary} strokeWidth={2} />
+              <TextInput
+                style={[styles.localSearchInput, { color: colors.primary }]}
+                placeholder="Search local businesses..."
+                placeholderTextColor={colors.primary + '80'}
+                value={localSearchQuery}
+                onChangeText={handleLocalSearch}
+                autoFocus
+                returnKeyType="search"
+              />
+              {localSearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => handleLocalSearch('')} activeOpacity={0.7}>
+                  <X size={20} color={colors.primary} strokeWidth={2} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.localSearchCloseButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={handleCloseLocalSearch}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.localSearchCloseText, { color: colors.text }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Search Results - shown when searching */}
+        {showLocalSearch && localSearchQuery.trim().length >= 2 && (
+          <View style={styles.localSearchResults}>
+            {loadingLocalSearch && (
+              <View style={styles.localSearchLoading}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.localSearchLoadingText, { color: colors.textSecondary }]}>
+                  Searching...
+                </Text>
+              </View>
+            )}
+
+            {!loadingLocalSearch && localSearchResults.length > 0 && (
+              <View>
+                <Text style={[styles.localSearchResultsTitle, { color: colors.textSecondary }]}>
+                  Results ({localSearchResults.length})
+                </Text>
+                {localSearchResults.map((place) => (
+                  <TouchableOpacity
+                    key={place.placeId}
+                    style={[styles.localSearchResultItem, { borderBottomColor: colors.border }]}
+                    onPress={() => {
+                      handleCloseLocalSearch();
+                      router.push(`/place/${place.placeId}`);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.localSearchResultLogo, { backgroundColor: colors.backgroundSecondary }]}>
+                      <Image
+                        source={require('@/assets/images/endorsing1.png')}
+                        style={styles.localSearchResultLogoImage}
+                        contentFit="cover"
+                        transition={200}
+                        cachePolicy="memory-disk"
+                      />
+                    </View>
+                    <View style={styles.localSearchResultText}>
+                      <Text style={[styles.localSearchResultName, { color: colors.text }]} numberOfLines={2}>
+                        {place.name}
+                      </Text>
+                      <Text style={[styles.localSearchResultCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {formatCategory(place.category)}{place.rating ? ` · ${place.rating}★` : ''}
+                      </Text>
+                      {place.address && (
+                        <Text style={[styles.localSearchResultAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {place.address}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {!loadingLocalSearch && localSearchResults.length === 0 && localSearchQuery.trim().length >= 2 && (
+              <View style={styles.localSearchEmpty}>
+                <Text style={[styles.localSearchEmptyText, { color: colors.textSecondary }]}>
+                  No businesses found for "{localSearchQuery}"
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Regular local content - hidden during active search with results */}
+        {(!showLocalSearch || localSearchQuery.trim().length < 2) && (
+          <LocalBusinessView
+            userBusinesses={userBusinesses}
+            userLocation={userLocation}
+            userCauses={profile.causes || []}
+            isDarkMode={isDarkMode}
+            onRequestLocation={requestLocation}
+          />
+        )}
+      </View>
     );
   };
 
@@ -1135,6 +1298,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600' as const,
   },
+  searchIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // Brand card styles (matching Local list style)
   brandList: {
@@ -1334,5 +1504,101 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     lineHeight: 22,
+  },
+
+  // Local search styles
+  localSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  localSearchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 0,
+    gap: 8,
+  },
+  localSearchInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600' as const,
+    padding: 0,
+    margin: 0,
+  },
+  localSearchCloseButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  localSearchCloseText: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+  },
+  localSearchResults: {
+    paddingHorizontal: 16,
+  },
+  localSearchLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  localSearchLoadingText: {
+    fontSize: 14,
+  },
+  localSearchResultsTitle: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    marginBottom: 12,
+    textTransform: 'uppercase' as const,
+  },
+  localSearchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  localSearchResultLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  localSearchResultLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  localSearchResultText: {
+    flex: 1,
+  },
+  localSearchResultName: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    marginBottom: 2,
+  },
+  localSearchResultCategory: {
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  localSearchResultAddress: {
+    fontSize: 12,
+  },
+  localSearchEmpty: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  localSearchEmptyText: {
+    fontSize: 14,
+    textAlign: 'center' as const,
   },
 });

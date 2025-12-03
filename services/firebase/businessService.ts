@@ -13,7 +13,8 @@ export interface BusinessUser {
 
 /**
  * Get all businesses that accept Endorse discounts from Firebase
- * Includes businesses with acceptsStandDiscounts=true OR customerDiscountPercent > 0
+ * Only includes businesses with acceptsStandDiscounts=true AND (customerDiscountPercent > 0 OR customDiscount set)
+ * This ensures businesses with discounts "turned off" don't appear in the money tab
  * @returns Array of business users
  */
 export async function getBusinessesAcceptingDiscounts(): Promise<BusinessUser[]> {
@@ -45,12 +46,14 @@ export async function getBusinessesAcceptingDiscounts(): Promise<BusinessUser[]>
       if (data.businessInfo && data.businessInfo.name) {
         const businessInfo = data.businessInfo;
 
-        // Include if: acceptsStandDiscounts is true OR customerDiscountPercent > 0
+        // Only include businesses that have discounts ENABLED (acceptsStandDiscounts === true)
+        // AND have some discount configured (percentage or custom)
         const acceptsDiscounts = businessInfo.acceptsStandDiscounts === true;
         const hasDiscount = (businessInfo.customerDiscountPercent || 0) > 0;
         const hasCustomDiscount = businessInfo.customDiscount && businessInfo.customDiscount.trim();
 
-        if (acceptsDiscounts || hasDiscount || hasCustomDiscount) {
+        // Must have discounts enabled AND at least one discount configured
+        if (acceptsDiscounts && (hasDiscount || hasCustomDiscount)) {
           businesses.push({
             id: doc.id,
             email: data.email,

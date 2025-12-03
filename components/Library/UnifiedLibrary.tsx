@@ -250,6 +250,8 @@ interface UnifiedLibraryProps {
   onSectionChange?: (section: LibrarySectionType) => void;
   // Show only endorsement section (hides section selector)
   endorsementOnly?: boolean;
+  // Open add endorsement modal on mount
+  initialShowAddModal?: boolean;
 }
 
 export default function UnifiedLibrary({
@@ -272,6 +274,7 @@ export default function UnifiedLibrary({
   externalSelectedSection,
   onSectionChange,
   endorsementOnly = false,
+  initialShowAddModal = false,
 }: UnifiedLibraryProps) {
   const colors = (isDarkMode ? darkColors : lightColors) || lightColors;
   const library = useLibrary();
@@ -339,6 +342,10 @@ export default function UnifiedLibrary({
   const endorsementList = propsEndorsementList !== undefined ? propsEndorsementList : library.state.endorsementList;
   const userLists = propsUserLists !== undefined ? propsUserLists : library.state.userLists;
 
+  // IMPORTANT: For action menu checks (endorse/unendorse), always use the CURRENT user's list
+  // not the viewed user's list when viewing someone else's profile
+  const currentUserEndorsementList = library.state.endorsementList;
+
   // Reorder mode state
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [reorderingListId, setReorderingListId] = useState<string | null>(null);
@@ -354,7 +361,7 @@ export default function UnifiedLibrary({
   const [showEndorsedActionMenu, setShowEndorsedActionMenu] = useState(false);
 
   // Add to endorsement search modal state
-  const [showAddEndorsementModal, setShowAddEndorsementModal] = useState(false);
+  const [showAddEndorsementModal, setShowAddEndorsementModal] = useState(initialShowAddModal);
   const [addSearchQuery, setAddSearchQuery] = useState('');
   const [allBusinesses, setAllBusinesses] = useState<BusinessUser[]>([]);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
@@ -592,15 +599,29 @@ export default function UnifiedLibrary({
       await Promise.all(
         entries.map(async (entry) => {
           try {
-            const entityId = entry.type === 'brand'
-              ? (entry as any).brandId
-              : (entry as any).businessId;
+            // Get entity ID based on entry type
+            let entityId: string | undefined;
+            let entityType: 'brand' | 'business' | 'place';
+
+            if (entry.type === 'brand') {
+              entityId = (entry as any).brandId;
+              entityType = 'brand';
+            } else if (entry.type === 'business') {
+              entityId = (entry as any).businessId;
+              entityType = 'business';
+            } else if (entry.type === 'place') {
+              entityId = (entry as any).placeId;
+              entityType = 'place';
+            } else if (entry.type === 'pending_business') {
+              // For pending businesses, use the entry ID itself
+              entityId = entry.id;
+              entityType = 'business';
+            }
 
             if (!entityId) return;
 
             // Try to get cumulative days from history service if user is logged in
             if (currentUserId) {
-              const entityType = entry.type === 'brand' ? 'brand' : 'business';
               const result = await getCumulativeDays(currentUserId, entityType, entityId);
               // Use history days if available, otherwise fall back to createdAt calculation
               if (result.totalDaysEndorsed > 0) {
@@ -614,9 +635,16 @@ export default function UnifiedLibrary({
           } catch (error) {
             console.error('[UnifiedLibrary] Error fetching cumulative days:', error);
             // Fallback on error: calculate from createdAt
-            const entityId = entry.type === 'brand'
-              ? (entry as any).brandId
-              : (entry as any).businessId;
+            let entityId: string | undefined;
+            if (entry.type === 'brand') {
+              entityId = (entry as any).brandId;
+            } else if (entry.type === 'business') {
+              entityId = (entry as any).businessId;
+            } else if (entry.type === 'place') {
+              entityId = (entry as any).placeId;
+            } else if (entry.type === 'pending_business') {
+              entityId = entry.id;
+            }
             if (entityId) {
               daysMap[entityId] = calculateDaysFromCreatedAt(entry.createdAt);
             }
@@ -1559,7 +1587,9 @@ export default function UnifiedLibrary({
   const getActionModalOptions = () => {
     if (!selectedItemForOptions) return [];
 
-    const isEndorsed = endorsementList?.entries?.some(e => {
+    // IMPORTANT: Check against the CURRENT USER's endorsement list, not the viewed user's list
+    // This ensures "Endorse/Unendorse" reflects the current user's actual endorsement status
+    const isEndorsed = currentUserEndorsementList?.entries?.some(e => {
       const entryId = selectedItemForOptions.brandId || selectedItemForOptions.businessId || selectedItemForOptions.valueId || (selectedItemForOptions as any).placeId;
       const endorsedId = e?.brandId || e?.businessId || e?.valueId || (e as any)?.placeId;
       return endorsedId === entryId;
@@ -1681,10 +1711,17 @@ export default function UnifiedLibrary({
 
   // Helper function to get cumulative days endorsed for an entry
   const getCumulativeDaysForEntry = (entry: ListEntry): number => {
-    const entityId = entry.type === 'brand'
-      ? (entry as any).brandId
-      : (entry as any).businessId;
-    return cumulativeDaysMap[entityId] || 0;
+    let entityId: string | undefined;
+    if (entry.type === 'brand') {
+      entityId = (entry as any).brandId;
+    } else if (entry.type === 'business') {
+      entityId = (entry as any).businessId;
+    } else if (entry.type === 'place') {
+      entityId = (entry as any).placeId;
+    } else if (entry.type === 'pending_business') {
+      entityId = entry.id;
+    }
+    return entityId ? (cumulativeDaysMap[entityId] || 0) : 0;
   };
 
   // Helper function to get card background color based on position

@@ -1197,6 +1197,7 @@ export default function HomeScreen() {
         followingCount={followingCount}
         followersCount={followersCount}
         endorsementOnly={true}
+        initialShowAddModal={params.openAddModal === 'true'}
       />
     );
   };
@@ -2863,6 +2864,7 @@ export default function HomeScreen() {
         followingCount={followingCount}
         followersCount={followersCount}
         endorsementOnly={true}
+        initialShowAddModal={params.openAddModal === 'true'}
       />
     );
   };

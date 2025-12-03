@@ -18,6 +18,7 @@ import {
   increment,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { addBonusDaysToAllEndorsements } from './endorsementHistoryService';
 
 export interface Referral {
   id?: string;
@@ -171,6 +172,16 @@ export async function recordReferral(
       referredByCode: referralCode.toUpperCase(),
       updatedAt: serverTimestamp(),
     });
+
+    // Add 7 bonus days to all endorsement items for the referrer
+    const REFERRAL_BONUS_DAYS = 7;
+    try {
+      const updatedCount = await addBonusDaysToAllEndorsements(referrerId, REFERRAL_BONUS_DAYS);
+      console.log(`[Referral] Added ${REFERRAL_BONUS_DAYS} bonus days to ${updatedCount} endorsement items for referrer:`, referrerId);
+    } catch (bonusError) {
+      // Don't fail the referral if bonus days fail to apply
+      console.error('[Referral] Error adding bonus days, continuing:', bonusError);
+    }
 
     console.log('[Referral] Recorded referral:', referralRef.id);
     return referralRef.id;

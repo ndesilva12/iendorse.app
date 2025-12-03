@@ -197,69 +197,78 @@ export default function MerchantVerify() {
       const businessData = businessDoc.data();
       const businessInfo = businessData?.businessInfo;
 
-      if (businessInfo?.requireFollow || businessInfo?.requireEndorse) {
-        // Check if customer is following the business
-        if (businessInfo.requireFollow) {
-          const customerIsFollowing = await isFollowing(customerUserId as string, businessId, 'business');
-          if (!customerIsFollowing) {
-            setRequirementError('User must follow this business to receive the discount');
-            Alert.alert('Requirement Not Met', 'User must follow this business to receive the discount');
-            setIsProcessing(false);
-            return;
+      // Check if customer is following the business (if required)
+      if (businessInfo?.requireFollow) {
+        const customerIsFollowing = await isFollowing(customerUserId as string, businessId, 'business');
+        if (!customerIsFollowing) {
+          setRequirementError('User must follow this business to receive the discount');
+          Alert.alert('Requirement Not Met', 'User must follow this business to receive the discount');
+          setIsProcessing(false);
+          return;
+        }
+      }
+
+      // ALWAYS check if customer has endorsed the business
+      // This is a core requirement for discounts - users must endorse businesses to get their discounts
+      const customerLists = await getUserLists(customerUserId as string);
+      const endorsementList = customerLists.find(list => list.isEndorsed === true);
+
+      console.log('[MerchantVerify] Checking endorsement for business:', businessId);
+      console.log('[MerchantVerify] Customer lists found:', customerLists.length);
+      console.log('[MerchantVerify] Endorsement list found:', !!endorsementList);
+
+      if (!endorsementList) {
+        setRequirementError('User must endorse this business to receive the discount');
+        Alert.alert('Requirement Not Met', 'User must endorse this business to receive the discount. Please ask the customer to add your business to their endorsement list.');
+        setIsProcessing(false);
+        return;
+      }
+
+      console.log('[MerchantVerify] Endorsement list entries:', endorsementList.entries.length);
+      console.log('[MerchantVerify] Endorsement list entries:', JSON.stringify(endorsementList.entries, null, 2));
+
+      // Check if user has endorsed this specific business
+      // Support multiple entry formats for robustness (filter out null/undefined entries)
+      const hasEndorsed = endorsementList.entries.filter(e => e).some(entry => {
+        if (entry.type === 'business') {
+          // Check by businessId (primary method)
+          if ('businessId' in entry && entry.businessId === businessId) {
+            console.log('[MerchantVerify] ✓ Found business by ID match');
+            return true;
+          }
+          // Check by business name as fallback
+          if ('businessName' in entry && entry.businessName === businessInfo?.name) {
+            console.log('[MerchantVerify] ✓ Found business by name match');
+            return true;
           }
         }
-
-        // Check if customer has endorsed the business (added to endorsement list)
-        if (businessInfo.requireEndorse) {
-          const customerLists = await getUserLists(customerUserId as string);
-          const endorsementList = customerLists.find(list => list.isEndorsed === true);
-
-          console.log('[MerchantVerify] Checking endorsement requirement for business:', businessId);
-          console.log('[MerchantVerify] Customer lists found:', customerLists.length);
-          console.log('[MerchantVerify] Endorsement list found:', !!endorsementList);
-
-          if (!endorsementList) {
-            setRequirementError('User must endorse this business to receive the discount');
-            Alert.alert('Requirement Not Met', 'User must endorse this business to receive the discount');
-            setIsProcessing(false);
-            return;
+        // Also check if user endorsed the business's brand (some users might endorse the brand)
+        if (entry.type === 'brand' && 'brandName' in entry && entry.brandName === businessInfo?.name) {
+          console.log('[MerchantVerify] ✓ Found business via brand name match');
+          return true;
+        }
+        // Check for place entries that match this business
+        if (entry.type === 'place' && 'placeId' in entry) {
+          // Check if this place maps to the business
+          if ('businessId' in entry && entry.businessId === businessId) {
+            console.log('[MerchantVerify] ✓ Found business via place businessId match');
+            return true;
           }
-
-          console.log('[MerchantVerify] Endorsement list entries:', endorsementList.entries.length);
-          console.log('[MerchantVerify] Endorsement list entries:', JSON.stringify(endorsementList.entries, null, 2));
-
-          // Check if user has endorsed this specific business
-          // Support multiple entry formats for robustness (filter out null/undefined entries)
-          const hasEndorsed = endorsementList.entries.filter(e => e).some(entry => {
-            if (entry.type === 'business') {
-              // Check by businessId (primary method)
-              if ('businessId' in entry && entry.businessId === businessId) {
-                console.log('[MerchantVerify] ✓ Found business by ID match');
-                return true;
-              }
-              // Check by business name as fallback
-              if ('businessName' in entry && entry.businessName === businessInfo.name) {
-                console.log('[MerchantVerify] ✓ Found business by name match');
-                return true;
-              }
-            }
-            // Also check if user endorsed the business's brand (some users might endorse the brand)
-            if (entry.type === 'brand' && 'brandName' in entry && entry.brandName === businessInfo.name) {
-              console.log('[MerchantVerify] ✓ Found business via brand name match');
-              return true;
-            }
-            return false;
-          });
-
-          console.log('[MerchantVerify] Has endorsed:', hasEndorsed);
-
-          if (!hasEndorsed) {
-            setRequirementError('User must endorse this business to receive the discount');
-            Alert.alert('Requirement Not Met', 'User must endorse this business to receive the discount');
-            setIsProcessing(false);
-            return;
+          if ('placeName' in entry && entry.placeName === businessInfo?.name) {
+            console.log('[MerchantVerify] ✓ Found business via place name match');
+            return true;
           }
         }
+        return false;
+      });
+
+      console.log('[MerchantVerify] Has endorsed:', hasEndorsed);
+
+      if (!hasEndorsed) {
+        setRequirementError('User must endorse this business to receive the discount');
+        Alert.alert('Requirement Not Met', 'User must endorse this business to receive the discount. Please ask the customer to add your business to their endorsement list.');
+        setIsProcessing(false);
+        return;
       }
 
       // Record transaction in Firebase

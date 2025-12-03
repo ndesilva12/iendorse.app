@@ -249,6 +249,13 @@ export default function MenuButton() {
                 </Text>
               </View>
 
+              {/* Bonus Info */}
+              <View style={[styles.bonusInfoBox, { backgroundColor: 'transparent', borderColor: colors.primary }]}>
+                <Text style={[styles.bonusInfoText, { color: colors.text }]}>
+                  Get all of your endorsements backdated by <Text style={{ fontWeight: '700', color: colors.primary }}>7 DAYS</Text> for each successful referral!
+                </Text>
+              </View>
+
               {/* Action Buttons */}
               <View style={styles.inviteActions}>
                 <TouchableOpacity
@@ -431,5 +438,15 @@ const styles = StyleSheet.create({
   closeInviteText: {
     fontSize: 15,
     fontWeight: '600' as const,
+  },
+  bonusInfoBox: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  bonusInfoText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center' as const,
   },
 });
