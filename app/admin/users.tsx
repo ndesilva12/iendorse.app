@@ -26,6 +26,7 @@ import { getCustomFields, CustomField } from '@/services/firebase/customFieldsSe
 import { getUserLists, deleteList, removeEntryFromList, addEntryToList, updateEntryInList, getEndorsementList, createList, ensureEndorsementList } from '@/services/firebase/listService';
 import { UserList, ListEntry } from '@/types/library';
 import { getFollowing, getFollowers, followEntity, unfollowEntity, Follow, FollowableType } from '@/services/firebase/followService';
+import { getCumulativeDays } from '@/services/firebase/endorsementHistoryService';
 import { makeAllProfilesPublic } from '@/services/firebase/userService';
 import { Picker } from '@react-native-picker/picker';
 import { pickAndUploadImage } from '@/lib/imageUpload';
@@ -169,6 +170,8 @@ export default function UsersManagement() {
   const [newEndorsementType, setNewEndorsementType] = useState<'brand' | 'business'>('brand');
   const [newEndorsementId, setNewEndorsementId] = useState('');
   const [newEndorsementName, setNewEndorsementName] = useState('');
+  const [endorsementMetrics, setEndorsementMetrics] = useState<Record<string, { totalDaysEndorsed: number; totalDaysInTop5: number; totalDaysInTop10: number }>>({});
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
 
   // Impersonation state
   const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
@@ -526,14 +529,57 @@ export default function UsersManagement() {
   // Load endorsement list for a user
   const loadUserEndorsements = async (userId: string) => {
     setLoadingEndorsements(true);
+    setLoadingMetrics(true);
     try {
       const endorsements = await getEndorsementList(userId);
       setEndorsementList(endorsements);
+
+      // Fetch metrics for each endorsement entry
+      if (endorsements?.entries?.length) {
+        const metrics: Record<string, { totalDaysEndorsed: number; totalDaysInTop5: number; totalDaysInTop10: number }> = {};
+
+        await Promise.all(
+          endorsements.entries.map(async (entry) => {
+            try {
+              let entityId: string | undefined;
+              let entityType: 'brand' | 'business' | 'place' | 'value' = 'brand';
+
+              if (entry.type === 'brand') {
+                entityId = (entry as any).brandId;
+                entityType = 'brand';
+              } else if (entry.type === 'business') {
+                entityId = (entry as any).businessId;
+                entityType = 'business';
+              } else if (entry.type === 'place') {
+                entityId = (entry as any).placeId;
+                entityType = 'place';
+              }
+
+              if (entityId) {
+                const result = await getCumulativeDays(userId, entityType, entityId);
+                metrics[entityId] = {
+                  totalDaysEndorsed: result.totalDaysEndorsed,
+                  totalDaysInTop5: result.totalDaysInTop5,
+                  totalDaysInTop10: result.totalDaysInTop10,
+                };
+              }
+            } catch (err) {
+              console.warn('[Admin] Error fetching metrics for entry:', err);
+            }
+          })
+        );
+
+        setEndorsementMetrics(metrics);
+      } else {
+        setEndorsementMetrics({});
+      }
     } catch (error) {
       console.error('[Admin] Error loading endorsements:', error);
       setEndorsementList(null);
+      setEndorsementMetrics({});
     } finally {
       setLoadingEndorsements(false);
+      setLoadingMetrics(false);
     }
   };
 
@@ -1949,20 +1995,46 @@ export default function UsersManagement() {
                       )}
 
                       {endorsementList.entries && endorsementList.entries.length > 0 ? (
-                        endorsementList.entries.map((entry) => {
+                        endorsementList.entries.map((entry, index) => {
                           const entryId = entry.id || '';
-                          const entryName = (entry as any).brandName || (entry as any).businessName || (entry as any).name || (entry as any).brandId || (entry as any).businessId || 'Unknown';
+                          const entryName = (entry as any).brandName || (entry as any).businessName || (entry as any).placeName || (entry as any).name || (entry as any).brandId || (entry as any).businessId || 'Unknown';
                           const entryType = entry.type || 'unknown';
-                          const daysEndorsed = calculateDaysFromDate(entry.createdAt);
+
+                          // Get entity ID for metrics lookup
+                          let entityId: string | undefined;
+                          if (entry.type === 'brand') {
+                            entityId = (entry as any).brandId;
+                          } else if (entry.type === 'business') {
+                            entityId = (entry as any).businessId;
+                          } else if (entry.type === 'place') {
+                            entityId = (entry as any).placeId;
+                          }
+
+                          // Get metrics from history or fall back to calculated days
+                          const metrics = entityId ? endorsementMetrics[entityId] : null;
+                          const daysEndorsed = metrics?.totalDaysEndorsed ?? calculateDaysFromDate(entry.createdAt);
+                          const daysInTop5 = metrics?.totalDaysInTop5 ?? 0;
+                          const daysInTop10 = metrics?.totalDaysInTop10 ?? 0;
 
                           return (
                             <View key={entryId} style={styles.endorsementRow}>
                               <View style={styles.endorsementInfo}>
-                                <Text style={styles.endorsementName}>{entryName}</Text>
-                                <Text style={styles.endorsementType}>({entryType})</Text>
-                                <Text style={styles.endorsementDays}>
-                                  Endorsed for {daysEndorsed} {daysEndorsed === 1 ? 'day' : 'days'}
-                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <Text style={styles.endorsementRank}>#{index + 1}</Text>
+                                  <Text style={styles.endorsementName}>{entryName}</Text>
+                                  <Text style={styles.endorsementType}>({entryType})</Text>
+                                </View>
+                                <View style={styles.endorsementMetricsRow}>
+                                  <Text style={styles.endorsementDays}>
+                                    📅 {daysEndorsed} {daysEndorsed === 1 ? 'day' : 'days'} total
+                                  </Text>
+                                  <Text style={[styles.endorsementDays, { color: '#FFD700' }]}>
+                                    🏆 {daysInTop5}d top 5
+                                  </Text>
+                                  <Text style={[styles.endorsementDays, { color: '#C0C0C0' }]}>
+                                    🥈 {daysInTop10}d top 10
+                                  </Text>
+                                </View>
                               </View>
                               <TouchableOpacity
                                 style={styles.removeEndorsementButton}
@@ -3180,6 +3252,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#28a745',
     marginTop: 2,
+  },
+  endorsementRank: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6c757d',
+    minWidth: 28,
+  },
+  endorsementMetricsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+    flexWrap: 'wrap',
   },
   removeEndorsementButton: {
     backgroundColor: '#dc3545',
