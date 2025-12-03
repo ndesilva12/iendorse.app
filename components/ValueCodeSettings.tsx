@@ -265,7 +265,7 @@ export default function ValueCodeSettings() {
     onChange: (type: EndorsementType) => void,
     zIndex: number
   ) => (
-    <View style={[styles.optionGroup, styles.dropdownOptionGroup, { zIndex: isOpen ? 1000 : 1 }]}>
+    <View style={[styles.optionGroup, styles.optionGroupType, styles.dropdownOptionGroup, { zIndex: isOpen ? 1000 : 1 }]}>
       <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Type</Text>
       <TouchableOpacity
         style={[styles.dropdown, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
@@ -377,7 +377,7 @@ export default function ValueCodeSettings() {
           100
         )}
 
-        <View style={[styles.optionGroup, isLargeScreen && styles.optionGroupLarge]}>
+        <View style={[styles.optionGroup, styles.optionGroupRight, isLargeScreen && styles.optionGroupLarge]}>
           <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Min Days</Text>
           <View style={[styles.inlineCounterSmall, isLargeScreen && styles.inlineCounterSmallLarge]}>
             <TouchableOpacity
@@ -410,7 +410,8 @@ export default function ValueCodeSettings() {
 
       {/* Min Followers Row */}
       <View style={[styles.tierOptionsRow, isLargeScreen && styles.tierOptionsRowLarge, { marginTop: 12 }]}>
-        <View style={[styles.optionGroup, isLargeScreen && styles.optionGroupLarge]}>
+        <View style={[styles.optionGroupType]} />
+        <View style={[styles.optionGroup, styles.optionGroupRight, isLargeScreen && styles.optionGroupLarge]}>
           <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Min Followers</Text>
           <View style={[styles.inlineCounterSmall, isLargeScreen && styles.inlineCounterSmallLarge]}>
             <TouchableOpacity
@@ -439,7 +440,6 @@ export default function ValueCodeSettings() {
             </TouchableOpacity>
           </View>
         </View>
-        <View style={[styles.optionGroup, isLargeScreen && styles.optionGroupLarge]} />
       </View>
     </View>
   );
@@ -720,15 +720,25 @@ const styles = StyleSheet.create({
   tierRowLabel: {
     fontSize: 14,
     fontWeight: '500' as const,
+    flex: 1,
   },
   tierOptionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 8,
   },
   // Option Groups
   optionGroup: {
     flex: 1,
+  },
+  optionGroupType: {
+    flex: 0,
+    minWidth: 100,
+    maxWidth: 110,
+  },
+  optionGroupRight: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   optionLabel: {
     fontSize: 11,
@@ -741,24 +751,24 @@ const styles = StyleSheet.create({
   inlineCounter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   inlineCounterSmall: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   smallButton: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   smallButtonCompact: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 6,
     borderWidth: 1,
     alignItems: 'center',
@@ -778,27 +788,29 @@ const styles = StyleSheet.create({
   },
   // Editable counter inputs
   editableCounterInput: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700' as const,
-    minWidth: 50,
+    minWidth: 44,
+    maxWidth: 50,
     textAlign: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     borderWidth: 1,
     borderRadius: 6,
   },
   editableCounterInputSmall: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700' as const,
-    minWidth: 40,
+    minWidth: 36,
+    maxWidth: 44,
     textAlign: 'center',
-    paddingVertical: 3,
-    paddingHorizontal: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
     borderWidth: 1,
     borderRadius: 4,
   },
   percentSign: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700' as const,
   },
   // Dropdown
@@ -806,18 +818,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 8,
     borderWidth: 1,
+    minHeight: 40,
   },
   dropdownText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500' as const,
   },
   dropdownList: {
     position: 'absolute',
-    top: 58,
+    top: 62,
     left: 0,
     right: 0,
     borderRadius: 8,
@@ -897,35 +910,38 @@ const styles = StyleSheet.create({
   },
   optionGroupLarge: {
     flex: 0,
-    minWidth: 120,
-    maxWidth: 140,
+    minWidth: 110,
+    maxWidth: 130,
+    alignItems: 'flex-end',
   },
   inlineCounterLarge: {
-    gap: 4,
+    gap: 3,
   },
   inlineCounterSmallLarge: {
     gap: 3,
   },
   smallButtonLarge: {
-    width: 26,
-    height: 26,
+    width: 28,
+    height: 28,
     borderRadius: 6,
   },
   smallButtonCompactLarge: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     borderRadius: 5,
   },
   editableCounterInputLarge: {
     fontSize: 14,
-    minWidth: 40,
-    paddingVertical: 2,
+    minWidth: 38,
+    maxWidth: 44,
+    paddingVertical: 4,
     paddingHorizontal: 2,
   },
   editableCounterInputSmallLarge: {
     fontSize: 13,
-    minWidth: 32,
-    paddingVertical: 2,
+    minWidth: 34,
+    maxWidth: 40,
+    paddingVertical: 4,
     paddingHorizontal: 2,
   },
   percentSignLarge: {
