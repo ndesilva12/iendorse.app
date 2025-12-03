@@ -826,12 +826,12 @@ export default function BrowseScreen() {
         {/* Search Bar - shown when search is active */}
         {showLocalSearch && (
           <View style={[styles.localSearchContainer, { backgroundColor: colors.background }]}>
-            <View style={[styles.localSearchBar, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-              <Search size={18} color={colors.textSecondary} strokeWidth={2} />
+            <View style={[styles.localSearchBar, { backgroundColor: colors.backgroundSecondary, borderColor: 'transparent' }]}>
+              <Search size={20} color={colors.primary} strokeWidth={2} />
               <TextInput
-                style={[styles.localSearchInput, { color: colors.text }]}
+                style={[styles.localSearchInput, { color: colors.primary }]}
                 placeholder="Search local businesses..."
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.primary + '80'}
                 value={localSearchQuery}
                 onChangeText={handleLocalSearch}
                 autoFocus
@@ -839,7 +839,7 @@ export default function BrowseScreen() {
               />
               {localSearchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => handleLocalSearch('')} activeOpacity={0.7}>
-                  <X size={18} color={colors.textSecondary} strokeWidth={2} />
+                  <X size={20} color={colors.primary} strokeWidth={2} />
                 </TouchableOpacity>
               )}
             </View>
@@ -1521,12 +1521,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: 0,
     gap: 8,
   },
   localSearchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '600' as const,
     padding: 0,
     margin: 0,
   },
