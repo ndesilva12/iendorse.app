@@ -563,37 +563,74 @@ export default function ValueCodeSettings() {
                     onChangeText={handleCustomDiscountTextChange}
                   />
 
-                  {/* Custom discount type and days */}
-                  <View style={[styles.tierOptionsRow, { marginTop: 12, zIndex: showCustomTypeDropdown ? 1000 : 1 }]}>
-                    {renderTypeDropdown(
-                      customDiscountType,
-                      showCustomTypeDropdown,
-                      () => setShowCustomTypeDropdown(!showCustomTypeDropdown),
-                      handleCustomDiscountTypeChange,
-                      100
-                    )}
-
-                    <View style={styles.optionGroup}>
-                      <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Min Days</Text>
-                      <View style={styles.inlineCounterSmall}>
-                        <TouchableOpacity
-                          style={[styles.smallButtonCompact, { borderColor: colors.border }]}
-                          onPress={() => handleCustomDiscountMinDaysChange(customDiscountMinDays - 1)}
-                          activeOpacity={0.7}
-                        >
-                          <Minus size={14} color={colors.text} strokeWidth={2} />
-                        </TouchableOpacity>
-                        <Text style={[styles.counterValueSmall, { color: colors.primary }]}>
-                          {customDiscountMinDays}
+                  {/* Custom discount type */}
+                  <View style={[styles.tierRowCentered, { marginTop: 12 }, Platform.OS === 'web' ? { overflow: 'visible', zIndex: showCustomTypeDropdown ? 1000 : 1 } : {}]}>
+                    <Text style={[styles.tierRowLabelCentered, { color: colors.textSecondary }]}>Type</Text>
+                    <View style={[styles.dropdownOptionGroup, { zIndex: showCustomTypeDropdown ? 1000 : 1 }]}>
+                      <TouchableOpacity
+                        style={[styles.dropdownCentered, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                        onPress={() => setShowCustomTypeDropdown(!showCustomTypeDropdown)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.dropdownText, { color: colors.text }]}>
+                          {getTypeLabel(customDiscountType)}
                         </Text>
-                        <TouchableOpacity
-                          style={[styles.smallButtonCompact, { borderColor: colors.border }]}
-                          onPress={() => handleCustomDiscountMinDaysChange(customDiscountMinDays + 1)}
-                          activeOpacity={0.7}
-                        >
-                          <Plus size={14} color={colors.text} strokeWidth={2} />
-                        </TouchableOpacity>
-                      </View>
+                        <ChevronDown size={16} color={colors.textSecondary} strokeWidth={2} />
+                      </TouchableOpacity>
+                      {showCustomTypeDropdown && (
+                        <View style={[styles.dropdownListCentered, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                          {(['any', 'top10', 'top5'] as EndorsementType[]).map((type) => (
+                            <TouchableOpacity
+                              key={type}
+                              style={[
+                                styles.dropdownItem,
+                                { borderBottomColor: colors.border },
+                                customDiscountType === type && { backgroundColor: colors.primary }
+                              ]}
+                              onPress={() => handleCustomDiscountTypeChange(type)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[
+                                styles.dropdownItemText,
+                                { color: customDiscountType === type ? '#FFFFFF' : colors.text }
+                              ]}>
+                                {getTypeLabel(type)}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Custom discount min days */}
+                  <View style={styles.tierRowCentered}>
+                    <Text style={[styles.tierRowLabelCentered, { color: colors.textSecondary }]}>Min Days</Text>
+                    <View style={styles.inlineCounter}>
+                      <TouchableOpacity
+                        style={[styles.smallButton, { borderColor: colors.border }]}
+                        onPress={() => handleCustomDiscountMinDaysChange(customDiscountMinDays - 1)}
+                        activeOpacity={0.7}
+                      >
+                        <Minus size={16} color={colors.text} strokeWidth={2} />
+                      </TouchableOpacity>
+                      <TextInput
+                        style={[styles.editableCounterInput, { color: colors.primary, borderColor: colors.border }]}
+                        value={String(customDiscountMinDays)}
+                        onChangeText={(text) => {
+                          const num = parseInt(text, 10);
+                          if (!isNaN(num)) handleCustomDiscountMinDaysChange(num);
+                        }}
+                        keyboardType="number-pad"
+                        selectTextOnFocus
+                      />
+                      <TouchableOpacity
+                        style={[styles.smallButton, { borderColor: colors.border }]}
+                        onPress={() => handleCustomDiscountMinDaysChange(customDiscountMinDays + 1)}
+                        activeOpacity={0.7}
+                      >
+                        <Plus size={16} color={colors.text} strokeWidth={2} />
+                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
@@ -676,7 +713,7 @@ const styles = StyleSheet.create({
   tierCard: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
+    padding: 12,
     marginBottom: 12,
   },
   tierHeader: {
@@ -695,12 +732,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
+    flexWrap: 'nowrap',
   },
   tierRowLabelCentered: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500' as const,
-    minWidth: 90,
+    minWidth: 70,
+    flexShrink: 0,
   },
   tierRow: {
     flexDirection: 'row',
@@ -742,7 +781,8 @@ const styles = StyleSheet.create({
   inlineCounter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    flexShrink: 1,
   },
   inlineCounterSmall: {
     flexDirection: 'row',
@@ -750,9 +790,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   smallButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 6,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -779,12 +819,13 @@ const styles = StyleSheet.create({
   },
   // Editable counter inputs
   editableCounterInput: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700' as const,
-    minWidth: 48,
+    minWidth: 40,
+    maxWidth: 50,
     textAlign: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
     borderWidth: 1,
     borderRadius: 6,
   },
@@ -800,7 +841,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   percentSign: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700' as const,
   },
   // Dropdown
@@ -818,15 +859,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
     borderWidth: 1,
-    minHeight: 38,
-    minWidth: 110,
+    minHeight: 32,
+    minWidth: 100,
+    maxWidth: 140,
+    flexShrink: 1,
   },
   dropdownText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500' as const,
   },
   dropdownList: {

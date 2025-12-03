@@ -68,6 +68,39 @@ export const getApiUsageStats = async (): Promise<ApiUsageStats | null> => {
   }
 };
 
+/**
+ * Initialize API usage document (call from admin to create if doesn't exist)
+ */
+export const initializeApiUsageStats = async (): Promise<{ success: boolean; message: string }> => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const month = today.substring(0, 7);
+
+    const statsRef = doc(db, 'system', 'placesApiUsage');
+    const statsDoc = await getDoc(statsRef);
+
+    if (statsDoc.exists()) {
+      return { success: true, message: 'API usage document already exists' };
+    }
+
+    // Create initial document
+    await setDoc(statsRef, {
+      totalCalls: 0,
+      searchCalls: 0,
+      detailsCalls: 0,
+      photoCalls: 0,
+      lastUpdated: Timestamp.now(),
+      dailyCalls: { [today]: 0 },
+      monthlyCalls: { [month]: 0 },
+    });
+
+    return { success: true, message: 'API usage document created successfully' };
+  } catch (error: any) {
+    console.error('[PlacesService] Error initializing API usage stats:', error);
+    return { success: false, message: error.message || 'Failed to initialize API usage stats' };
+  }
+};
+
 // Types for Places API responses
 export interface PlaceSearchResult {
   placeId: string;

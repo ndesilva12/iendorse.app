@@ -17,7 +17,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, RefreshCw, TrendingUp, Search, MapPin, Image } from 'lucide-react-native';
-import { getApiUsageStats } from '@/services/firebase/placesService';
+import { getApiUsageStats, initializeApiUsageStats } from '@/services/firebase/placesService';
 
 // Admin email whitelist
 const ADMIN_EMAILS = ['normancdesilva@gmail.com'];
@@ -34,6 +34,7 @@ export default function ApiUsageAdmin() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
@@ -59,6 +60,22 @@ export default function ApiUsageAdmin() {
     setIsRefreshing(true);
     await loadStats();
     setIsRefreshing(false);
+  };
+
+  const handleInitialize = async () => {
+    setIsInitializing(true);
+    try {
+      const result = await initializeApiUsageStats();
+      if (result.success) {
+        await loadStats();
+      }
+      alert(result.message);
+    } catch (error: any) {
+      console.error('[ApiUsageAdmin] Error initializing stats:', error);
+      alert(error.message || 'Failed to initialize stats');
+    } finally {
+      setIsInitializing(false);
+    }
   };
 
   const getUsagePercentage = (used: number, limit: number): number => {
@@ -234,12 +251,23 @@ export default function ApiUsageAdmin() {
             <TrendingUp size={48} color="#ccc" strokeWidth={1.5} />
             <Text style={styles.emptyTitle}>No Data Available</Text>
             <Text style={styles.emptyText}>
-              API usage statistics will appear here once API calls are made.
+              API usage statistics will appear here once API calls are made. Click "Initialize Stats" to create the tracking document.
             </Text>
-            <TouchableOpacity style={styles.refreshButtonLarge} onPress={handleRefresh}>
-              <RefreshCw size={18} color="#fff" strokeWidth={2} />
-              <Text style={styles.refreshButtonLargeText}>Refresh</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+              <TouchableOpacity
+                style={[styles.refreshButtonLarge, { backgroundColor: '#10B981' }]}
+                onPress={handleInitialize}
+                disabled={isInitializing}
+              >
+                <Text style={styles.refreshButtonLargeText}>
+                  {isInitializing ? 'Initializing...' : 'Initialize Stats'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.refreshButtonLarge} onPress={handleRefresh}>
+                <RefreshCw size={18} color="#fff" strokeWidth={2} />
+                <Text style={styles.refreshButtonLargeText}>Refresh</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>
