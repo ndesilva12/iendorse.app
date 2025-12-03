@@ -250,7 +250,7 @@ export default function MenuButton() {
               </View>
 
               {/* Bonus Info */}
-              <View style={[styles.bonusInfoBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+              <View style={[styles.bonusInfoBox, { backgroundColor: 'transparent', borderColor: colors.primary }]}>
                 <Text style={[styles.bonusInfoText, { color: colors.text }]}>
                   Get all of your endorsements backdated by <Text style={{ fontWeight: '700', color: colors.primary }}>7 DAYS</Text> for each successful referral!
                 </Text>
