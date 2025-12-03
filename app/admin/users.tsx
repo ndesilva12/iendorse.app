@@ -99,6 +99,7 @@ export default function UsersManagement() {
   const [createDescription, setCreateDescription] = useState('');
   const [createLocation, setCreateLocation] = useState('');
   const [createProfileImageUrl, setCreateProfileImageUrl] = useState('');
+  const [createCoverImageUrl, setCreateCoverImageUrl] = useState('');
   const [createCauses, setCreateCauses] = useState('');
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
@@ -119,10 +120,13 @@ export default function UsersManagement() {
   const [formLatitude, setFormLatitude] = useState('');
   const [formLongitude, setFormLongitude] = useState('');
   const [formProfileImageUrl, setFormProfileImageUrl] = useState('');
+  const [formCoverImageUrl, setFormCoverImageUrl] = useState('');
 
   // Upload states
   const [editProfileUploading, setEditProfileUploading] = useState(false);
+  const [editCoverUploading, setEditCoverUploading] = useState(false);
   const [createProfileUploading, setCreateProfileUploading] = useState(false);
+  const [createCoverUploading, setCreateCoverUploading] = useState(false);
 
   // Form state - Social Media
   const [formFacebook, setFormFacebook] = useState('');
@@ -297,6 +301,7 @@ export default function UsersManagement() {
     setFormLatitude(details.latitude?.toString() || '');
     setFormLongitude(details.longitude?.toString() || '');
     setFormProfileImageUrl((details as any).profileImage || '');
+    setFormCoverImageUrl((details as any).coverImage || '');
 
     // Social media
     const social = details.socialMedia || {};
@@ -901,6 +906,9 @@ export default function UsersManagement() {
       if (formProfileImageUrl?.trim()) {
         userDetails.profileImage = formProfileImageUrl.trim();
       }
+      if (formCoverImageUrl?.trim()) {
+        userDetails.coverImage = formCoverImageUrl.trim();
+      }
       if (Object.keys(socialMedia).length > 0) {
         userDetails.socialMedia = socialMedia;
       }
@@ -1170,7 +1178,7 @@ export default function UsersManagement() {
       }
 
       // Add userDetails if any profile fields are filled
-      if (createName.trim() || createDescription.trim() || createLocation.trim() || createProfileImageUrl.trim()) {
+      if (createName.trim() || createDescription.trim() || createLocation.trim() || createProfileImageUrl.trim() || createCoverImageUrl.trim()) {
         newUserData.userDetails = {};
         if (createName.trim()) {
           newUserData.userDetails.name = createName.trim();
@@ -1183,6 +1191,9 @@ export default function UsersManagement() {
         }
         if (createProfileImageUrl.trim()) {
           newUserData.userDetails.profileImage = createProfileImageUrl.trim();
+        }
+        if (createCoverImageUrl.trim()) {
+          newUserData.userDetails.coverImage = createCoverImageUrl.trim();
         }
       }
 
@@ -1197,6 +1208,7 @@ export default function UsersManagement() {
       setCreateDescription('');
       setCreateLocation('');
       setCreateProfileImageUrl('');
+      setCreateCoverImageUrl('');
       setCreateCauses('');
       setShowCreateModal(false);
 
@@ -1503,6 +1515,39 @@ export default function UsersManagement() {
               </View>
               {formProfileImageUrl ? (
                 <Image source={{ uri: formProfileImageUrl }} style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 12, alignSelf: 'center' }} />
+              ) : null}
+
+              <Text style={styles.label}>Cover Image</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="https://example.com/cover.jpg"
+                  value={formCoverImageUrl}
+                  onChangeText={setFormCoverImageUrl}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  style={[styles.uploadButton, editCoverUploading && { opacity: 0.5 }]}
+                  onPress={async () => {
+                    if (!editingUser?.userId) return;
+                    setEditCoverUploading(true);
+                    const url = await pickAndUploadImage(editingUser.userId, 'cover', [16, 9]);
+                    if (url) {
+                      setFormCoverImageUrl(url);
+                    }
+                    setEditCoverUploading(false);
+                  }}
+                  disabled={editCoverUploading}
+                >
+                  {editCoverUploading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.uploadButtonText}>Upload</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {formCoverImageUrl ? (
+                <Image source={{ uri: formCoverImageUrl }} style={{ width: '100%', height: 80, borderRadius: 8, marginBottom: 12 }} />
               ) : null}
 
               {/* SOCIAL MEDIA */}
@@ -2230,6 +2275,42 @@ export default function UsersManagement() {
                 <Image source={{ uri: createProfileImageUrl }} style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 12, alignSelf: 'center' }} />
               ) : null}
 
+              <Text style={styles.label}>Cover Image</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="https://example.com/cover.jpg"
+                  value={createCoverImageUrl}
+                  onChangeText={setCreateCoverImageUrl}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  style={[styles.uploadButton, createCoverUploading && { opacity: 0.5 }]}
+                  onPress={async () => {
+                    if (!createUserId.trim()) {
+                      Alert.alert('User ID Required', 'Please enter a User ID first to upload images.');
+                      return;
+                    }
+                    setCreateCoverUploading(true);
+                    const url = await pickAndUploadImage(createUserId.trim(), 'cover', [16, 9]);
+                    if (url) {
+                      setCreateCoverImageUrl(url);
+                    }
+                    setCreateCoverUploading(false);
+                  }}
+                  disabled={createCoverUploading}
+                >
+                  {createCoverUploading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.uploadButtonText}>Upload</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {createCoverImageUrl ? (
+                <Image source={{ uri: createCoverImageUrl }} style={{ width: '100%', height: 80, borderRadius: 8, marginBottom: 12 }} />
+              ) : null}
+
               <Text style={styles.sectionTitle}>💡 Values (Optional)</Text>
               <Text style={styles.helpText}>
                 Format: id|name|category|type (one per line). Type can be "support" or "avoid".
@@ -2279,6 +2360,7 @@ export default function UsersManagement() {
                     setCreateDescription('');
                     setCreateLocation('');
                     setCreateProfileImageUrl('');
+                    setCreateCoverImageUrl('');
                     setCreateCauses('');
                   }}
                 >
