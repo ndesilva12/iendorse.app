@@ -17,7 +17,7 @@ import { Search, MapPin, AlertCircle, ChevronDown, Map as MapIcon, X, Percent } 
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
 import { getBusinessesAcceptingDiscounts, calculateDistance, calculateAlignmentScore, normalizeScores, BusinessUser } from '@/services/firebase/businessService';
-import { getLogoUrl } from '@/lib/logo';
+import { getLogoUrl, getBusinessLogoUrl } from '@/lib/logo';
 import BusinessMapView from './BusinessMapView';
 
 type LocalDistanceOption = 1 | 5 | 10 | 25 | 50 | 100;
@@ -284,8 +284,8 @@ export default function BusinessesAcceptingDiscounts() {
   const renderBusinessCard = ({ item }: { item: BusinessUser }) => {
     const { businessInfo, distance } = item;
 
-    // Get logo URL
-    const logoUrl = businessInfo.logoUrl || (businessInfo.website ? getLogoUrl(businessInfo.website) : null);
+    // Get logo URL (avoids unreliable Google Places photos)
+    const logoUrl = getBusinessLogoUrl(businessInfo.logoUrl, businessInfo.website);
 
     // Get discount tiers
     const discountTiers = formatDiscountTiers(businessInfo);

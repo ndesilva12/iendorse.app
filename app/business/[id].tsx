@@ -25,7 +25,7 @@ import { useEffect, useState, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { BusinessInfo, Cause } from '@/types';
-import { getLogoUrl } from '@/lib/logo';
+import { getLogoUrl, getBusinessLogoUrl, isGooglePlacesPhotoUrl } from '@/lib/logo';
 import { calculateAlignmentScore } from '@/services/firebase/businessService';
 import { getUserLists, addEntryToList } from '@/services/firebase/listService';
 import { calculateSimilarityScore, getSimilarityLabel, normalizeSimilarityScores, normalizeBusinessScoresWithBrands, calculateBrandScore } from '@/lib/scoring';
@@ -609,10 +609,11 @@ export default function BusinessDetailScreen() {
     );
   }
 
-  // Use cover image for hero, otherwise fall back to uploaded logo, then generated logo
-  const coverSource = business.businessInfo.coverImageUrl || business.businessInfo.logoUrl || (business.businessInfo.website ? getLogoUrl(business.businessInfo.website) : getLogoUrl(''));
-  // Use uploaded logoUrl first, fallback to generated logo from website
-  const logoSource = business.businessInfo.logoUrl || (business.businessInfo.website ? getLogoUrl(business.businessInfo.website) : getLogoUrl(''));
+  // Use cover image for hero, otherwise fall back to uploaded logo (avoiding Google Places photos), then generated logo
+  const coverSource = business.businessInfo.coverImageUrl ||
+    getBusinessLogoUrl(business.businessInfo.logoUrl, business.businessInfo.website);
+  // Use uploaded logoUrl (avoiding Google Places photos), fallback to generated logo from website
+  const logoSource = getBusinessLogoUrl(business.businessInfo.logoUrl, business.businessInfo.website);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
