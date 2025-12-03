@@ -929,3 +929,78 @@ export const updateEndorsementMetrics = async (
 
   await updateDoc(docRef, updateData);
 };
+
+/**
+ * Migrate existing endorsement list entries to create endorsement history records
+ * This is needed for entries that were added before the tracking system was implemented
+ */
+export const migrateEndorsementHistory = async (
+  userId: string,
+  entries: Array<{
+    type: 'brand' | 'business' | 'place' | 'value';
+    entityId: string;
+    entityName: string;
+    createdAt: Date;
+    position: number;
+  }>
+): Promise<{ created: number; existing: number }> => {
+  let created = 0;
+  let existing = 0;
+
+  for (const entry of entries) {
+    const historyId = generateHistoryId(userId, entry.type, entry.entityId);
+    const docRef = doc(db, ENDORSEMENT_HISTORY_COLLECTION, historyId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      existing++;
+      continue;
+    }
+
+    // Create new history record with the entry's creation date
+    const newPeriod: EndorsementPeriod = {
+      id: generatePeriodId(),
+      startDate: entry.createdAt,
+      endDate: null, // Currently active
+      startPosition: entry.position,
+      positionHistory: [],
+      daysInPeriod: 0,
+      daysInTop5: 0,
+      daysInTop10: 0,
+    };
+
+    const newHistory: Omit<EndorsementHistory, 'createdAt' | 'updatedAt'> = {
+      id: historyId,
+      userId,
+      entityType: entry.type,
+      entityId: entry.entityId,
+      entityName: entry.entityName,
+      totalDaysEndorsed: 0,
+      totalDaysInTop5: 0,
+      totalDaysInTop10: 0,
+      periods: [newPeriod],
+      isCurrentlyEndorsed: true,
+      currentPosition: entry.position,
+      currentPeriodStartDate: entry.createdAt,
+    };
+
+    await setDoc(docRef, {
+      ...newHistory,
+      periods: [{
+        ...newPeriod,
+        startDate: entry.createdAt,
+        endDate: null,
+        positionHistory: [],
+      }],
+      currentPeriodStartDate: entry.createdAt,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    created++;
+    console.log(`[EndorsementHistory] Created migration history for ${entry.entityName}`);
+  }
+
+  console.log(`[EndorsementHistory] Migration complete: ${created} created, ${existing} already existed`);
+  return { created, existing };
+};

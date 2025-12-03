@@ -26,7 +26,7 @@ import { getCustomFields, CustomField } from '@/services/firebase/customFieldsSe
 import { getUserLists, deleteList, removeEntryFromList, addEntryToList, updateEntryInList, getEndorsementList, createList, ensureEndorsementList } from '@/services/firebase/listService';
 import { UserList, ListEntry } from '@/types/library';
 import { getFollowing, getFollowers, followEntity, unfollowEntity, Follow, FollowableType } from '@/services/firebase/followService';
-import { getCumulativeDays, updateEndorsementMetrics, handleBackdateEntry } from '@/services/firebase/endorsementHistoryService';
+import { getCumulativeDays, updateEndorsementMetrics, handleBackdateEntry, migrateEndorsementHistory } from '@/services/firebase/endorsementHistoryService';
 import { makeAllProfilesPublic } from '@/services/firebase/userService';
 import { Picker } from '@react-native-picker/picker';
 import { pickAndUploadImage } from '@/lib/imageUpload';
@@ -174,6 +174,7 @@ export default function UsersManagement() {
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [editingMetricsEntityId, setEditingMetricsEntityId] = useState<string | null>(null);
   const [editingMetricsValues, setEditingMetricsValues] = useState<{ top5: string; top10: string }>({ top5: '', top10: '' });
+  const [migratingHistory, setMigratingHistory] = useState(false);
 
   // Impersonation state
   const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
@@ -757,6 +758,73 @@ export default function UsersManagement() {
       } else {
         Alert.alert('Error', error?.message || 'Could not update metrics');
       }
+    }
+  };
+
+  // Migrate endorsement history for existing entries
+  const handleMigrateHistory = async () => {
+    if (!editingUser || !endorsementList || !endorsementList.entries) return;
+
+    setMigratingHistory(true);
+    try {
+      // Build entries for migration
+      const migrationEntries = endorsementList.entries
+        .map((entry, index) => {
+          let entityId: string | undefined;
+          let entityName = 'Unknown';
+          let entityType: 'brand' | 'business' | 'place' | 'value' | undefined;
+
+          if (entry.type === 'brand') {
+            entityId = (entry as any).brandId;
+            entityName = (entry as any).brandName || entityId || 'Unknown Brand';
+            entityType = 'brand';
+          } else if (entry.type === 'business') {
+            entityId = (entry as any).businessId;
+            entityName = (entry as any).businessName || entityId || 'Unknown Business';
+            entityType = 'business';
+          } else if (entry.type === 'place') {
+            entityId = (entry as any).placeId;
+            entityName = (entry as any).placeName || entityId || 'Unknown Place';
+            entityType = 'place';
+          } else if (entry.type === 'value') {
+            entityId = (entry as any).valueId;
+            entityName = (entry as any).valueName || entityId || 'Unknown Value';
+            entityType = 'value';
+          }
+
+          if (entityId && entityType) {
+            return {
+              type: entityType,
+              entityId,
+              entityName,
+              createdAt: entry.createdAt,
+              position: index + 1,
+            };
+          }
+          return null;
+        })
+        .filter((e): e is NonNullable<typeof e> => e !== null);
+
+      const result = await migrateEndorsementHistory(editingUser.userId, migrationEntries);
+
+      // Reload metrics
+      await loadUserEndorsements(editingUser.userId);
+
+      const message = `Migration complete: ${result.created} records created, ${result.existing} already existed.`;
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert('Migration Complete', message);
+      }
+    } catch (error: any) {
+      console.error('[Admin] Error migrating history:', error);
+      if (Platform.OS === 'web') {
+        window.alert(`Error: ${error.message || 'Could not migrate history'}`);
+      } else {
+        Alert.alert('Error', error.message || 'Could not migrate history');
+      }
+    } finally {
+      setMigratingHistory(false);
     }
   };
 
@@ -2044,14 +2112,25 @@ export default function UsersManagement() {
 
                   {expandedEndorsements && (
                     <View style={styles.endorsementContent}>
-                      <TouchableOpacity
-                        style={styles.addEndorsementButton}
-                        onPress={() => setAddingEndorsement(!addingEndorsement)}
-                      >
-                        <Text style={styles.addEndorsementButtonText}>
-                          {addingEndorsement ? 'Cancel' : '+ Add Endorsement'}
-                        </Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <TouchableOpacity
+                          style={styles.addEndorsementButton}
+                          onPress={() => setAddingEndorsement(!addingEndorsement)}
+                        >
+                          <Text style={styles.addEndorsementButtonText}>
+                            {addingEndorsement ? 'Cancel' : '+ Add Endorsement'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.addEndorsementButton, { backgroundColor: '#6c757d' }]}
+                          onPress={handleMigrateHistory}
+                          disabled={migratingHistory}
+                        >
+                          <Text style={styles.addEndorsementButtonText}>
+                            {migratingHistory ? 'Migrating...' : 'Migrate History'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
 
                       {addingEndorsement && (
                         <View style={styles.addEndorsementForm}>
