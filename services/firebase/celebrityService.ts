@@ -50,6 +50,7 @@ export interface CelebrityAccountData {
   twitter?: string; // Twitter/X handle (without @)
   instagram?: string; // Instagram handle (without @)
   profileImageUrl?: string; // Optional profile image URL
+  coverImageUrl?: string; // Optional cover/banner image URL
   endorsements: CelebrityEndorsement[] | string[]; // Can be full endorsement objects or just business names
 }
 
@@ -134,6 +135,7 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
     if (data.location) userDetails.location = data.location;
     if (data.website) userDetails.website = data.website;
     if (data.profileImageUrl) userDetails.profileImage = data.profileImageUrl;
+    if (data.coverImageUrl) userDetails.coverImage = data.coverImageUrl;
 
     const userProfile: Partial<UserProfile> = {
       id: userId,

@@ -317,6 +317,8 @@ export default function UserProfileScreen() {
   const userName = userDetails?.name || 'User';
   const isOwnProfile = userId === clerkUser?.id;
   const profileImageUrl = userDetails?.profileImage;
+  // Use cover image if available, otherwise fall back to profile image
+  const coverImageUrl = userDetails?.coverImage || profileImageUrl;
 
   const handleFollowUser = async () => {
     if (!clerkUser?.id) {
@@ -397,7 +399,7 @@ export default function UserProfileScreen() {
         {/* Hero Image Container */}
         <View style={styles.heroImageContainer}>
           <Image
-            source={{ uri: profileImageUrl || 'https://via.placeholder.com/800x130/4A90E2/FFFFFF?text=Profile' }}
+            source={{ uri: coverImageUrl || 'https://via.placeholder.com/800x130/4A90E2/FFFFFF?text=Profile' }}
             style={styles.heroImage}
             contentFit="cover"
             transition={200}
