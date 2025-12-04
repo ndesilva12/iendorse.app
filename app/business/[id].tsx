@@ -1055,6 +1055,8 @@ export default function BusinessDetailScreen() {
             )}
           </View>
 
+          {/* Why Section - Hidden for business accounts since they don't have values */}
+          {profile?.accountType !== 'business' && (
           <View style={[styles.alignmentCard, { backgroundColor: colors.backgroundSecondary }]}>
             <View style={styles.alignmentLabelRow}>
               <Text style={[styles.alignmentLabel, { color: colors.text }]}>
@@ -1136,6 +1138,7 @@ export default function BusinessDetailScreen() {
               </Text>
             )}
           </View>
+          )}
 
           {/* Endorsements Section */}
           <View style={styles.section}>

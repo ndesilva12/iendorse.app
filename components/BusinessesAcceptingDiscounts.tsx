@@ -532,6 +532,7 @@ export default function BusinessesAcceptingDiscounts() {
                     setShowMapModal(false);
                     router.push(`/business/${businessId}`);
                   }}
+                  isBusinessAccount={profile?.accountType === 'business'}
                 />
               ) : (
                 <View style={styles.mapModalEmpty}>

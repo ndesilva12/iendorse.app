@@ -857,6 +857,8 @@ export default function BrandDetailScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Why Section - Hidden for business accounts since they don't have values */}
+          {profile?.accountType !== 'business' && (
           <View style={[styles.alignmentCard, { backgroundColor: colors.backgroundSecondary }]}>
             <View style={styles.alignmentLabelRow}>
               <Text style={[styles.alignmentLabel, { color: colors.text }]}>
@@ -937,6 +939,7 @@ export default function BrandDetailScreen() {
               </Text>
             )}
           </View>
+          )}
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Money Flow</Text>
