@@ -3082,11 +3082,11 @@ export default function UnifiedLibrary({
                   />
                 ) : (
                   <TouchableOpacity
-                    style={[styles.editableRankBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
+                    style={[styles.editableRankBadge, { backgroundColor: colors.primary, borderColor: colors.primary }]}
                     onPress={() => startEditingRank(index)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.editableRankText, { color: colors.primary }]}>
+                    <Text style={[styles.editableRankText, { color: '#FFFFFF' }]}>
                       {index + 1}
                     </Text>
                   </TouchableOpacity>
