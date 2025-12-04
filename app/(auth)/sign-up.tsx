@@ -94,8 +94,8 @@ export default function SignUpScreen() {
     }
   };
 
-  // If already signed in, show option to sign out
-  if (authLoaded && isSignedIn) {
+  // Show loading state while auth is loading to prevent flash
+  if (!authLoaded) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
         <View style={styles.alreadySignedInContainer}>
@@ -104,34 +104,24 @@ export default function SignUpScreen() {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={[styles.alreadySignedInTitle, { color: colors.text }]}>
-            You're already signed in
-          </Text>
-          <Text style={[styles.alreadySignedInSubtitle, { color: colors.textSecondary }]}>
-            Sign out first to create a new account
-          </Text>
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary, marginTop: 24 }]}
-            onPress={() => router.replace('/')}
-          >
-            <Text style={styles.buttonText}>Continue to App</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.signOutButton, { backgroundColor: colors.danger }]}
-            onPress={handleForceSignOut}
-            disabled={isSigningOut}
-          >
-            {isSigningOut ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <LogOut size={20} color="#fff" strokeWidth={2} />
-                <Text style={styles.buttonText}>Sign Out</Text>
-              </>
-            )}
-          </TouchableOpacity>
+  // If already signed in, redirect to home immediately
+  if (isSignedIn) {
+    router.replace('/');
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+        <View style={styles.alreadySignedInContainer}>
+          <Image
+            source={require('@/assets/images/endorsing.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
         </View>
       </SafeAreaView>
     );

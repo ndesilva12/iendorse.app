@@ -309,3 +309,76 @@ function calculateDistance(
 function toRad(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
+
+/**
+ * Get endorsement count for a single business
+ * @param businessId - The business ID to check
+ * @returns The endorsement count for this business
+ */
+export async function getBusinessEndorsementCount(businessId: string): Promise<number> {
+  try {
+    // Fetch all user lists from Firebase
+    const userListsRef = collection(db, 'userLists');
+    const userListsSnapshot = await getDocs(userListsRef);
+
+    let endorsementCount = 0;
+
+    // Process each list
+    userListsSnapshot.forEach((docSnap) => {
+      const listData = docSnap.data();
+
+      // Only process lists that have entries
+      if (!listData.entries || !Array.isArray(listData.entries)) return;
+
+      // Check if this business is in the list
+      listData.entries.forEach((entry: any) => {
+        if (entry.type === 'business' && entry.businessId === businessId) {
+          endorsementCount += 1;
+        }
+      });
+    });
+
+    return endorsementCount;
+  } catch (error) {
+    console.error('[TopRankings] Error getting business endorsement count:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get endorsement counts for multiple businesses (more efficient than calling single function multiple times)
+ * @param businessIds - Array of business IDs to check
+ * @returns Map of businessId -> endorsementCount
+ */
+export async function getBusinessesEndorsementCounts(businessIds: string[]): Promise<Map<string, number>> {
+  try {
+    // Fetch all user lists from Firebase
+    const userListsRef = collection(db, 'userLists');
+    const userListsSnapshot = await getDocs(userListsRef);
+
+    const endorsementCounts = new Map<string, number>();
+    // Initialize all counts to 0
+    businessIds.forEach(id => endorsementCounts.set(id, 0));
+
+    // Process each list
+    userListsSnapshot.forEach((docSnap) => {
+      const listData = docSnap.data();
+
+      // Only process lists that have entries
+      if (!listData.entries || !Array.isArray(listData.entries)) return;
+
+      // Check for business entries
+      listData.entries.forEach((entry: any) => {
+        if (entry.type === 'business' && entry.businessId && businessIds.includes(entry.businessId)) {
+          const currentCount = endorsementCounts.get(entry.businessId) || 0;
+          endorsementCounts.set(entry.businessId, currentCount + 1);
+        }
+      });
+    });
+
+    return endorsementCounts;
+  } catch (error) {
+    console.error('[TopRankings] Error getting businesses endorsement counts:', error);
+    return new Map();
+  }
+}

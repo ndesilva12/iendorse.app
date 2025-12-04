@@ -212,14 +212,23 @@ export default function OnboardingScreen() {
   // Welcome modal state
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
+  // Track if we've determined the account type (prevents flash of values screen for business users)
+  const [accountTypeDetermined, setAccountTypeDetermined] = useState(false);
+
   // Update step when isBusinessUser is determined (handles late-loading params)
   useEffect(() => {
+    // Wait for profile to finish loading before determining account type
+    if (isLoading) return;
+
     if (isBusinessUser && currentStep === 'select_values' && !hasSubmittedClaim) {
       console.log('[Onboarding] Business user detected, switching to claim step');
       setCurrentStep('claim_business');
       setIsCheckingClaims(true);
     }
-  }, [isBusinessUser]);
+
+    // Mark account type as determined once we know for sure
+    setAccountTypeDetermined(true);
+  }, [isBusinessUser, isLoading]);
 
   // Check if business user already has claims
   useEffect(() => {
@@ -450,8 +459,9 @@ export default function OnboardingScreen() {
     });
   };
 
-  // Show loading while checking claims for business users
-  if (isCheckingClaims) {
+  // Show loading while checking claims for business users OR while profile/account type is still loading
+  // This prevents the values selection page from flashing for business users
+  if (isCheckingClaims || isLoading || !accountTypeDetermined) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>

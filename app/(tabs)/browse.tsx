@@ -25,6 +25,7 @@ import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/business
 import { calculateBrandScore, normalizeBrandScores } from '@/lib/scoring';
 import { getLogoUrl } from '@/lib/logo';
 import LocalBusinessView from '@/components/Library/LocalBusinessView';
+import { getTopBrands } from '@/services/firebase/topRankingsService';
 import { useLibrary } from '@/contexts/LibraryContext';
 import { followEntity, unfollowEntity, isFollowing as checkIsFollowing } from '@/services/firebase/followService';
 import { addEntryToList, removeEntryFromList } from '@/services/firebase/listService';
@@ -142,6 +143,9 @@ export default function BrowseScreen() {
   const [loadingLocalSearch, setLoadingLocalSearch] = useState(false);
   const localSearchDebounce = useRef<NodeJS.Timeout | null>(null);
 
+  // Top brands for when user has no causes (order by endorsements)
+  const [topBrandsData, setTopBrandsData] = useState<Map<string, number>>(new Map());
+
   // Fetch user businesses
   const fetchUserBusinesses = useCallback(async () => {
     try {
@@ -155,6 +159,27 @@ export default function BrowseScreen() {
   useEffect(() => {
     fetchUserBusinesses();
   }, [fetchUserBusinesses]);
+
+  // Fetch top brands for endorsement-based ordering when user has no causes
+  useEffect(() => {
+    const fetchTopBrandsForOrdering = async () => {
+      // Only fetch if user has no causes (like business accounts)
+      if (!profile.causes || profile.causes.length === 0) {
+        try {
+          const topBrands = await getTopBrands(200);
+          const endorsementMap = new Map<string, number>();
+          topBrands.forEach((item, index) => {
+            // Use the score as endorsement ranking (higher score = more endorsements)
+            endorsementMap.set(item.id, item.score);
+          });
+          setTopBrandsData(endorsementMap);
+        } catch (error) {
+          console.error('[Browse] Error fetching top brands:', error);
+        }
+      }
+    };
+    fetchTopBrandsForOrdering();
+  }, [profile.causes]);
 
   // Auto-fetch location on mount if permission already granted
   useEffect(() => {
@@ -427,6 +452,30 @@ export default function BrowseScreen() {
       };
     }
 
+    // If user has no causes (like business accounts), order by endorsements
+    const userHasNoCauses = !profile.causes || profile.causes.length === 0;
+
+    if (userHasNoCauses && topBrandsData.size > 0) {
+      // Sort by endorsement score (higher = more endorsed)
+      const sortedByEndorsements = [...currentBrands].sort((a, b) => {
+        const scoreA = topBrandsData.get(a.id) || 0;
+        const scoreB = topBrandsData.get(b.id) || 0;
+        return scoreB - scoreA;
+      });
+
+      // All brands are "aligned" since there's no values to compare
+      const topBrands = sortedByEndorsements.slice(0, 50);
+      const scoredMap = new Map<string, number>();
+      // Set a neutral score of 50 for all brands when no values
+      currentBrands.forEach(brand => scoredMap.set(brand.id, 50));
+
+      return {
+        allSupport: topBrands,
+        allAvoid: [], // No "unaligned" when there's no causes
+        scoredBrands: scoredMap,
+      };
+    }
+
     const brandsWithScores = currentBrands.map(brand => {
       const score = calculateBrandScore(brand.name, profile.causes || [], valuesMatrix);
       return { brand, score };
@@ -444,7 +493,7 @@ export default function BrowseScreen() {
       allAvoid: unalignedBrands,
       scoredBrands: scoredMap,
     };
-  }, [brands, profile.causes, valuesMatrix]);
+  }, [brands, profile.causes, valuesMatrix, topBrandsData]);
 
   // Transform Firebase values into the format expected by the UI
   const availableValues = useMemo(() => {
@@ -727,6 +776,7 @@ export default function BrowseScreen() {
   const renderBrandCard = (brand: Product, index: number) => {
     const score = scoredBrands.get(brand.id) || 0;
     const scoreColor = score >= 50 ? colors.primary : colors.danger;
+    const userHasNoCauses = !profile.causes || profile.causes.length === 0;
 
     return (
       <View key={brand.id} style={{ position: 'relative', marginBottom: 4 }}>
@@ -756,11 +806,14 @@ export default function BrowseScreen() {
                 {brand.category || 'Brand'}
               </Text>
             </View>
-            <View style={styles.brandScoreContainer}>
-              <Text style={[styles.brandScore, { color: scoreColor }]}>
-                {Math.round(score)}
-              </Text>
-            </View>
+            {/* Only show score if user has causes/values */}
+            {!userHasNoCauses && (
+              <View style={styles.brandScoreContainer}>
+                <Text style={[styles.brandScore, { color: scoreColor }]}>
+                  {Math.round(score)}
+                </Text>
+              </View>
+            )}
             {/* Action Menu Button - Opens Modal */}
             <TouchableOpacity
               style={styles.actionMenuButton}
