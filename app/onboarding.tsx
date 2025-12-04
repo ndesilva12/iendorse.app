@@ -110,15 +110,17 @@ export default function OnboardingScreen() {
   // Redirect users who have already completed onboarding
   // This handles the case where a user's claim was approved while they were offline
   // OR an existing business user who already has values selected
+  // Business accounts don't need values - they can proceed without them
   useEffect(() => {
-    if (!isLoading && profile?.causes?.length > 0) {
-      // User has completed values selection - they should go to browse tab
-      // Business users don't NEED businessInfo to use the app
-      console.log('[Onboarding] User already has causes, redirecting to browse');
-      router.replace('/(tabs)/browse');
-      return;
+    if (!isLoading) {
+      // Regular users need causes to proceed
+      if (profile?.accountType !== 'business' && profile?.causes?.length > 0) {
+        console.log('[Onboarding] User already has causes, redirecting to browse');
+        router.replace('/(tabs)/browse');
+        return;
+      }
     }
-  }, [isLoading, profile?.causes?.length]);
+  }, [isLoading, profile?.causes?.length, profile?.accountType]);
 
   // Handler to exit onboarding and sign out
   const handleExitOnboarding = async () => {
@@ -230,9 +232,11 @@ export default function OnboardingScreen() {
       try {
         const claims = await getClaimsByUser(clerkUser.id);
         if (claims.length > 0) {
-          console.log('[Onboarding] Business user already has claims, skipping to values');
+          console.log('[Onboarding] Business user already has claims, going to browse');
           setHasSubmittedClaim(true);
-          setCurrentStep('select_values');
+          // Business users skip values selection - go directly to browse
+          router.replace('/(tabs)/browse');
+          return;
         }
       } catch (error) {
         console.error('[Onboarding] Error checking claims:', error);
@@ -347,8 +351,8 @@ export default function OnboardingScreen() {
       return;
     }
 
-    if (!businessEmail.trim() && !businessPhone.trim()) {
-      Alert.alert('Required', 'Please provide a business email or phone number for verification');
+    if (!businessPhone.trim()) {
+      Alert.alert('Required', 'Please provide a business phone number for verification');
       return;
     }
 
@@ -372,8 +376,9 @@ export default function OnboardingScreen() {
       console.log('[Onboarding] Business claim submitted successfully');
       setHasSubmittedClaim(true);
 
-      // Navigate directly to values selection - no Alert needed for web compatibility
-      setCurrentStep('select_values');
+      // Business users skip values selection - go directly to browse
+      console.log('[Onboarding] Business user - skipping values selection, going to browse');
+      router.replace('/(tabs)/browse');
     } catch (error: any) {
       console.error('[Onboarding] Error submitting claim:', error);
       Alert.alert('Error', error?.message || 'Failed to submit claim. Please try again.');
@@ -498,7 +503,7 @@ export default function OnboardingScreen() {
               </View>
             </View>
             <View style={[styles.stepIndicator, { backgroundColor: colors.backgroundSecondary }]}>
-              <Text style={[styles.stepText, { color: colors.primary }]}>Step 1 of 2</Text>
+              <Text style={[styles.stepText, { color: colors.primary }]}>Claim Your Business</Text>
             </View>
             <Text style={[styles.title, { color: colors.text }]}>Claim Your Business</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -623,20 +628,7 @@ export default function OnboardingScreen() {
                 </View>
 
                 <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: colors.text }]}>Business Email</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="contact@yourbusiness.com"
-                    placeholderTextColor={colors.textSecondary}
-                    value={businessEmail}
-                    onChangeText={setBusinessEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: colors.text }]}>Business Phone</Text>
+                  <Text style={[styles.label, { color: colors.text }]}>Business Phone *</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
                     placeholder="(555) 123-4567"
@@ -671,11 +663,11 @@ export default function OnboardingScreen() {
             <TouchableOpacity
               style={[
                 styles.continueButton,
-                { backgroundColor: selectedPlace && businessRole.trim() && (businessEmail.trim() || businessPhone.trim()) ? colors.primary : colors.neutral },
-                (!selectedPlace || !businessRole.trim() || (!businessEmail.trim() && !businessPhone.trim())) && { opacity: 0.5 }
+                { backgroundColor: selectedPlace && businessRole.trim() && businessPhone.trim() ? colors.primary : colors.neutral },
+                (!selectedPlace || !businessRole.trim() || !businessPhone.trim()) && { opacity: 0.5 }
               ]}
               onPress={handleSubmitClaim}
-              disabled={isSubmittingClaim || !selectedPlace || !businessRole.trim() || (!businessEmail.trim() && !businessPhone.trim())}
+              disabled={isSubmittingClaim || !selectedPlace || !businessRole.trim() || !businessPhone.trim()}
               activeOpacity={0.8}
             >
               {isSubmittingClaim ? (

@@ -144,8 +144,8 @@ export default function BusinessSetupScreen() {
       return;
     }
 
-    if (!businessEmail.trim() && !businessPhone.trim()) {
-      Alert.alert('Required', 'Please provide a business email or phone number for verification');
+    if (!businessPhone.trim()) {
+      Alert.alert('Required', 'Please provide a business phone number for verification');
       return;
     }
 
@@ -457,20 +457,7 @@ export default function BusinessSetupScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Business Email</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
-                  placeholder="contact@yourbusiness.com"
-                  placeholderTextColor={colors.textSecondary}
-                  value={businessEmail}
-                  onChangeText={setBusinessEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Business Phone</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Business Phone *</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, color: colors.text }]}
                   placeholder="(555) 123-4567"
@@ -500,16 +487,16 @@ export default function BusinessSetupScreen() {
             <TouchableOpacity
               style={[
                 styles.submitButton,
-                { backgroundColor: businessRole.trim() && (businessEmail.trim() || businessPhone.trim()) ? colors.primary : colors.border }
+                { backgroundColor: businessRole.trim() && businessPhone.trim() ? colors.primary : colors.border }
               ]}
               onPress={handleSubmitClaim}
-              disabled={isSubmitting || !businessRole.trim() || (!businessEmail.trim() && !businessPhone.trim())}
+              disabled={isSubmitting || !businessRole.trim() || !businessPhone.trim()}
               activeOpacity={0.8}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={[styles.submitButtonText, { color: businessRole.trim() && (businessEmail.trim() || businessPhone.trim()) ? '#FFFFFF' : colors.textSecondary }]}>
+                <Text style={[styles.submitButtonText, { color: businessRole.trim() && businessPhone.trim() ? '#FFFFFF' : colors.textSecondary }]}>
                   Submit Claim
                 </Text>
               )}

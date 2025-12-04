@@ -14,6 +14,7 @@ type Props = {
   userLocation: { latitude: number; longitude: number } | null;
   distanceRadius: number; // in miles
   onBusinessPress?: (businessId: string) => void;
+  isBusinessAccount?: boolean; // Hide score badges for business accounts
 };
 
 type SelectedBusiness = {
@@ -161,7 +162,7 @@ const mutedMapStyle = [
   }
 ];
 
-export default function BusinessMapView({ businesses, userLocation, distanceRadius, onBusinessPress }: Props) {
+export default function BusinessMapView({ businesses, userLocation, distanceRadius, onBusinessPress, isBusinessAccount }: Props) {
   const [selectedBusiness, setSelectedBusiness] = useState<SelectedBusiness>(null);
 
   // Calculate the appropriate zoom/delta based on distance radius
@@ -277,7 +278,8 @@ export default function BusinessMapView({ businesses, userLocation, distanceRadi
               </View>
 
               <View style={styles.selectionBody}>
-                {/* Alignment Score Badge */}
+                {/* Alignment Score Badge - Hidden for business accounts */}
+                {!isBusinessAccount && (
                 <View style={[
                   styles.scoreBadge,
                   { backgroundColor: (selectedBusiness.alignmentScore ?? 50) >= 50 ? '#22C55E15' : '#EF444415' }
@@ -294,6 +296,7 @@ export default function BusinessMapView({ businesses, userLocation, distanceRadi
                     Score: {selectedBusiness.alignmentScore ?? 50}
                   </Text>
                 </View>
+                )}
 
                 {/* Address */}
                 <View style={styles.addressContainer}>
