@@ -595,18 +595,23 @@ export default function BusinessesManagement() {
     // Confirm deletion
     const confirmMessage = `Are you sure you want to delete business "${business.businessName}"?\n\nThis will:\n- Delete the business account from Firebase\n- Delete all business data, transactions, etc.\n\nThis action CANNOT be undone!`;
 
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(confirmMessage)
-      : await new Promise((resolve) => {
-          Alert.alert(
-            'Delete Business',
-            confirmMessage,
-            [
-              { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
-              { text: 'Delete', onPress: () => resolve(true), style: 'destructive' }
-            ]
-          );
-        });
+    let confirmed = false;
+
+    if (Platform.OS === 'web') {
+      confirmed = window.confirm(confirmMessage);
+    } else {
+      confirmed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Delete Business',
+          confirmMessage,
+          [
+            { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
+            { text: 'Delete', onPress: () => resolve(true), style: 'destructive' }
+          ],
+          { cancelable: false }
+        );
+      });
+    }
 
     if (!confirmed) return;
 

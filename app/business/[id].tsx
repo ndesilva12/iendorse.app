@@ -15,6 +15,7 @@ import {
   Share,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { lightColors, darkColors } from '@/constants/colors';
 import { AVAILABLE_VALUES } from '@/mocks/causes';
@@ -1538,7 +1539,7 @@ export default function BusinessDetailScreen() {
         transparent={false}
         onRequestClose={() => setShowFollowersModal(false)}
       >
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.modalSafeArea, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Followers</Text>
             <TouchableOpacity onPress={() => setShowFollowersModal(false)}>
@@ -1556,7 +1557,7 @@ export default function BusinessDetailScreen() {
               />
             )}
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Following Modal */}
@@ -1566,7 +1567,7 @@ export default function BusinessDetailScreen() {
         transparent={false}
         onRequestClose={() => setShowFollowingModal(false)}
       >
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.modalSafeArea, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Following</Text>
             <TouchableOpacity onPress={() => setShowFollowingModal(false)}>
@@ -1583,7 +1584,7 @@ export default function BusinessDetailScreen() {
               />
             )}
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
     </View>
@@ -1594,6 +1595,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
+  },
+  modalSafeArea: {
+    flex: 1,
   },
   webWrapper: {
     flex: 1,
