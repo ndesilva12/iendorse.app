@@ -705,10 +705,15 @@ export default function BusinessDetailScreen() {
               )}
             </View>
             <View style={[styles.scoreContainer, { position: 'relative', zIndex: showActionMenu ? 1000 : 1 }]}>
-              <View style={[styles.endorsementBadge, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-                <Users size={16} color={colors.primary} strokeWidth={2} />
-                <Text style={[styles.endorsementBadgeText, { color: colors.primary }]}>
-                  {businessEndorsementCount}
+              <View style={styles.endorsementBadgeContainer}>
+                <View style={[styles.endorsementBadge, { backgroundColor: 'transparent', borderColor: colors.primary }]}>
+                  <Users size={16} color={colors.primary} strokeWidth={2} />
+                  <Text style={[styles.endorsementBadgeText, { color: colors.primary }]}>
+                    {businessEndorsementCount}
+                  </Text>
+                </View>
+                <Text style={[styles.endorsementBadgeLabel, { color: colors.textSecondary }]}>
+                  endorsements
                 </Text>
               </View>
               <TouchableOpacity
@@ -1073,90 +1078,6 @@ export default function BusinessDetailScreen() {
             )}
           </View>
 
-          {/* Why Section - Hidden for business accounts since they don't have values */}
-          {profile?.accountType !== 'business' && (
-          <View style={[styles.alignmentCard, { backgroundColor: colors.backgroundSecondary }]}>
-            <View style={styles.alignmentLabelRow}>
-              <Text style={[styles.alignmentLabel, { color: colors.text }]}>
-                Why
-              </Text>
-            </View>
-
-            {/* Aligned Values Section */}
-            {alignmentData.alignedValues.length > 0 && (
-              <View style={styles.whySubsection}>
-                <View style={styles.whySubsectionHeader}>
-                  <TrendingUp size={16} color={colors.success} strokeWidth={2} />
-                  <Text style={[styles.whySubsectionTitle, { color: colors.success }]}>
-                    Aligned ({alignmentData.alignedValues.length})
-                  </Text>
-                </View>
-                <View style={styles.valueTagsContainer}>
-                  {alignmentData.alignedValues.map((item) => {
-                    const allValues = Object.values(AVAILABLE_VALUES).flat();
-                    const value = allValues.find(v => v.id === item.id);
-                    if (!value) return null;
-
-                    const tagColor = item.userStance === 'support' ? colors.success : colors.danger;
-                    const stanceLabel = item.userStance === 'support' ? 'Both support' : 'Both oppose';
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[styles.valueTag, { backgroundColor: tagColor + '15' }]}
-                        onPress={() => router.push(`/value/${item.id}`)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.valueTagText, { color: tagColor }]}>
-                          {value.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {/* Unaligned Values Section */}
-            {alignmentData.unalignedValues.length > 0 && (
-              <View style={[styles.whySubsection, alignmentData.alignedValues.length > 0 && { marginTop: 16 }]}>
-                <View style={styles.whySubsectionHeader}>
-                  <TrendingDown size={16} color={colors.danger} strokeWidth={2} />
-                  <Text style={[styles.whySubsectionTitle, { color: colors.danger }]}>
-                    Not Aligned ({alignmentData.unalignedValues.length})
-                  </Text>
-                </View>
-                <View style={styles.valueTagsContainer}>
-                  {alignmentData.unalignedValues.map((item) => {
-                    const allValues = Object.values(AVAILABLE_VALUES).flat();
-                    const value = allValues.find(v => v.id === item.id);
-                    if (!value) return null;
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[styles.valueTag, { backgroundColor: colors.danger + '15' }]}
-                        onPress={() => router.push(`/value/${item.id}`)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.valueTagText, { color: colors.danger }]}>
-                          {value.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {/* Show message if no shared values */}
-            {alignmentData.alignedValues.length === 0 && alignmentData.unalignedValues.length === 0 && (
-              <Text style={[styles.noValuesText, { color: colors.textSecondary }]}>
-                No shared values to compare
-              </Text>
-            )}
-          </View>
-          )}
 
           {/* Endorsements Section */}
           <View style={styles.section}>
@@ -1938,6 +1859,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700' as const,
   },
+  endorsementBadgeContainer: {
+    alignItems: 'center',
+  },
   endorsementBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1951,6 +1875,10 @@ const styles = StyleSheet.create({
   endorsementBadgeText: {
     fontSize: 16,
     fontWeight: '700' as const,
+  },
+  endorsementBadgeLabel: {
+    fontSize: 11,
+    marginTop: 2,
   },
   actionMenuButton: {
     width: 36,
@@ -2099,24 +2027,6 @@ const styles = StyleSheet.create({
   valueTagText: {
     fontSize: 13,
     fontWeight: '600' as const,
-  },
-  whySubsection: {
-    marginTop: 8,
-  },
-  whySubsectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-  },
-  whySubsectionTitle: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  noValuesText: {
-    fontSize: 14,
-    textAlign: 'center' as const,
-    paddingVertical: 12,
   },
   errorContainer: {
     flex: 1,
