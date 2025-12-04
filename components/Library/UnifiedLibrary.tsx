@@ -351,6 +351,10 @@ export default function UnifiedLibrary({
   const [reorderingListId, setReorderingListId] = useState<string | null>(null);
   const [localEntries, setLocalEntries] = useState<ListEntry[]>([]);
 
+  // Editable rank state
+  const [editingRankIndex, setEditingRankIndex] = useState<number | null>(null);
+  const [editingRankValue, setEditingRankValue] = useState<string>('');
+
   // Cumulative days endorsed state (keyed by entityId)
   const [cumulativeDaysMap, setCumulativeDaysMap] = useState<Record<string, number>>({});
 
@@ -1300,6 +1304,38 @@ export default function UnifiedLibrary({
     const newEntries = [...localEntries];
     [newEntries[index], newEntries[index + 1]] = [newEntries[index + 1], newEntries[index]];
     setLocalEntries(newEntries);
+  };
+
+  // Start editing a rank number
+  const startEditingRank = (index: number) => {
+    setEditingRankIndex(index);
+    setEditingRankValue(String(index + 1));
+  };
+
+  // Handle rank input change
+  const handleRankChange = (value: string) => {
+    // Only allow numbers
+    const numericValue = value.replace(/[^0-9]/g, '');
+    setEditingRankValue(numericValue);
+  };
+
+  // Finish editing and move to new position
+  const finishEditingRank = () => {
+    if (editingRankIndex === null) return;
+
+    const newRank = parseInt(editingRankValue, 10);
+
+    // Validate the new rank
+    if (!isNaN(newRank) && newRank >= 1 && newRank <= localEntries.length) {
+      const newIndex = newRank - 1; // Convert to 0-based index
+      if (newIndex !== editingRankIndex) {
+        const newEntries = arrayMove(localEntries, editingRankIndex, newIndex);
+        setLocalEntries(newEntries);
+      }
+    }
+
+    setEditingRankIndex(null);
+    setEditingRankValue('');
   };
 
   // Handle drag end (desktop)
@@ -3031,9 +3067,30 @@ export default function UnifiedLibrary({
               {...listeners}
             >
               <View style={styles.forYouItemRow}>
-                <Text style={[styles.forYouItemNumber, { color: colors.textSecondary }]}>
-                  {index + 1}
-                </Text>
+                {/* Editable rank number */}
+                {editingRankIndex === index ? (
+                  <TextInput
+                    style={[styles.editableRankInput, { color: colors.primary, borderColor: colors.primary }]}
+                    value={editingRankValue}
+                    onChangeText={handleRankChange}
+                    onBlur={finishEditingRank}
+                    onSubmitEditing={finishEditingRank}
+                    keyboardType="number-pad"
+                    autoFocus
+                    selectTextOnFocus
+                    maxLength={3}
+                  />
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.editableRankBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
+                    onPress={() => startEditingRank(index)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.editableRankText, { color: colors.primary }]}>
+                      {index + 1}
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 <View style={styles.forYouCardWrapper}>
                   {renderListEntry(entry, true)}
                 </View>
@@ -5223,6 +5280,33 @@ const styles = StyleSheet.create({
     minWidth: 20,
     textAlign: 'right',
     marginLeft: -4,
+  },
+  editableRankBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginTop: 16,
+    marginRight: 4,
+  },
+  editableRankText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  editableRankInput: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '700',
+    padding: 0,
+    marginTop: 16,
+    marginRight: 4,
   },
   forYouCardWrapper: {
     flex: 1,
