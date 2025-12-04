@@ -77,6 +77,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import * as Clipboard from 'expo-clipboard';
 import MenuButton from '@/components/MenuButton';
@@ -139,6 +140,7 @@ export default function HomeScreen() {
   const { profile, isDarkMode, clerkUser, markIntroAsSeen, isLoading: isProfileLoading } = useUser();
   const library = useLibrary();
   const colors = isDarkMode ? darkColors : lightColors;
+  const insets = useSafeAreaInsets();
   const { referralCode } = useReferralCode();
   const [mainView, setMainView] = useState<MainView>('myLibrary');
   const [forYouSubsection, setForYouSubsection] = useState<ForYouSubsection>('aligned');
@@ -158,6 +160,7 @@ export default function HomeScreen() {
   const [followingList, setFollowingList] = useState<Array<{ id: string; name: string; profileImage?: string; location?: string; type: 'user' | 'brand' | 'business' }>>([]);
   const [followersList, setFollowersList] = useState<Array<{ id: string; name: string; profileImage?: string; location?: string }>>([]);
   const [isLoadingFollowData, setIsLoadingFollowData] = useState(false);
+  const [followersSearchQuery, setFollowersSearchQuery] = useState('');
   const [localDistance, setLocalDistance] = useState<LocalDistanceOption>(null);
   const [userBusinesses, setUserBusinesses] = useState<BusinessUser[]>([]);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -4891,12 +4894,12 @@ export default function HomeScreen() {
       >
         <View style={styles.followersModalOverlay}>
           <View style={[styles.followersModalContent, { backgroundColor: colors.background }]}>
-            {/* Header */}
-            <View style={[styles.followersModalHeader, { borderBottomColor: colors.border }]}>
+            {/* Header - add safe area padding for mobile */}
+            <View style={[styles.followersModalHeader, { borderBottomColor: colors.border, paddingTop: isMobileScreen ? insets.top + 16 : 16 }]}>
               <Text style={[styles.followersModalTitle, { color: colors.text }]}>
                 {followersModalTab === 'following' ? 'Following' : 'Followers'}
               </Text>
-              <TouchableOpacity onPress={() => setShowFollowersModal(false)} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => { setShowFollowersModal(false); setFollowersSearchQuery(''); }} activeOpacity={0.7}>
                 <X size={24} color={colors.text} strokeWidth={2} />
               </TouchableOpacity>
             </View>
@@ -4911,6 +4914,7 @@ export default function HomeScreen() {
                 ]}
                 onPress={() => {
                   setFollowersModalTab('following');
+                  setFollowersSearchQuery('');
                   loadFollowersData('following');
                 }}
                 activeOpacity={0.7}
@@ -4930,6 +4934,7 @@ export default function HomeScreen() {
                 ]}
                 onPress={() => {
                   setFollowersModalTab('followers');
+                  setFollowersSearchQuery('');
                   loadFollowersData('followers');
                 }}
                 activeOpacity={0.7}
@@ -4943,6 +4948,27 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Search Input */}
+            <View style={[styles.followersSearchContainer, { borderBottomColor: colors.border }]}>
+              <View style={[styles.followersSearchInputWrapper, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Search size={18} color={colors.textSecondary} strokeWidth={2} />
+                <TextInput
+                  style={[styles.followersSearchInput, { color: colors.text }]}
+                  placeholder={`Search ${followersModalTab}...`}
+                  placeholderTextColor={colors.textSecondary}
+                  value={followersSearchQuery}
+                  onChangeText={setFollowersSearchQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {followersSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setFollowersSearchQuery('')} activeOpacity={0.7}>
+                    <X size={18} color={colors.textSecondary} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
             {/* Content */}
             <ScrollView style={styles.followersModalList} showsVerticalScrollIndicator={false}>
               {isLoadingFollowData ? (
@@ -4953,19 +4979,25 @@ export default function HomeScreen() {
               ) : (
                 <>
                   {followersModalTab === 'following' ? (
-                    followingList.length === 0 ? (
+                    (() => {
+                      const filteredFollowing = followingList.filter(item =>
+                        item.name.toLowerCase().includes(followersSearchQuery.toLowerCase()) ||
+                        (item.location && item.location.toLowerCase().includes(followersSearchQuery.toLowerCase()))
+                      );
+                      return filteredFollowing.length === 0 ? (
                       <View style={styles.followersModalEmpty}>
                         <Text style={[styles.followersModalEmptyText, { color: colors.textSecondary }]}>
-                          Not following anyone yet
+                          {followersSearchQuery ? 'No results found' : 'Not following anyone yet'}
                         </Text>
                       </View>
                     ) : (
-                      followingList.map((item) => (
+                      filteredFollowing.map((item) => (
                         <TouchableOpacity
                           key={item.id}
                           style={[styles.followersModalItem, { borderBottomColor: colors.border }]}
                           onPress={() => {
                             setShowFollowersModal(false);
+                            setFollowersSearchQuery('');
                             if (item.type === 'user') {
                               router.push(`/user/${item.id}`);
                             } else if (item.type === 'brand') {
@@ -5004,21 +5036,28 @@ export default function HomeScreen() {
                           <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
                         </TouchableOpacity>
                       ))
-                    )
+                    );
+                    })()
                   ) : (
-                    followersList.length === 0 ? (
+                    (() => {
+                      const filteredFollowers = followersList.filter(item =>
+                        item.name.toLowerCase().includes(followersSearchQuery.toLowerCase()) ||
+                        (item.location && item.location.toLowerCase().includes(followersSearchQuery.toLowerCase()))
+                      );
+                      return filteredFollowers.length === 0 ? (
                       <View style={styles.followersModalEmpty}>
                         <Text style={[styles.followersModalEmptyText, { color: colors.textSecondary }]}>
-                          No followers yet
+                          {followersSearchQuery ? 'No results found' : 'No followers yet'}
                         </Text>
                       </View>
                     ) : (
-                      followersList.map((item) => (
+                      filteredFollowers.map((item) => (
                         <TouchableOpacity
                           key={item.id}
                           style={[styles.followersModalItem, { borderBottomColor: colors.border }]}
                           onPress={() => {
                             setShowFollowersModal(false);
+                            setFollowersSearchQuery('');
                             router.push(`/user/${item.id}`);
                           }}
                           activeOpacity={0.7}
@@ -5046,7 +5085,8 @@ export default function HomeScreen() {
                           <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
                         </TouchableOpacity>
                       ))
-                    )
+                    );
+                    })()
                   )}
                 </>
               )}
@@ -7193,6 +7233,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
+  },
+  followersSearchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  followersSearchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  followersSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
   },
   followersModalTitle: {
     fontSize: 18,
