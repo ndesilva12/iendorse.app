@@ -564,12 +564,11 @@ export default function LocalBusinessView({
           ))}
         </View>
         <TouchableOpacity
-          style={[styles.mapButton, { backgroundColor: colors.primary }]}
+          style={[styles.mapButton, { backgroundColor: 'transparent', borderColor: colors.primary }]}
           onPress={handleMapPress}
           activeOpacity={0.7}
         >
-          <MapPin size={14} color={colors.white} strokeWidth={2} />
-          <Text style={[styles.mapButtonText, { color: colors.white }]}>Map</Text>
+          <Text style={[styles.mapButtonText, { color: colors.primary }]}>Map</Text>
         </TouchableOpacity>
       </View>
 
@@ -755,10 +754,11 @@ const styles = StyleSheet.create({
   mapButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    borderWidth: 1.5,
   },
   mapButtonText: {
     fontSize: 14,

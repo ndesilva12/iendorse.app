@@ -403,12 +403,11 @@ export default function BusinessesAcceptingDiscounts() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.mapButton, { backgroundColor: colors.primary }]}
+            style={[styles.mapButton, { backgroundColor: 'transparent', borderColor: colors.primary }]}
             onPress={() => setShowMapModal(true)}
             activeOpacity={0.7}
           >
-            <MapIcon size={16} color={colors.white} strokeWidth={2} />
-            <Text style={[styles.mapButtonText, { color: colors.white }]}>Map</Text>
+            <Text style={[styles.mapButtonText, { color: colors.primary }]}>Map</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -705,10 +704,11 @@ const styles = StyleSheet.create({
   mapButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1.5,
   },
   mapButtonText: {
     fontSize: 14,
