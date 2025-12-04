@@ -57,6 +57,10 @@ export default function ReorderEndorsementsAdmin() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
 
+  // Editable rank state
+  const [editingRankIndex, setEditingRankIndex] = useState<number | null>(null);
+  const [editingRankValue, setEditingRankValue] = useState<string>('');
+
   useEffect(() => {
     if (user?.primaryEmailAddress?.emailAddress) {
       const email = user.primaryEmailAddress.emailAddress;
@@ -146,6 +150,43 @@ export default function ReorderEndorsementsAdmin() {
     newEntries.splice(toIndex, 0, movedEntry);
     setEntries(newEntries);
     setHasChanges(true);
+  };
+
+  // Start editing a rank
+  const startEditingRank = (index: number) => {
+    setEditingRankIndex(index);
+    setEditingRankValue(String(index + 1));
+  };
+
+  // Handle rank input change
+  const handleRankChange = (value: string) => {
+    // Only allow numbers
+    const numericValue = value.replace(/[^0-9]/g, '');
+    setEditingRankValue(numericValue);
+  };
+
+  // Finish editing and move to new position
+  const finishEditingRank = () => {
+    if (editingRankIndex === null) return;
+
+    const newRank = parseInt(editingRankValue, 10);
+
+    // Validate the new rank
+    if (!isNaN(newRank) && newRank >= 1 && newRank <= entries.length) {
+      const newIndex = newRank - 1; // Convert to 0-based index
+      if (newIndex !== editingRankIndex) {
+        moveEntry(editingRankIndex, newIndex);
+      }
+    }
+
+    setEditingRankIndex(null);
+    setEditingRankValue('');
+  };
+
+  // Cancel editing
+  const cancelEditingRank = () => {
+    setEditingRankIndex(null);
+    setEditingRankValue('');
   };
 
   const handleSave = async () => {
@@ -357,7 +398,7 @@ export default function ReorderEndorsementsAdmin() {
               {entries.length} Endorsement{entries.length !== 1 ? 's' : ''}
             </Text>
             <Text style={styles.listHint}>
-              {Platform.OS === 'web' ? 'Drag or use arrows to reorder' : 'Use arrows to reorder'}
+              {Platform.OS === 'web' ? 'Tap rank to edit, drag, or use arrows' : 'Tap rank to edit, or use arrows'}
             </Text>
           </View>
 
@@ -372,10 +413,28 @@ export default function ReorderEndorsementsAdmin() {
                     </View>
                   )}
 
-                  {/* Position Number */}
-                  <View style={styles.positionBadge}>
-                    <Text style={styles.positionText}>{index + 1}</Text>
-                  </View>
+                  {/* Position Number - Editable */}
+                  {editingRankIndex === index ? (
+                    <TextInput
+                      style={styles.positionInput}
+                      value={editingRankValue}
+                      onChangeText={handleRankChange}
+                      onBlur={finishEditingRank}
+                      onSubmitEditing={finishEditingRank}
+                      keyboardType="number-pad"
+                      autoFocus
+                      selectTextOnFocus
+                      maxLength={3}
+                    />
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.positionBadge}
+                      onPress={() => startEditingRank(index)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.positionText}>{index + 1}</Text>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Entry Image */}
                   {getEntryImage(entry) ? (
@@ -724,17 +783,32 @@ const styles = StyleSheet.create({
     cursor: 'grab',
   },
   positionBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#f0f0f0',
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#e3f2fd',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#90caf9',
   },
   positionText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: '700',
+    color: '#1976d2',
+  },
+  positionInput: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#1976d2',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1976d2',
+    padding: 0,
   },
   entryImage: {
     width: 40,
