@@ -34,6 +34,7 @@ import { followEntity, unfollowEntity, isFollowing as checkIsFollowing, getFollo
 import FollowingFollowersList from '@/components/FollowingFollowersList';
 import { useReferralCode } from '@/hooks/useReferralCode';
 import { appendReferralTracking } from '@/services/firebase/referralService';
+import { getBusinessEndorsementCount } from '@/services/firebase/topRankingsService';
 
 interface BusinessUser {
   id: string;
@@ -71,6 +72,7 @@ export default function BusinessDetailScreen() {
   const [showFollowingModal, setShowFollowingModal] = useState(false);
   const [endorsementsVisibleCount, setEndorsementsVisibleCount] = useState(5);
   const [endorsementActionMenuTarget, setEndorsementActionMenuTarget] = useState<{ type: 'brand' | 'business'; id: string; name: string } | null>(null);
+  const [businessEndorsementCount, setBusinessEndorsementCount] = useState(0);
 
   useEffect(() => {
     const fetchBusiness = async () => {
@@ -394,6 +396,21 @@ export default function BusinessDetailScreen() {
     loadFollowCounts();
   }, [business?.id]);
 
+  // Load endorsement count for this business
+  useEffect(() => {
+    const loadEndorsementCount = async () => {
+      if (!business?.id) return;
+
+      try {
+        const count = await getBusinessEndorsementCount(business.id);
+        setBusinessEndorsementCount(count);
+      } catch (error) {
+        console.error('[BusinessDetail] Error loading endorsement count:', error);
+      }
+    };
+    loadEndorsementCount();
+  }, [business?.id]);
+
   const handleShopPress = async () => {
     if (!business?.businessInfo.website) return;
     try {
@@ -688,9 +705,10 @@ export default function BusinessDetailScreen() {
               )}
             </View>
             <View style={[styles.scoreContainer, { position: 'relative', zIndex: showActionMenu ? 1000 : 1 }]}>
-              <View style={[styles.scoreCircle, { borderColor: alignmentColor, backgroundColor: colors.background }]}>
-                <Text style={[styles.scoreNumber, { color: alignmentColor }]}>
-                  {alignmentData.alignmentStrength}
+              <View style={[styles.endorsementBadge, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                <Users size={16} color={colors.primary} strokeWidth={2} />
+                <Text style={[styles.endorsementBadgeText, { color: colors.primary }]}>
+                  {businessEndorsementCount}
                 </Text>
               </View>
               <TouchableOpacity
@@ -1917,6 +1935,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scoreNumber: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+  },
+  endorsementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  endorsementBadgeText: {
     fontSize: 16,
     fontWeight: '700' as const,
   },
