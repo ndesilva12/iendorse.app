@@ -626,18 +626,16 @@ export default function SignUpScreen() {
               <Text style={styles.buttonText}>Continue</Text>
             )}
           </TouchableOpacity>
-          <View style={styles.contactContainer}>
+          <View style={styles.linkContainer}>
             <TouchableOpacity onPress={() => setShowContactModal(true)}>
               <Text style={[styles.contactText, { color: colors.primary }]}>Contact</Text>
             </TouchableOpacity>
-          </View>
-          <View style={styles.linkContainer}>
-            <Text style={[styles.linkText, { color: colors.textSecondary }]}>Already have an account? </Text>
+            <Text style={[styles.linkText, { color: colors.textSecondary }]}>  |  </Text>
             <TouchableOpacity onPress={() => {
               resetForm();
               router.push('/(auth)/sign-in');
             }}>
-              <Text style={[styles.link, { color: colors.primary }]}>Sign in</Text>
+              <Text style={[styles.contactText, { color: colors.primary }]}>Sign in</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
