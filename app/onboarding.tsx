@@ -102,8 +102,8 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ accountType?: string }>();
   const { signOut } = useAuth();
-  const { addCauses, profile, isDarkMode, clerkUser, isLoading, setAccountType, clearAllStoredData } = useUser();
-  const { values: firebaseValues } = useData();
+  const { profile, isDarkMode, clerkUser, isLoading, setAccountType, clearAllStoredData } = useUser();
+  // Note: values removed from user profiles - values are only used for brand associations in browse tab
   const colors = isDarkMode ? darkColors : lightColors;
   const insets = useSafeAreaInsets();
 
@@ -200,16 +200,9 @@ export default function OnboardingScreen() {
   const [verificationDetails, setVerificationDetails] = useState('');
   const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
 
-  // Values selection state
-  const [selectedValues, setSelectedValues] = useState<SelectedValue[]>(() => {
-    return profile.causes.map(c => ({
-      id: c.id,
-      name: c.name,
-      category: c.category,
-      type: c.type,
-      description: c.description,
-    }));
-  });
+  // Values selection state - DEPRECATED: values no longer associated with users
+  // Keeping minimal state for backwards compatibility during transition
+  const [selectedValues, setSelectedValues] = useState<SelectedValue[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   // Welcome modal state
@@ -424,24 +417,9 @@ export default function OnboardingScreen() {
   };
 
   const handleContinue = async () => {
-    console.log('[Onboarding] Continue pressed with', selectedValues.length, 'values');
-    if (selectedValues.length >= minValues) {
-      const causes: Cause[] = selectedValues.map(v => ({
-        id: v.id,
-        name: v.name,
-        category: v.category,
-        type: v.type,
-        description: v.description,
-      }));
-      console.log('[Onboarding] Saving causes for user:', clerkUser?.id);
-      await addCauses(causes);
-      console.log('[Onboarding] addCauses completed');
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Show custom welcome modal
-      setShowWelcomeModal(true);
-    }
+    // Values selection removed - just redirect to browse
+    console.log('[Onboarding] Continue pressed - redirecting to browse');
+    router.replace('/(tabs)/browse');
   };
 
   const handleWelcomeComplete = () => {
