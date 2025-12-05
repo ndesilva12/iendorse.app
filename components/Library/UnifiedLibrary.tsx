@@ -2872,7 +2872,18 @@ export default function UnifiedLibrary({
         })
       : categoryFilteredEntries;
 
-    const entriesToDisplay = searchFilteredEntries;
+    // Filter out deleted business entries (businesses that no longer exist)
+    const existingBusinessEntries = searchFilteredEntries.filter(entry => {
+      if (!entry || entry.type !== 'business') return true; // Keep non-business entries
+      const businessId = (entry as any).businessId;
+      if (!businessId) return false; // Remove entries without businessId
+      // Check if business exists in allBusinesses or userBusinesses
+      const businessExists = allBusinesses.some(b => b.id === businessId) ||
+                            userBusinesses.some(b => b.id === businessId);
+      return businessExists;
+    });
+
+    const entriesToDisplay = existingBusinessEntries;
 
     // Check if there are local entries to show the local filter
     const hasLocalEntries = allEntries.some(e => e && isLocalEntry(e));

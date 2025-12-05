@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Search as SearchIcon, TrendingUp, TrendingDown, Minus, ScanBarcode, X, Heart, MessageCircle, Share2, ExternalLink, MoreVertical, UserPlus, UserMinus, List as ListIcon, Plus, Check, Globe } from 'lucide-react-native';
+import { Search as SearchIcon, ScanBarcode, X, Heart, MessageCircle, Share2, ExternalLink, MoreVertical, UserPlus, UserMinus, List as ListIcon, Plus, Check, Globe, ChevronRight } from 'lucide-react-native';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
 import {
@@ -31,8 +31,7 @@ import { LOCAL_BUSINESSES } from '@/mocks/local-businesses';
 import { Product } from '@/types';
 import { lookupBarcode, findBrandInDatabase, getBrandProduct } from '@/mocks/barcode-products';
 import { getLogoUrl } from '@/lib/logo';
-import { getBusinessesAcceptingDiscounts, getAllUserBusinesses, BusinessUser, calculateAlignmentScore } from '@/services/firebase/businessService';
-import { calculateBrandScore, normalizeBrandScores } from '@/lib/scoring';
+import { getBusinessesAcceptingDiscounts, getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
 import { getAllPublicUsers } from '@/services/firebase/userService';
 import { UserProfile } from '@/types';
 import { copyListToLibrary, getEndorsementList } from '@/services/firebase/listService';
@@ -363,11 +362,6 @@ export default function SearchScreen() {
       label: categoryLabels[key] || key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
     }));
   }, [availableCategories]);
-
-  // Helper function to normalize alignment scores to 0-100 range
-  const normalizeScore = useCallback((score: number | undefined): number => {
-    return Math.min(100, Math.max(0, Math.round(Math.abs(score ?? 50))));
-  }, []);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Product[]>([]);
@@ -840,14 +834,6 @@ export default function SearchScreen() {
     }
   }, []);
 
-  const getAlignmentReason = useCallback((matchingValues: string[]) => {
-    if (!matchingValues || matchingValues.length === 0) return null;
-    const allValues = Object.values(availableValuesByCategory).flat();
-    const firstMatchingValue = allValues.find(v => v.id === matchingValues[0]);
-    if (!firstMatchingValue) return null;
-    return firstMatchingValue.name;
-  }, [availableValuesByCategory]);
-
   const formatTimeAgo = useCallback((date: Date) => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -880,21 +866,13 @@ export default function SearchScreen() {
               business.businessInfo.description?.toLowerCase().includes(searchLower)
             );
           })
-          .map(business => {
-            // Calculate alignment score using the same method as home tab
-            const rawScore = business.causes && profile?.causes
-              ? calculateAlignmentScore(profile.causes, business.causes)
-              : 0;
-            const alignmentScore = Math.round(50 + (rawScore * 0.8)); // Map to 10-90 range
-
-            return {
+          .map(business => ({
               id: `firebase-business-${business.id}`,
               firebaseId: business.id, // Store original Firebase ID
               name: business.businessInfo.name,
               brand: business.businessInfo.name,
               category: business.businessInfo.category,
               description: business.businessInfo.description || '',
-              alignmentScore,
               exampleImageUrl: business.businessInfo.logoUrl || (business.businessInfo.website ? getLogoUrl(business.businessInfo.website) : ''),
               website: business.businessInfo.website,
               location: business.businessInfo.location,
@@ -907,8 +885,7 @@ export default function SearchScreen() {
               moneyFlow: { company: business.businessInfo.name, shareholders: [], overallAlignment: 0 },
               relatedValues: [],
               isFirebaseBusiness: true, // Flag to identify Firebase businesses
-            } as Product & { firebaseId: string; isFirebaseBusiness: boolean };
-          });
+            } as Product & { firebaseId: string; isFirebaseBusiness: boolean }));
 
         // Search users
         const userResults = publicUsers
@@ -931,7 +908,6 @@ export default function SearchScreen() {
             brand: user.profile.userDetails?.name || 'User',
             category: 'User',
             description: user.profile.userDetails?.description || '',
-            alignmentScore: 50, // Default score for users
             exampleImageUrl: user.profile.userDetails?.profileImage || '',
             website: user.profile.userDetails?.website || '',
             location: user.profile.userDetails?.location || '',
@@ -959,7 +935,6 @@ export default function SearchScreen() {
             brand: brand.name,
             category: brand.category || 'Brand',
             description: brand.description || '',
-            alignmentScore: 50, // Default score for brands
             exampleImageUrl: brand.exampleImageUrl || (brand.website ? getLogoUrl(brand.website) : ''),
             website: brand.website || '',
             location: brand.location || '',
@@ -1259,32 +1234,7 @@ export default function SearchScreen() {
     }
   };
 
-  const getAlignmentColor = (score: number | undefined) => {
-    const normalizedScore = score ?? 50;
-    if (normalizedScore > 55) return colors.primary; // Blue for aligned
-    if (normalizedScore >= 45) return Colors.neutral; // Grey for neutral (45-55)
-    return Colors.danger; // Red/pink for unaligned
-  };
-
-  const getAlignmentIcon = (score: number | undefined) => {
-    const normalizedScore = score ?? 50;
-    if (normalizedScore >= 70) return TrendingUp;
-    if (normalizedScore >= 40) return Minus;
-    return TrendingDown;
-  };
-
-  const getAlignmentLabel = (score: number | undefined) => {
-    const normalizedScore = score ?? 50;
-    if (normalizedScore >= 70) return 'Strongly Aligned';
-    if (normalizedScore >= 40) return 'Neutral';
-    return 'Not Aligned';
-  };
-
   const renderProduct = ({ item }: { item: Product }) => {
-    const alignmentColor = getAlignmentColor(item.alignmentScore);
-    const score = normalizeScore(item.alignmentScore);
-    const scoreColor = score >= 50 ? colors.primary : colors.danger;
-
     return (
       <TouchableOpacity
         style={styles.productCard}
@@ -1310,9 +1260,7 @@ export default function SearchScreen() {
             </Text>
           </View>
           <View style={styles.productScoreContainer}>
-            <Text style={[styles.productScore, { color: scoreColor }]}>
-              {score}
-            </Text>
+            <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
           </View>
         </View>
       </TouchableOpacity>
@@ -1509,13 +1457,6 @@ export default function SearchScreen() {
   };
 
   const renderResultListItem = ({ item }: { item: Product }) => {
-    const alignmentColor = getAlignmentColor(item.alignmentScore);
-    const normalizedScore = normalizeScore(item.alignmentScore);
-
-    // Aligned items (blue) should be outlined only, unaligned (red) should have fill
-    const isAligned = (item.alignmentScore ?? 50) > 55;
-    const scoreBackgroundColor = isAligned ? 'transparent' : alignmentColor + '15';
-
     return (
       <TouchableOpacity
         style={[styles.resultListItem, { borderBottomColor: colors.border }]}
@@ -1539,11 +1480,7 @@ export default function SearchScreen() {
             {item.name}
           </Text>
         </View>
-        <View style={[styles.resultListScore, { borderColor: alignmentColor, backgroundColor: scoreBackgroundColor }]}>
-          <Text style={[styles.resultListScoreText, { color: alignmentColor }]}>
-            {normalizedScore}
-          </Text>
-        </View>
+        <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
       </TouchableOpacity>
     );
   };
@@ -1552,7 +1489,6 @@ export default function SearchScreen() {
     if (!selectedPostProduct) return null;
 
     const interaction = getProductInteraction(selectedPostProduct.id);
-    const alignmentReason = getAlignmentReason(selectedPostProduct.matchingValues || []);
 
     return (
       <View style={[styles.postContainer, { backgroundColor: colors.background }]}>
@@ -1579,9 +1515,6 @@ export default function SearchScreen() {
               <Text style={[styles.brandCategory, { color: colors.textSecondary }]}>{selectedPostProduct.category}</Text>
             </View>
           </TouchableOpacity>
-          <View style={[styles.postAlignmentBadge, { backgroundColor: colors.success + '15' }]}>
-            <Text style={[styles.postAlignmentScore, { color: colors.success }]}>{normalizeScore(selectedPostProduct.alignmentScore)}</Text>
-          </View>
         </View>
 
         <TouchableOpacity
@@ -1599,14 +1532,6 @@ export default function SearchScreen() {
             cachePolicy="memory-disk"
           />
         </TouchableOpacity>
-
-        {alignmentReason && (
-          <View style={styles.alignmentReasonContainer}>
-            <Text style={[styles.alignmentReasonText, { color: colors.textSecondary }]}>
-              You're seeing this because you align with <Text style={{ fontWeight: '600', color: colors.text }}>{alignmentReason}</Text>
-            </Text>
-          </View>
-        )}
 
         <View style={styles.actionsContainer}>
           <View style={styles.leftActions}>
@@ -2220,28 +2145,6 @@ export default function SearchScreen() {
                 <Text style={[styles.resultName, { color: colors.text }]}>
                   {scannedProduct.name}
                 </Text>
-
-                <View style={styles.alignmentContainer}>
-                  {(() => {
-                    const alignmentColor = getAlignmentColor(scannedProduct.alignmentScore);
-                    const AlignmentIcon = getAlignmentIcon(scannedProduct.alignmentScore);
-                    const alignmentLabel = getAlignmentLabel(scannedProduct.alignmentScore);
-
-                    return (
-                      <>
-                        <View style={[styles.alignmentScore, { backgroundColor: alignmentColor + '15' }]}>
-                          <AlignmentIcon size={24} color={alignmentColor} strokeWidth={2.5} />
-                          <Text style={[styles.alignmentScoreText, { color: alignmentColor }]}>
-                            {normalizeScore(scannedProduct.alignmentScore)}
-                          </Text>
-                        </View>
-                        <Text style={[styles.alignmentLabel, { color: alignmentColor }]}>
-                          {alignmentLabel}
-                        </Text>
-                      </>
-                    );
-                  })()}
-                </View>
 
                 <TouchableOpacity
                   style={[styles.viewDetailsButton, { backgroundColor: colors.primary }]}

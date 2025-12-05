@@ -142,6 +142,7 @@ export default function BrowseScreen() {
 
   // Top brands for when user has no causes (order by endorsements)
   const [topBrandsData, setTopBrandsData] = useState<Map<string, number>>(new Map());
+  const [loadingTopBrands, setLoadingTopBrands] = useState(true);
 
   // Fetch user businesses
   const fetchUserBusinesses = useCallback(async () => {
@@ -160,6 +161,7 @@ export default function BrowseScreen() {
   // Fetch top brands for endorsement-based ordering (always fetch - values feature removed)
   useEffect(() => {
     const fetchTopBrandsForOrdering = async () => {
+      setLoadingTopBrands(true);
       try {
         const topBrands = await getTopBrands(200);
         const endorsementMap = new Map<string, number>();
@@ -170,6 +172,8 @@ export default function BrowseScreen() {
         setTopBrandsData(endorsementMap);
       } catch (error) {
         console.error('[Browse] Error fetching top brands:', error);
+      } finally {
+        setLoadingTopBrands(false);
       }
     };
     fetchTopBrandsForOrdering();
@@ -604,7 +608,8 @@ export default function BrowseScreen() {
   const renderSectionBlocks = () => {
     const globalCount = allSupport.length;
     const localCount = userBusinesses.length;
-    const valuesCount = (profile.causes || []).length;
+    // Count total available values for browsing (not user's selected values)
+    const valuesCount = Object.values(availableValues).reduce((total, values) => total + (values?.length || 0), 0);
 
     const SectionBox = ({ section, label, count, Icon }: { section: BrowseSection; label: string; count: number; Icon: any }) => {
       const isSelected = selectedSection === section;
@@ -750,6 +755,18 @@ export default function BrowseScreen() {
 
   // Render Global content
   const renderGlobalContent = () => {
+    // Show loading spinner while fetching top brands data
+    if (loadingTopBrands) {
+      return (
+        <View style={styles.loadingSection}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary, marginTop: 12 }]}>
+            Loading top brands...
+          </Text>
+        </View>
+      );
+    }
+
     // Use allSupport which contains top brands ordered by endorsements
     const items = allSupport;
 
@@ -1291,6 +1308,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center' as const,
     lineHeight: 20,
+  },
+
+  // Loading section styles
+  loadingSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+  },
+  loadingText: {
+    fontSize: 14,
+    textAlign: 'center' as const,
   },
 
   // Values content styles
