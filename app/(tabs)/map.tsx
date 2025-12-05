@@ -461,71 +461,6 @@ export default function MapScreen() {
         ))}
       </ScrollView>
 
-      {/* Collapsible markers list for web */}
-      {Platform.OS === 'web' && mapMarkers.length > 0 && (
-        <TouchableOpacity
-          style={[styles.markersListToggle, { borderTopColor: colors.border }]}
-          onPress={() => setShowMarkersList(!showMarkersList)}
-        >
-          <Text style={[styles.markersListToggleText, { color: colors.text }]}>
-            {mapMarkers.length} Location{mapMarkers.length !== 1 ? 's' : ''}
-          </Text>
-          {showMarkersList ? (
-            <ChevronUp size={18} color={colors.textSecondary} />
-          ) : (
-            <ChevronDown size={18} color={colors.textSecondary} />
-          )}
-        </TouchableOpacity>
-      )}
-
-      {/* Expanded markers list for web */}
-      {Platform.OS === 'web' && showMarkersList && mapMarkers.length > 0 && (
-        <ScrollView
-          style={[styles.markersListExpanded, { borderTopColor: colors.border }]}
-          showsVerticalScrollIndicator={true}
-        >
-          {mapMarkers.slice(0, 20).map((marker) => (
-            <TouchableOpacity
-              key={marker.id}
-              style={[styles.markerListItem, { borderBottomColor: colors.border }]}
-              onPress={() => {
-                if (marker.type === 'business') {
-                  router.push(`/business/${marker.id}`);
-                } else if (marker.type === 'brand') {
-                  router.push(`/brand/${marker.id}`);
-                } else if (marker.type === 'place') {
-                  router.push(`/place/${marker.id}`);
-                }
-              }}
-            >
-              <View style={[styles.markerListLogo, { backgroundColor: '#FFFFFF' }]}>
-                {marker.logoUrl ? (
-                  <Image
-                    source={{ uri: marker.logoUrl }}
-                    style={styles.markerListLogoImage}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <MapPin size={16} color={colors.primary} />
-                )}
-              </View>
-              <View style={styles.markerListInfo}>
-                <Text style={[styles.markerListName, { color: colors.text }]} numberOfLines={1}>
-                  {marker.name}
-                </Text>
-                <Text style={[styles.markerListCategory, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {marker.category}{marker.distance ? ` • ${marker.distance.toFixed(1)} mi` : ''}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-          {mapMarkers.length > 20 && (
-            <Text style={[styles.markersListMore, { color: colors.textSecondary }]}>
-              +{mapMarkers.length - 20} more locations
-            </Text>
-          )}
-        </ScrollView>
-      )}
     </View>
   );
 
@@ -784,6 +719,66 @@ export default function MapScreen() {
               </Text>
             </View>
           )}
+          {/* Floating locations list popup */}
+          {mapMarkers.length > 0 && (
+            <View style={[styles.floatingListContainer, { backgroundColor: colors.background }]}>
+              <TouchableOpacity
+                style={[styles.floatingListHeader, { borderBottomColor: showMarkersList ? colors.border : 'transparent' }]}
+                onPress={() => setShowMarkersList(!showMarkersList)}
+              >
+                <Text style={[styles.floatingListTitle, { color: colors.text }]}>
+                  {mapMarkers.length} Location{mapMarkers.length !== 1 ? 's' : ''}
+                </Text>
+                {showMarkersList ? (
+                  <ChevronUp size={18} color={colors.textSecondary} />
+                ) : (
+                  <ChevronDown size={18} color={colors.textSecondary} />
+                )}
+              </TouchableOpacity>
+              {showMarkersList && (
+                <ScrollView
+                  style={styles.floatingListContent}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {mapMarkers.slice(0, 30).map((marker) => (
+                    <TouchableOpacity
+                      key={marker.id}
+                      style={[styles.floatingListItem, { borderBottomColor: colors.border }]}
+                      onPress={() => {
+                        if (marker.type === 'business') {
+                          router.push(`/business/${marker.id}`);
+                        } else if (marker.type === 'brand') {
+                          router.push(`/brand/${marker.id}`);
+                        } else if (marker.type === 'place') {
+                          router.push(`/place/${marker.id}`);
+                        }
+                      }}
+                    >
+                      <View style={[styles.floatingListLogo, { backgroundColor: '#F3F4F6' }]}>
+                        {marker.logoUrl ? (
+                          <Image
+                            source={{ uri: marker.logoUrl }}
+                            style={styles.floatingListLogoImage}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <MapPin size={14} color={colors.primary} />
+                        )}
+                      </View>
+                      <Text style={[styles.floatingListName, { color: colors.text }]} numberOfLines={1}>
+                        {marker.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  {mapMarkers.length > 30 && (
+                    <Text style={[styles.floatingListMore, { color: colors.textSecondary }]}>
+                      +{mapMarkers.length - 30} more
+                    </Text>
+                  )}
+                </ScrollView>
+              )}
+            </View>
+          )}
         </View>
       );
     }
@@ -995,56 +990,63 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  markersListToggle: {
+  floatingListContainer: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 220,
+    maxHeight: 350,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+    overflow: 'hidden',
+  },
+  floatingListHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    borderTopWidth: 1,
+    borderBottomWidth: 1,
   },
-  markersListToggleText: {
+  floatingListTitle: {
     fontSize: 14,
     fontWeight: '600',
   },
-  markersListExpanded: {
-    maxHeight: 250,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
+  floatingListContent: {
+    maxHeight: 280,
   },
-  markerListItem: {
+  floatingListItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    gap: 10,
+    gap: 8,
   },
-  markerListLogo: {
-    width: 36,
-    height: 36,
+  floatingListLogo: {
+    width: 28,
+    height: 28,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  markerListLogoImage: {
+  floatingListLogoImage: {
     width: '100%',
     height: '100%',
   },
-  markerListInfo: {
+  floatingListName: {
     flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  markerListName: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  markerListCategory: {
-    fontSize: 12,
-    textTransform: 'capitalize',
-  },
-  markersListMore: {
-    fontSize: 12,
+  floatingListMore: {
+    fontSize: 11,
     textAlign: 'center',
     paddingVertical: 8,
   },
