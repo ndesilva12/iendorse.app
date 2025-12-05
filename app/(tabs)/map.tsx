@@ -141,21 +141,31 @@ export default function MapScreen() {
     getLocation();
   }, []);
 
-  // Fetch endorsement list and businesses
+  // Get endorsement list from library context (same as home tab)
   useEffect(() => {
-    const fetchData = async () => {
+    const loadData = async () => {
       if (!clerkUser?.id) return;
 
       setLoading(true);
       try {
-        // Fetch endorsement list
-        const list = await getEndorsementList(clerkUser.id);
-        if (list) {
-          setEndorsementList(list.entries || []);
+        // Get endorsement list from library context
+        const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
+        if (endorsementListData?.entries) {
+          console.log('[Map] Found endorsement list with', endorsementListData.entries.length, 'entries');
+          setEndorsementList(endorsementListData.entries);
+        } else {
+          console.log('[Map] No endorsement list found, trying direct fetch');
+          // Fallback to direct fetch
+          const list = await getEndorsementList(clerkUser.id);
+          if (list) {
+            console.log('[Map] Direct fetch found', list.entries?.length || 0, 'entries');
+            setEndorsementList(list.entries || []);
+          }
         }
 
-        // Fetch all businesses
+        // Fetch all businesses for location data
         const businesses = await getAllUserBusinesses();
+        console.log('[Map] Found', businesses.length, 'businesses');
         setAllBusinesses(businesses);
       } catch (error) {
         console.error('[Map] Error fetching data:', error);
@@ -164,18 +174,25 @@ export default function MapScreen() {
       }
     };
 
-    fetchData();
-  }, [clerkUser?.id]);
+    loadData();
+  }, [clerkUser?.id, library.state.userLists]);
 
   // Convert endorsement list entries to map markers
   const mapMarkers = useMemo(() => {
     const markers: MapMarker[] = [];
+    let placeCount = 0;
+    let businessCount = 0;
+    let brandCount = 0;
+    let noLocationCount = 0;
+
+    console.log('[Map] Processing', endorsementList.length, 'endorsement entries');
 
     // Process all endorsement list entries
     endorsementList.forEach((entry) => {
       let marker: MapMarker | null = null;
 
       if (entry.type === 'business') {
+        businessCount++;
         const businessEntry = entry as BusinessListEntry;
         const business = allBusinesses.find(b => b.id === businessEntry.businessId);
 
@@ -198,6 +215,7 @@ export default function MapScreen() {
           };
         }
       } else if (entry.type === 'brand') {
+        brandCount++;
         const brandEntry = entry as BrandListEntry;
         const brand = brands.find(b => b.id === brandEntry.brandId);
 
@@ -220,6 +238,7 @@ export default function MapScreen() {
           };
         }
       } else if (entry.type === 'place') {
+        placeCount++;
         const placeEntry = entry as PlaceListEntry;
 
         // Place entries have location directly in the entry
@@ -245,8 +264,13 @@ export default function MapScreen() {
 
       if (marker) {
         markers.push(marker);
+      } else {
+        noLocationCount++;
       }
     });
+
+    console.log('[Map] Entry breakdown: places:', placeCount, 'businesses:', businessCount, 'brands:', brandCount);
+    console.log('[Map] Markers created:', markers.length, 'No location:', noLocationCount);
 
     // Apply filter
     let filteredMarkers = markers;
@@ -492,6 +516,195 @@ export default function MapScreen() {
     </View>
   );
 
+  // Initialize Leaflet map for web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || loading || loadingLocation) return;
+
+    // Load Leaflet CSS
+    if (!document.querySelector('link[data-leaflet-map-css]')) {
+      const link = document.createElement('link');
+      link.setAttribute('rel', 'stylesheet');
+      link.setAttribute('href', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+      link.setAttribute('data-leaflet-map-css', 'true');
+      document.head.appendChild(link);
+    }
+
+    // Load Leaflet library
+    const initLeaflet = () => {
+      if (!(window as any).L) {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.async = true;
+        script.onload = () => initializeMap();
+        document.body.appendChild(script);
+      } else {
+        initializeMap();
+      }
+    };
+
+    const initializeMap = () => {
+      const L = (window as any).L;
+      if (!L) return;
+
+      const mapElement = document.getElementById('endorsement-map');
+      if (!mapElement) return;
+
+      // Remove existing map if any
+      if ((mapElement as any)._leaflet_id) {
+        (mapElement as any)._leaflet_map?.remove();
+      }
+
+      // Calculate zoom level based on markers
+      let zoom = 12;
+      if (mapMarkers.length === 0) zoom = 10;
+      else if (mapMarkers.length === 1) zoom = 14;
+      else if (mapMarkers.length < 10) zoom = 11;
+      else zoom = 10;
+
+      // Initialize map
+      const map = L.map('endorsement-map').setView([mapRegion.latitude, mapRegion.longitude], zoom);
+
+      // Add tile layer (CartoDB Voyager for better labels)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap contributors © CARTO',
+        maxZoom: 19,
+        subdomains: 'abcd',
+      }).addTo(map);
+
+      // Add user location marker (blue)
+      if (userLocation) {
+        L.marker([userLocation.latitude, userLocation.longitude], {
+          icon: L.divIcon({
+            className: 'user-location-marker',
+            html: `<svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20s12-11 12-20c0-6.63-5.37-12-12-12z" fill="#3B82F6"/>
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20s12-11 12-20c0-6.63-5.37-12-12-12z" stroke="white" stroke-width="2"/>
+              <circle cx="12" cy="12" r="4" fill="white"/>
+            </svg>`,
+            iconSize: [24, 32],
+            iconAnchor: [12, 32],
+          }),
+        }).addTo(map).bindPopup('You are here');
+      }
+
+      // Add local radius circle if local filter is active
+      if (activeFilter === 'local' && userLocation) {
+        L.circle([userLocation.latitude, userLocation.longitude], {
+          radius: 50 * 1609.34, // 50 miles in meters
+          color: 'rgba(59, 130, 246, 0.5)',
+          fillColor: 'rgba(59, 130, 246, 0.1)',
+          fillOpacity: 0.2,
+          weight: 2,
+        }).addTo(map);
+      }
+
+      // Add endorsement markers (green)
+      mapMarkers.forEach((marker) => {
+        const markerColor = '#22C55E';
+        const distanceText = marker.distance !== undefined
+          ? marker.distance < 1
+            ? `${(marker.distance * 5280).toFixed(0)} ft away`
+            : `${marker.distance.toFixed(1)} mi away`
+          : '';
+
+        L.marker([marker.latitude, marker.longitude], {
+          icon: L.divIcon({
+            className: 'endorsement-marker',
+            html: `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
+              <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
+            </svg>`,
+            iconSize: [20, 28],
+            iconAnchor: [10, 28],
+          }),
+        })
+          .addTo(map)
+          .bindPopup(`
+            <div style="min-width: 200px; padding: 12px;">
+              <div style="font-size: 16px; font-weight: bold; margin-bottom: 6px; color: #1f2937;">
+                ${marker.name}
+              </div>
+              <div style="font-size: 13px; color: #6b7280; margin-bottom: 8px; text-transform: capitalize;">
+                ${marker.category}
+              </div>
+              ${marker.address ? `
+                <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px; line-height: 1.4;">
+                  📍 ${marker.address}
+                </div>
+              ` : ''}
+              ${distanceText ? `
+                <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">
+                  ${distanceText}
+                </div>
+              ` : ''}
+              <button
+                onclick="window.dispatchEvent(new CustomEvent('navigate-to-endorsement', { detail: { id: '${marker.id}', type: '${marker.type}' } }))"
+                style="
+                  width: 100%;
+                  background-color: #00aaff;
+                  color: white;
+                  border: none;
+                  padding: 8px 16px;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: background-color 0.2s;
+                "
+                onmouseover="this.style.backgroundColor='#0099ee'"
+                onmouseout="this.style.backgroundColor='#00aaff'"
+              >
+                View Details
+              </button>
+            </div>
+          `, {
+            maxWidth: 280,
+            className: 'endorsement-popup'
+          });
+      });
+
+      // Fit map bounds to show all markers
+      if (mapMarkers.length > 1) {
+        const bounds = L.latLngBounds(mapMarkers.map(m => [m.latitude, m.longitude]));
+        if (userLocation) {
+          bounds.extend([userLocation.latitude, userLocation.longitude]);
+        }
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+      } else if (mapMarkers.length === 1) {
+        map.setView([mapMarkers[0].latitude, mapMarkers[0].longitude], 14);
+      }
+
+      // Store map reference
+      (mapElement as any)._leaflet_map = map;
+    };
+
+    // Initialize after a short delay to ensure DOM is ready
+    const timer = setTimeout(initLeaflet, 100);
+
+    // Listen for navigation events
+    const handleNavigate = (event: any) => {
+      const { id, type } = event.detail;
+      if (type === 'business') {
+        router.push(`/business/${id}`);
+      } else if (type === 'brand') {
+        router.push(`/brand/${id}`);
+      } else if (type === 'place') {
+        router.push(`/place/${id}`);
+      }
+    };
+
+    window.addEventListener('navigate-to-endorsement', handleNavigate);
+
+    return () => {
+      clearTimeout(timer);
+      const mapElement = document.getElementById('endorsement-map');
+      if (mapElement && (mapElement as any)._leaflet_map) {
+        (mapElement as any)._leaflet_map.remove();
+      }
+      window.removeEventListener('navigate-to-endorsement', handleNavigate);
+    };
+  }, [mapMarkers, userLocation, mapRegion, activeFilter, loading, loadingLocation, router]);
+
   // Render map
   const renderMap = () => {
     if (loading || loadingLocation) {
@@ -506,21 +719,10 @@ export default function MapScreen() {
     }
 
     if (Platform.OS === 'web') {
-      // For web, use an iframe with OpenStreetMap
-      const centerLat = mapRegion.latitude;
-      const centerLng = mapRegion.longitude;
-      const zoom = 12;
-
+      // For web, use Leaflet map (initialized in useEffect)
       return (
         <View style={styles.mapContainer}>
-          <iframe
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=${centerLng - 0.1},${centerLat - 0.1},${centerLng + 0.1},${centerLat + 0.1}&layer=mapnik&marker=${centerLat},${centerLng}`}
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-            }}
-          />
+          <div id="endorsement-map" style={{ width: '100%', height: '100%' }} />
         </View>
       );
     }
