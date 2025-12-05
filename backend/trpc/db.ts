@@ -18,5 +18,5 @@ export async function getUserProfile(userId: string): Promise<UserProfile> {
 
 export async function saveUserProfile(userId: string, profile: UserProfile): Promise<void> {
   userProfiles.set(userId, profile);
-  console.log('[DB] Saved profile for user:', userId, 'with', profile.causes.length, 'causes');
+  console.log('[DB] Saved profile for user:', userId, 'with', profile.causes?.length || 0, 'causes');
 }
