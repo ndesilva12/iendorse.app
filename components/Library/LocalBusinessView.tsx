@@ -436,7 +436,8 @@ export default function LocalBusinessView({
 
   const renderLocalBusinessCard = (
     businessData: BusinessWithScore,
-    type: 'aligned' | 'unaligned'
+    type: 'aligned' | 'unaligned',
+    rank?: number
   ) => {
     const { business, distance, closestLocation } = businessData;
     const shortAddress = shortenAddress(closestLocation);
@@ -458,6 +459,14 @@ export default function LocalBusinessView({
           activeOpacity={0.7}
         >
           <View style={styles.businessCardInner}>
+            {/* Rank number */}
+            {rank !== undefined && (
+              <View style={styles.rankContainer}>
+                <Text style={[styles.rankNumber, { color: colors.textSecondary }]}>
+                  {rank}
+                </Text>
+              </View>
+            )}
             <View style={styles.businessLogoContainer}>
               <Image
                 source={{ uri: business.businessInfo.logoUrl || getLogoUrl(business.businessInfo.website || '') }}
@@ -588,9 +597,9 @@ export default function LocalBusinessView({
       {/* Business List */}
       <View style={styles.businessList}>
         {allBusinesses.length > 0 ? (
-          allBusinesses.map((biz) => {
+          allBusinesses.map((biz, index) => {
             const isAligned = biz.alignmentScore >= 50;
-            return renderLocalBusinessCard(biz, isAligned ? 'aligned' : 'unaligned');
+            return renderLocalBusinessCard(biz, isAligned ? 'aligned' : 'unaligned', index + 1);
           })
         ) : (
           <View style={styles.emptySection}>
@@ -778,6 +787,15 @@ const styles = StyleSheet.create({
   businessList: {
     paddingHorizontal: Platform.OS === 'web' ? 4 : 8,
     paddingTop: 4,
+  },
+  rankContainer: {
+    width: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rankNumber: {
+    fontSize: 16,
+    fontWeight: '700' as const,
   },
   businessCard: {
     borderRadius: 0,

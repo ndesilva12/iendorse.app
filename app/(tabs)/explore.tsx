@@ -381,7 +381,7 @@ export default function SearchScreen() {
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
   const [loadingMoreBusinesses, setLoadingMoreBusinesses] = useState(false);
   const [showAllBusinesses, setShowAllBusinesses] = useState(false);
-  const [activeTab, setActiveTab] = useState<'topBusinesses' | 'topUsers'>('topUsers');
+  const [activeTab, setActiveTab] = useState<'following' | 'topUsers'>('topUsers');
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
   const [scannedInfo, setScannedInfo] = useState<{productName: string; brandName: string; imageUrl?: string; notInDatabase: boolean} | null>(null);
@@ -1485,18 +1485,18 @@ export default function SearchScreen() {
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'topBusinesses' && styles.activeTab,
-            activeTab === 'topBusinesses' && { borderBottomColor: colors.primary }
+            activeTab === 'following' && styles.activeTab,
+            activeTab === 'following' && { borderBottomColor: colors.primary }
           ]}
-          onPress={() => setActiveTab('topBusinesses')}
+          onPress={() => setActiveTab('following')}
           activeOpacity={0.7}
         >
           <Text style={[
             styles.tabText,
-            { color: activeTab === 'topBusinesses' ? colors.primary : colors.textSecondary },
-            activeTab === 'topBusinesses' && styles.activeTabText
+            { color: activeTab === 'following' ? colors.primary : colors.textSecondary },
+            activeTab === 'following' && styles.activeTabText
           ]}>
-            Top Businesses
+            Following
           </Text>
         </TouchableOpacity>
       </View>
@@ -1720,46 +1720,62 @@ export default function SearchScreen() {
       {renderSectionTitle()}
 
       {query.trim().length === 0 ? (
-        activeTab === 'topBusinesses' ? (
+        activeTab === 'following' ? (
           <FlatList
-            key="top-businesses-list"
-            data={topBusinessItems}
-            renderItem={renderTopBusinessItem}
+            key="following-list"
+            data={followingItems}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.userCard, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => {
+                  if (item.type === 'user') {
+                    router.push(`/user/${item.id}`);
+                  } else if (item.type === 'business') {
+                    router.push(`/business/${item.id}`);
+                  } else if (item.type === 'brand') {
+                    router.push(`/brand/${item.id}`);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.userCardAvatar, { backgroundColor: colors.background }]}>
+                  {item.profileImage ? (
+                    <Image
+                      source={{ uri: item.profileImage }}
+                      style={styles.userCardAvatarImage}
+                      contentFit="cover"
+                      transition={200}
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <Text style={[styles.userCardAvatarText, { color: colors.primary }]}>
+                      {item.name.charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.userCardInfo}>
+                  <Text style={[styles.userCardName, { color: colors.text }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.userCardLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {item.type === 'user' ? (item.location || 'User') : (item.category || item.type)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
             keyExtractor={item => `${item.type}-${item.id}`}
             contentContainerStyle={[styles.userListContainer, { paddingBottom: 100 }]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              loadingBusinesses ? (
-                <View style={styles.loadingState}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+                  <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
                 </View>
-              ) : (
-                <View style={styles.emptyState}>
-                  <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
-                    <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
-                  </View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No Endorsements Yet</Text>
-                  <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                    Be the first to endorse a business or brand!
-                  </Text>
-                </View>
-              )
-            }
-            ListFooterComponent={
-              !showAllBusinesses && topBusinessItems.length > 0 ? (
-                <TouchableOpacity
-                  style={[styles.showMoreButton, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={loadMoreBusinesses}
-                  disabled={loadingMoreBusinesses}
-                >
-                  {loadingMoreBusinesses ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Text style={[styles.showMoreText, { color: colors.primary }]}>Show More</Text>
-                  )}
-                </TouchableOpacity>
-              ) : null
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>Not Following Anyone</Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                  Follow users, businesses, and brands to see them here
+                </Text>
+              </View>
             }
           />
         ) : (

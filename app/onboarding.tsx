@@ -110,17 +110,17 @@ export default function OnboardingScreen() {
   // Redirect users who have already completed onboarding
   // This handles the case where a user's claim was approved while they were offline
   // OR an existing business user who already has values selected
-  // Business accounts don't need values - they can proceed without them
+  // Values selection has been removed - all users go straight to browse
   useEffect(() => {
     if (!isLoading) {
-      // Regular users need causes to proceed
-      if (profile?.accountType !== 'business' && profile?.causes?.length > 0) {
-        console.log('[Onboarding] User already has causes, redirecting to browse');
+      // Regular users (non-business) skip values selection and go straight to browse
+      if (profile?.accountType !== 'business') {
+        console.log('[Onboarding] Regular user - skipping values selection, redirecting to browse');
         router.replace('/(tabs)/browse');
         return;
       }
     }
-  }, [isLoading, profile?.causes?.length, profile?.accountType]);
+  }, [isLoading, profile?.accountType]);
 
   // Handler to exit onboarding and sign out
   const handleExitOnboarding = async () => {
