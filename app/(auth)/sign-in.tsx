@@ -6,6 +6,7 @@ import { darkColors, lightColors } from '@/constants/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUser } from '@/contexts/UserContext';
 import { Users, Target, ListChecks, Search, Gift, QrCode, Sparkles, ChevronDown, ChevronUp, LogOut } from 'lucide-react-native';
+import ContactModal from '@/components/ContactModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function SignInScreen() {
@@ -25,6 +26,7 @@ export default function SignInScreen() {
   const [resetStep, setResetStep] = React.useState<'email' | 'code' | 'password'>('email');
   const [showLearnMore, setShowLearnMore] = React.useState(false);
   const [isSigningOut, setIsSigningOut] = React.useState(false);
+  const [showContactModal, setShowContactModal] = React.useState(false);
 
   // Handle force sign out
   const handleForceSignOut = async () => {
@@ -310,6 +312,12 @@ export default function SignInScreen() {
                   <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>Forgot password?</Text>
                 </TouchableOpacity>
                 <Text style={[styles.linkText, { color: colors.textSecondary }]}>  |  </Text>
+                <TouchableOpacity onPress={() => setShowContactModal(true)}>
+                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>Contact</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.linkContainer}>
+                <Text style={[styles.linkText, { color: colors.textSecondary }]}>Don't have an account?  </Text>
                 <TouchableOpacity onPress={() => router.push('/(auth)/sign-up')}>
                   <Text style={[styles.link, { color: colors.primary }]}>Sign up</Text>
                 </TouchableOpacity>
@@ -514,6 +522,14 @@ export default function SignInScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Contact Modal */}
+      <ContactModal
+        visible={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        isDarkMode={isDarkMode}
+        requireContactInfo={true}
+      />
     </SafeAreaView>
   );
 }

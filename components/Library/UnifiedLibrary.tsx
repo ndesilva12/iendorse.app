@@ -60,7 +60,7 @@ import { Product, Cause } from '@/types';
 import { BusinessUser, getAllUserBusinesses } from '@/services/firebase/businessService';
 import { useUser } from '@/contexts/UserContext';
 import { useRouter } from 'expo-router';
-import { updateListMetadata, copyListToLibrary } from '@/services/firebase/listService';
+import { updateListMetadata, copyListToLibrary, removeEntryFromList } from '@/services/firebase/listService';
 import { followEntity, unfollowEntity, isFollowing as checkIsFollowing } from '@/services/firebase/followService';
 import AddToLibraryModal from '@/components/AddToLibraryModal';
 import EditListModal from '@/components/EditListModal';
@@ -661,6 +661,41 @@ export default function UnifiedLibrary({
 
     fetchCumulativeDays();
   }, [currentUserId, endorsementList?.entries]);
+
+  // Clean up orphaned business entries (businesses that were deleted)
+  useEffect(() => {
+    const cleanupOrphanedEntries = async () => {
+      if (!endorsementList?.entries?.length || !endorsementList?.id) return;
+      if (!allBusinesses || allBusinesses.length === 0) return;
+
+      // Find business entries where the business no longer exists
+      const orphanedEntries = endorsementList.entries.filter(entry => {
+        if (!entry || entry.type !== 'business') return false;
+        const businessId = (entry as any).businessId;
+        if (!businessId) return false;
+
+        // Check if business exists in allBusinesses
+        const businessExists = allBusinesses.some(b => b.id === businessId);
+        return !businessExists;
+      });
+
+      // Remove orphaned entries from the list
+      if (orphanedEntries.length > 0) {
+        console.log(`[UnifiedLibrary] Found ${orphanedEntries.length} orphaned business entries, cleaning up...`);
+
+        for (const entry of orphanedEntries) {
+          try {
+            await removeEntryFromList(endorsementList.id, entry.id);
+            console.log(`[UnifiedLibrary] Removed orphaned entry: ${entry.id}`);
+          } catch (error) {
+            console.error(`[UnifiedLibrary] Failed to remove orphaned entry ${entry.id}:`, error);
+          }
+        }
+      }
+    };
+
+    cleanupOrphanedEntries();
+  }, [endorsementList?.entries, endorsementList?.id, allBusinesses]);
 
   // Search external places when query changes (with debounce)
   useEffect(() => {
@@ -2837,7 +2872,18 @@ export default function UnifiedLibrary({
         })
       : categoryFilteredEntries;
 
-    const entriesToDisplay = searchFilteredEntries;
+    // Filter out deleted business entries (businesses that no longer exist)
+    const existingBusinessEntries = searchFilteredEntries.filter(entry => {
+      if (!entry || entry.type !== 'business') return true; // Keep non-business entries
+      const businessId = (entry as any).businessId;
+      if (!businessId) return false; // Remove entries without businessId
+      // Check if business exists in allBusinesses or userBusinesses
+      const businessExists = allBusinesses.some(b => b.id === businessId) ||
+                            userBusinesses.some(b => b.id === businessId);
+      return businessExists;
+    });
+
+    const entriesToDisplay = existingBusinessEntries;
 
     // Check if there are local entries to show the local filter
     const hasLocalEntries = allEntries.some(e => e && isLocalEntry(e));

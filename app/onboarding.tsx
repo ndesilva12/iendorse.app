@@ -113,14 +113,17 @@ export default function OnboardingScreen() {
   // Values selection has been removed - all users go straight to browse
   useEffect(() => {
     if (!isLoading) {
+      // Check if this is a business user - either from query params (new signup) or profile (existing user)
+      const isBusinessSignup = params.accountType === 'business' || profile?.accountType === 'business';
+
       // Regular users (non-business) skip values selection and go straight to browse
-      if (profile?.accountType !== 'business') {
+      if (!isBusinessSignup) {
         console.log('[Onboarding] Regular user - skipping values selection, redirecting to browse');
         router.replace('/(tabs)/browse');
         return;
       }
     }
-  }, [isLoading, profile?.accountType]);
+  }, [isLoading, profile?.accountType, params.accountType]);
 
   // Handler to exit onboarding and sign out
   const handleExitOnboarding = async () => {

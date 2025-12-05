@@ -624,6 +624,40 @@ export default function BusinessesManagement() {
       const totalDeletedFollows = userFollowResult.deleted + businessFollowResult.deleted;
       console.log(`[Admin Businesses] ✅ Deleted ${totalDeletedFollows} follow relationships`);
 
+      // Remove this business from all users' endorsement lists
+      try {
+        const allListsRef = collection(db, 'userLists');
+        const allListsSnapshot = await getDocs(allListsRef);
+        let removedFromLists = 0;
+
+        for (const listDoc of allListsSnapshot.docs) {
+          const listData = listDoc.data();
+          const entries = listData.entries || [];
+
+          // Check if this list contains an entry for the deleted business
+          const hasBusinessEntry = entries.some(
+            (entry: any) => entry?.type === 'business' && entry?.businessId === business.userId
+          );
+
+          if (hasBusinessEntry) {
+            // Filter out the deleted business entry
+            const updatedEntries = entries.filter(
+              (entry: any) => !(entry?.type === 'business' && entry?.businessId === business.userId)
+            );
+
+            // Update the list with filtered entries
+            await updateDoc(doc(db, 'userLists', listDoc.id), {
+              entries: updatedEntries,
+              updatedAt: new Date()
+            });
+            removedFromLists++;
+          }
+        }
+        console.log(`[Admin Businesses] ✅ Removed business from ${removedFromLists} user lists`);
+      } catch (listCleanupError) {
+        console.error('[Admin Businesses] Error cleaning up user lists:', listCleanupError);
+      }
+
       // Delete the user document (which includes the business account)
       const userRef = doc(db, 'users', business.userId);
       await deleteDoc(userRef);
