@@ -260,24 +260,35 @@ export default function BrowseScreen() {
         const items: FollowingItem[] = [];
 
         for (const item of following) {
-          if (item.entityType === 'user') {
+          // Use followedType and followedId (not entityType/entityId)
+          if (item.followedType === 'user') {
             // Find user in publicUsers or fetch if needed
-            const user = publicUsers.find(u => u.id === item.entityId);
+            const user = publicUsers.find(u => u.id === item.followedId);
             if (user) {
               items.push({
-                id: item.entityId,
+                id: item.followedId,
                 type: 'user',
                 name: user.profile.userDetails?.name || 'User',
                 description: user.profile.userDetails?.description,
                 profileImage: user.profile.userDetails?.profileImage,
                 location: user.profile.userDetails?.location,
               });
+            } else {
+              // User not found in publicUsers, add with placeholder info
+              items.push({
+                id: item.followedId,
+                type: 'user',
+                name: 'User',
+                description: undefined,
+                profileImage: undefined,
+                location: undefined,
+              });
             }
-          } else if (item.entityType === 'business') {
-            const business = userBusinesses.find(b => b.id === item.entityId);
+          } else if (item.followedType === 'business') {
+            const business = userBusinesses.find(b => b.id === item.followedId);
             if (business) {
               items.push({
-                id: item.entityId,
+                id: item.followedId,
                 type: 'business',
                 name: business.businessInfo.name,
                 description: business.businessInfo.description,
@@ -285,18 +296,40 @@ export default function BrowseScreen() {
                 location: business.businessInfo.location,
                 category: business.businessInfo.category,
               });
+            } else {
+              // Business not found, add with placeholder info
+              items.push({
+                id: item.followedId,
+                type: 'business',
+                name: 'Business',
+                description: undefined,
+                profileImage: undefined,
+                location: undefined,
+                category: undefined,
+              });
             }
-          } else if (item.entityType === 'brand') {
-            const brand = brands?.find(b => b.id === item.entityId);
+          } else if (item.followedType === 'brand') {
+            const brand = brands?.find(b => b.id === item.followedId);
             if (brand) {
               items.push({
-                id: item.entityId,
+                id: item.followedId,
                 type: 'brand',
                 name: brand.name,
                 description: brand.description,
                 profileImage: brand.exampleImageUrl,
                 category: brand.category,
                 website: brand.website,
+              });
+            } else {
+              // Brand not found, add with placeholder info
+              items.push({
+                id: item.followedId,
+                type: 'brand',
+                name: 'Brand',
+                description: undefined,
+                profileImage: undefined,
+                category: undefined,
+                website: undefined,
               });
             }
           }
@@ -1466,10 +1499,10 @@ export default function BrowseScreen() {
       <View style={styles.searchSection}>
         {/* Search Bar */}
         <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.searchInputContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <Search size={20} color={colors.primary} strokeWidth={2} />
+          <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundSecondary }]}>
+            <Search size={22} color={colors.primary} strokeWidth={2} />
             <TextInput
-              style={[styles.searchInput, { color: colors.primary }]}
+              style={[styles.searchInput, { color: colors.text }]}
               placeholder="Search"
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
@@ -1487,7 +1520,7 @@ export default function BrowseScreen() {
                 style={{ padding: 8 }}
                 activeOpacity={0.7}
               >
-                <X size={20} color={colors.textSecondary} strokeWidth={2} />
+                <X size={22} color={colors.textSecondary} strokeWidth={2} />
               </TouchableOpacity>
             )}
           </View>
@@ -2219,16 +2252,16 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 0,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '500' as const,
+    fontSize: 18,
+    fontWeight: '600' as const,
     padding: 0,
     margin: 0,
   },

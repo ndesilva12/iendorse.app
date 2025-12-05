@@ -34,7 +34,7 @@ import { useLibrary } from '@/contexts/LibraryContext';
 import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
 import { getEndorsementList } from '@/services/firebase/listService';
 import { getLogoUrl } from '@/lib/logo';
-import { ListEntry } from '@/types/library';
+import { ListEntry, BrandListEntry, BusinessListEntry, PlaceListEntry } from '@/types/library';
 
 // Categories for filtering
 const CATEGORIES = [
@@ -58,7 +58,7 @@ const CATEGORIES = [
 // Map marker data interface
 interface MapMarker {
   id: string;
-  type: 'business' | 'brand';
+  type: 'business' | 'brand' | 'place';
   name: string;
   category: string;
   latitude: number;
@@ -118,6 +118,7 @@ export default function MapScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'endorsements' | 'local'>('endorsements');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showMarkersList, setShowMarkersList] = useState(false);
 
   // Fetch user location
   useEffect(() => {
@@ -166,24 +167,27 @@ export default function MapScreen() {
     fetchData();
   }, [clerkUser?.id]);
 
-  // Convert endorsement list entries and businesses to map markers
+  // Convert endorsement list entries to map markers
   const mapMarkers = useMemo(() => {
     const markers: MapMarker[] = [];
 
-    if (activeFilter === 'endorsements') {
-      // Show markers from user's endorsement list
-      endorsementList.forEach((entry) => {
-        // Check if it's a business with location
-        const business = allBusinesses.find(b => b.id === entry.itemId);
+    // Process all endorsement list entries
+    endorsementList.forEach((entry) => {
+      let marker: MapMarker | null = null;
+
+      if (entry.type === 'business') {
+        const businessEntry = entry as BusinessListEntry;
+        const business = allBusinesses.find(b => b.id === businessEntry.businessId);
+
         if (business && business.businessInfo.latitude && business.businessInfo.longitude) {
           const distance = userLocation
             ? calculateDistance(userLocation.latitude, userLocation.longitude, business.businessInfo.latitude, business.businessInfo.longitude)
             : undefined;
 
-          markers.push({
+          marker = {
             id: business.id,
             type: 'business',
-            name: business.businessInfo.name,
+            name: businessEntry.businessName || business.businessInfo.name,
             category: business.businessInfo.category || 'other',
             latitude: business.businessInfo.latitude,
             longitude: business.businessInfo.longitude,
@@ -191,20 +195,21 @@ export default function MapScreen() {
             address: business.businessInfo.location,
             distance,
             isLocal: distance ? distance <= 50 : false,
-          });
+          };
         }
+      } else if (entry.type === 'brand') {
+        const brandEntry = entry as BrandListEntry;
+        const brand = brands.find(b => b.id === brandEntry.brandId);
 
-        // Check if it's a brand with location (from Firebase brands)
-        const brand = brands.find(b => b.id === entry.itemId);
         if (brand && brand.latitude && brand.longitude) {
           const distance = userLocation
             ? calculateDistance(userLocation.latitude, userLocation.longitude, brand.latitude, brand.longitude)
             : undefined;
 
-          markers.push({
+          marker = {
             id: brand.id,
             type: 'brand',
-            name: brand.name,
+            name: brandEntry.brandName || brand.name,
             category: brand.category || 'other',
             latitude: brand.latitude,
             longitude: brand.longitude,
@@ -212,47 +217,54 @@ export default function MapScreen() {
             address: brand.location,
             distance,
             isLocal: distance ? distance <= 50 : false,
-          });
+          };
         }
-      });
-    } else if (activeFilter === 'local' && userLocation) {
-      // Show all local businesses within 50 miles
-      allBusinesses.forEach((business) => {
-        if (business.businessInfo.latitude && business.businessInfo.longitude) {
-          const distance = calculateDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            business.businessInfo.latitude,
-            business.businessInfo.longitude
-          );
+      } else if (entry.type === 'place') {
+        const placeEntry = entry as PlaceListEntry;
 
-          if (distance <= 50) {
-            markers.push({
-              id: business.id,
-              type: 'business',
-              name: business.businessInfo.name,
-              category: business.businessInfo.category || 'other',
-              latitude: business.businessInfo.latitude,
-              longitude: business.businessInfo.longitude,
-              logoUrl: business.businessInfo.logoUrl || (business.businessInfo.website ? getLogoUrl(business.businessInfo.website) : undefined),
-              address: business.businessInfo.location,
-              distance,
-              isLocal: true,
-            });
-          }
+        // Place entries have location directly in the entry
+        if (placeEntry.location?.lat && placeEntry.location?.lng) {
+          const distance = userLocation
+            ? calculateDistance(userLocation.latitude, userLocation.longitude, placeEntry.location.lat, placeEntry.location.lng)
+            : undefined;
+
+          marker = {
+            id: placeEntry.placeId,
+            type: 'place',
+            name: placeEntry.placeName,
+            category: placeEntry.category || 'other',
+            latitude: placeEntry.location.lat,
+            longitude: placeEntry.location.lng,
+            logoUrl: placeEntry.imageUrl,
+            address: placeEntry.address,
+            distance,
+            isLocal: distance ? distance <= 50 : false,
+          };
         }
-      });
+      }
+
+      if (marker) {
+        markers.push(marker);
+      }
+    });
+
+    // Apply filter
+    let filteredMarkers = markers;
+
+    // Local filter: only show markers within 50 miles
+    if (activeFilter === 'local') {
+      filteredMarkers = markers.filter(m => m.isLocal === true);
     }
 
     // Apply category filter
     if (selectedCategory !== 'all') {
-      return markers.filter(m =>
+      filteredMarkers = filteredMarkers.filter(m =>
         m.category.toLowerCase().includes(selectedCategory.toLowerCase()) ||
         selectedCategory.toLowerCase().includes(m.category.toLowerCase())
       );
     }
 
-    return markers;
+    return filteredMarkers;
   }, [endorsementList, allBusinesses, brands, activeFilter, selectedCategory, userLocation]);
 
   // Get unique categories from markers
@@ -311,8 +323,10 @@ export default function MapScreen() {
 
     if (selectedMarker.type === 'business') {
       router.push(`/business/${selectedMarker.id}`);
-    } else {
+    } else if (selectedMarker.type === 'brand') {
       router.push(`/brand/${selectedMarker.id}`);
+    } else if (selectedMarker.type === 'place') {
+      router.push(`/place/${selectedMarker.id}`);
     }
     setSelectedMarker(null);
   };
@@ -334,7 +348,12 @@ export default function MapScreen() {
   // Render filters
   const renderFilters = () => (
     <View style={[styles.filtersContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-      <View style={styles.filterRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScrollRow}
+        contentContainerStyle={styles.filterScrollContent}
+      >
         {/* Main filter buttons */}
         <TouchableOpacity
           style={[
@@ -378,49 +397,96 @@ export default function MapScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Category filter toggle */}
+        {/* Separator */}
+        <View style={[styles.filterSeparator, { backgroundColor: colors.border }]} />
+
+        {/* Category filter chips in same row */}
+        {CATEGORIES.filter(cat => availableCategories.includes(cat.id) || cat.id === 'all').map((cat) => (
+          <TouchableOpacity
+            key={cat.id}
+            style={[
+              styles.categoryChip,
+              selectedCategory === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color },
+              { borderColor: selectedCategory === cat.id ? cat.color : colors.border }
+            ]}
+            onPress={() => setSelectedCategory(cat.id)}
+          >
+            {selectedCategory === cat.id && (
+              <Check size={14} color={cat.color} strokeWidth={2.5} />
+            )}
+            <Text style={[
+              styles.categoryChipText,
+              { color: selectedCategory === cat.id ? cat.color : colors.text }
+            ]}>
+              {cat.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Collapsible markers list for web */}
+      {Platform.OS === 'web' && mapMarkers.length > 0 && (
         <TouchableOpacity
-          style={[styles.categoryToggle, { borderColor: colors.border }]}
-          onPress={() => setShowFilters(!showFilters)}
+          style={[styles.markersListToggle, { borderTopColor: colors.border }]}
+          onPress={() => setShowMarkersList(!showMarkersList)}
         >
-          <Filter size={18} color={selectedCategory !== 'all' ? colors.primary : colors.textSecondary} />
-          {showFilters ? (
-            <ChevronUp size={16} color={colors.textSecondary} />
+          <Text style={[styles.markersListToggleText, { color: colors.text }]}>
+            {mapMarkers.length} Location{mapMarkers.length !== 1 ? 's' : ''}
+          </Text>
+          {showMarkersList ? (
+            <ChevronUp size={18} color={colors.textSecondary} />
           ) : (
-            <ChevronDown size={16} color={colors.textSecondary} />
+            <ChevronDown size={18} color={colors.textSecondary} />
           )}
         </TouchableOpacity>
-      </View>
+      )}
 
-      {/* Category filter chips */}
-      {showFilters && (
+      {/* Expanded markers list for web */}
+      {Platform.OS === 'web' && showMarkersList && mapMarkers.length > 0 && (
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryScrollContent}
+          style={[styles.markersListExpanded, { borderTopColor: colors.border }]}
+          showsVerticalScrollIndicator={true}
         >
-          {CATEGORIES.filter(cat => availableCategories.includes(cat.id) || cat.id === 'all').map((cat) => (
+          {mapMarkers.slice(0, 20).map((marker) => (
             <TouchableOpacity
-              key={cat.id}
-              style={[
-                styles.categoryChip,
-                selectedCategory === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color },
-                { borderColor: selectedCategory === cat.id ? cat.color : colors.border }
-              ]}
-              onPress={() => setSelectedCategory(cat.id)}
+              key={marker.id}
+              style={[styles.markerListItem, { borderBottomColor: colors.border }]}
+              onPress={() => {
+                if (marker.type === 'business') {
+                  router.push(`/business/${marker.id}`);
+                } else if (marker.type === 'brand') {
+                  router.push(`/brand/${marker.id}`);
+                } else if (marker.type === 'place') {
+                  router.push(`/place/${marker.id}`);
+                }
+              }}
             >
-              {selectedCategory === cat.id && (
-                <Check size={14} color={cat.color} strokeWidth={2.5} />
-              )}
-              <Text style={[
-                styles.categoryChipText,
-                { color: selectedCategory === cat.id ? cat.color : colors.text }
-              ]}>
-                {cat.label}
-              </Text>
+              <View style={[styles.markerListLogo, { backgroundColor: '#FFFFFF' }]}>
+                {marker.logoUrl ? (
+                  <Image
+                    source={{ uri: marker.logoUrl }}
+                    style={styles.markerListLogoImage}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <MapPin size={16} color={colors.primary} />
+                )}
+              </View>
+              <View style={styles.markerListInfo}>
+                <Text style={[styles.markerListName, { color: colors.text }]} numberOfLines={1}>
+                  {marker.name}
+                </Text>
+                <Text style={[styles.markerListCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {marker.category}{marker.distance ? ` • ${marker.distance.toFixed(1)} mi` : ''}
+                </Text>
+              </View>
             </TouchableOpacity>
           ))}
+          {mapMarkers.length > 20 && (
+            <Text style={[styles.markersListMore, { color: colors.textSecondary }]}>
+              +{mapMarkers.length - 20} more locations
+            </Text>
+          )}
         </ScrollView>
       )}
     </View>
@@ -455,54 +521,6 @@ export default function MapScreen() {
               border: 'none',
             }}
           />
-          {/* Overlay markers list for web */}
-          {mapMarkers.length > 0 && (
-            <View style={[styles.webMarkersOverlay, { backgroundColor: colors.background }]}>
-              <Text style={[styles.webMarkersTitle, { color: colors.text }]}>
-                {mapMarkers.length} Location{mapMarkers.length !== 1 ? 's' : ''}
-              </Text>
-              <ScrollView style={styles.webMarkersList} showsVerticalScrollIndicator={false}>
-                {mapMarkers.slice(0, 10).map((marker) => (
-                  <TouchableOpacity
-                    key={marker.id}
-                    style={[styles.webMarkerItem, { borderBottomColor: colors.border }]}
-                    onPress={() => {
-                      if (marker.type === 'business') {
-                        router.push(`/business/${marker.id}`);
-                      } else {
-                        router.push(`/brand/${marker.id}`);
-                      }
-                    }}
-                  >
-                    <View style={[styles.webMarkerLogo, { backgroundColor: '#FFFFFF' }]}>
-                      {marker.logoUrl ? (
-                        <Image
-                          source={{ uri: marker.logoUrl }}
-                          style={styles.webMarkerLogoImage}
-                          contentFit="cover"
-                        />
-                      ) : (
-                        <MapPin size={20} color={colors.primary} />
-                      )}
-                    </View>
-                    <View style={styles.webMarkerInfo}>
-                      <Text style={[styles.webMarkerName, { color: colors.text }]} numberOfLines={1}>
-                        {marker.name}
-                      </Text>
-                      <Text style={[styles.webMarkerCategory, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {marker.category}{marker.distance ? ` • ${marker.distance.toFixed(1)} mi` : ''}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-                {mapMarkers.length > 10 && (
-                  <Text style={[styles.webMarkersMore, { color: colors.textSecondary }]}>
-                    +{mapMarkers.length - 10} more locations
-                  </Text>
-                )}
-              </ScrollView>
-            </View>
-          )}
         </View>
       );
     }
@@ -671,14 +689,20 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   filtersContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  filterRow: {
-    flexDirection: 'row',
+  filterScrollRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  filterScrollContent: {
     alignItems: 'center',
     gap: 8,
+  },
+  filterSeparator: {
+    width: 1,
+    height: 24,
+    marginHorizontal: 4,
   },
   filterButton: {
     flexDirection: 'row',
@@ -708,22 +732,58 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  categoryToggle: {
+  markersListToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+  },
+  markersListToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  markersListExpanded: {
+    maxHeight: 250,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+  },
+  markerListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 10,
+  },
+  markerListLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  markerListLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  markerListInfo: {
+    flex: 1,
+  },
+  markerListName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  markerListCategory: {
+    fontSize: 12,
+    textTransform: 'capitalize',
+  },
+  markersListMore: {
+    fontSize: 12,
+    textAlign: 'center',
     paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    gap: 4,
-    marginLeft: 'auto',
-  },
-  categoryScroll: {
-    marginTop: 12,
-  },
-  categoryScrollContent: {
-    gap: 8,
-    paddingRight: 16,
   },
   categoryChip: {
     flexDirection: 'row',
@@ -870,64 +930,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-  },
-  // Web-specific styles
-  webMarkersOverlay: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 280,
-    maxHeight: '60%',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  webMarkersTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  webMarkersList: {
-    flex: 1,
-  },
-  webMarkerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    gap: 10,
-  },
-  webMarkerLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  webMarkerLogoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  webMarkerInfo: {
-    flex: 1,
-  },
-  webMarkerName: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  webMarkerCategory: {
-    fontSize: 12,
-    textTransform: 'capitalize',
-  },
-  webMarkersMore: {
-    fontSize: 12,
-    textAlign: 'center',
-    paddingVertical: 8,
   },
 });
