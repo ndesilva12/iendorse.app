@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, TrendingUp, TrendingDown, AlertCircle, ThumbsUp, MapPin, Plus, X, ChevronRight, List, UserPlus, MoreVertical, Share2, Users } from 'lucide-react-native';
+import { ArrowLeft, AlertCircle, ThumbsUp, MapPin, Plus, X, ChevronRight, List, UserPlus, MoreVertical, Share2, Users } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { lightColors, darkColors } from '@/constants/colors';
-import { AVAILABLE_VALUES } from '@/mocks/causes';
 import { useUser } from '@/contexts/UserContext';
 import { useData } from '@/contexts/DataContext';
 import { useLibrary } from '@/contexts/LibraryContext';
@@ -559,35 +558,8 @@ export default function BrandDetailScreen() {
     }
   };
 
-  // Calculate which values match with this brand - split into aligned and unaligned
-  const alignedValues: { id: string; userStance: string; brandStance: string }[] = [];
-  const unalignedValues: { id: string; userStance: string; brandStance: string }[] = [];
-  const matchingValues: string[] = []; // Legacy - all shared values
-
-  if (brand && brand.name && profile.causes && valuesMatrix) {
-    profile.causes.forEach(cause => {
-      const valueData = valuesMatrix[cause.id];
-      if (!valueData) return;
-
-      const isInSupport = valueData.support.includes(brand.name);
-      const isInOppose = valueData.oppose.includes(brand.name);
-
-      if (isInSupport || isInOppose) {
-        matchingValues.push(cause.id);
-
-        const brandStance = isInSupport ? 'support' : 'oppose';
-        const userStance = cause.type;
-
-        if (userStance === brandStance) {
-          // Both have same stance
-          alignedValues.push({ id: cause.id, userStance, brandStance });
-        } else {
-          // Conflicting stances
-          unalignedValues.push({ id: cause.id, userStance, brandStance });
-        }
-      }
-    });
-  }
+  // Note: Values alignment calculation removed - values are no longer associated with user profiles
+  // Values are now only used for browsing brands by their associations
 
   // Show loading state
   if (isLoading) {
@@ -852,89 +824,7 @@ export default function BrandDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Why Section - Hidden for business accounts since they don't have values */}
-          {profile?.accountType !== 'business' && (
-          <View style={[styles.alignmentCard, { backgroundColor: colors.backgroundSecondary }]}>
-            <View style={styles.alignmentLabelRow}>
-              <Text style={[styles.alignmentLabel, { color: colors.text }]}>
-                Why
-              </Text>
-            </View>
-
-            {/* Aligned Values Section */}
-            {alignedValues.length > 0 && (
-              <View style={styles.whySubsection}>
-                <View style={styles.whySubsectionHeader}>
-                  <TrendingUp size={16} color={colors.success} strokeWidth={2} />
-                  <Text style={[styles.whySubsectionTitle, { color: colors.success }]}>
-                    Aligned ({alignedValues.length})
-                  </Text>
-                </View>
-                <View style={styles.valueTagsContainer}>
-                  {alignedValues.map((item) => {
-                    const allValues = Object.values(AVAILABLE_VALUES).flat();
-                    const value = allValues.find(v => v.id === item.id);
-                    if (!value) return null;
-
-                    const tagColor = item.userStance === 'support' ? colors.success : colors.danger;
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[styles.valueTag, { backgroundColor: tagColor + '15' }]}
-                        onPress={() => router.push(`/value/${item.id}`)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.valueTagText, { color: tagColor }]}>
-                          {value.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {/* Unaligned Values Section */}
-            {unalignedValues.length > 0 && (
-              <View style={[styles.whySubsection, alignedValues.length > 0 && { marginTop: 16 }]}>
-                <View style={styles.whySubsectionHeader}>
-                  <TrendingDown size={16} color={colors.danger} strokeWidth={2} />
-                  <Text style={[styles.whySubsectionTitle, { color: colors.danger }]}>
-                    Not Aligned ({unalignedValues.length})
-                  </Text>
-                </View>
-                <View style={styles.valueTagsContainer}>
-                  {unalignedValues.map((item) => {
-                    const allValues = Object.values(AVAILABLE_VALUES).flat();
-                    const value = allValues.find(v => v.id === item.id);
-                    if (!value) return null;
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[styles.valueTag, { backgroundColor: colors.danger + '15' }]}
-                        onPress={() => router.push(`/value/${item.id}`)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.valueTagText, { color: colors.danger }]}>
-                          {value.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {/* Show message if no shared values */}
-            {alignedValues.length === 0 && unalignedValues.length === 0 && (
-              <Text style={[styles.noValuesText, { color: colors.textSecondary }]}>
-                No shared values to compare
-              </Text>
-            )}
-          </View>
-          )}
+          {/* Note: "Why" section removed - values are no longer associated with user profiles */}
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Money Flow</Text>
@@ -1232,7 +1122,7 @@ export default function BrandDetailScreen() {
                 userId={brand.id}
                 entityType="brand"
                 isDarkMode={isDarkMode}
-                userCauses={profile?.causes || []}
+                userCauses={[]}
               />
             )}
           </View>
@@ -1259,7 +1149,7 @@ export default function BrandDetailScreen() {
                 mode="following"
                 userId={brand.id}
                 isDarkMode={isDarkMode}
-                userCauses={profile?.causes || []}
+                userCauses={[]}
               />
             )}
           </View>

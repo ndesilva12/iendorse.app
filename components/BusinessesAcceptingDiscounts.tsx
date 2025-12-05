@@ -99,7 +99,6 @@ export default function BusinessesAcceptingDiscounts() {
       totalBusinesses: businesses.length,
       hasLocation: !!userLocation,
       userLocation,
-      userCausesCount: profile.causes?.length || 0,
       distanceFilter,
     });
 
@@ -122,11 +121,7 @@ export default function BusinessesAcceptingDiscounts() {
         );
       }
 
-      // Calculate alignment score if user has causes
-      if (profile.causes && profile.causes.length > 0) {
-        const rawScore = calculateAlignmentScore(profile.causes, business.causes || []);
-        newBusiness.alignmentScore = rawScore;
-      }
+      // Note: Alignment score calculation removed - values are no longer associated with user profiles
 
       return newBusiness;
     });
@@ -192,7 +187,7 @@ export default function BusinessesAcceptingDiscounts() {
 
     console.log('[BusinessesAcceptingDiscounts] ✅ Final filtered businesses:', processed.length);
     setFilteredBusinesses(processed);
-  }, [userLocation, businesses, distanceFilter, searchQuery, profile.causes]);
+  }, [userLocation, businesses, distanceFilter, searchQuery]);
 
   const handleEnableLocation = () => {
     Alert.alert(

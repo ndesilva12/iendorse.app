@@ -692,7 +692,7 @@ export default function ProfileScreen() {
               profileImage={profileImageUrl}
               userBusinesses={userBusinesses}
               scoredBrands={scoredBrands}
-              userCauses={profile?.causes || []}
+              userCauses={[]}
               followingCount={followingCount}
               followersCount={followersCount}
             />
@@ -731,7 +731,7 @@ export default function ProfileScreen() {
                 mode={followModalMode}
                 userId={clerkUser.id}
                 isDarkMode={isDarkMode}
-                userCauses={profile?.causes || []}
+                userCauses={[]}
                 onNavigate={() => {
                   setFollowModalVisible(false);
                   setSelectedStatSection('endorsements');

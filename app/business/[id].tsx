@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, TrendingUp, TrendingDown, AlertCircle, MapPin, Navigation, Percent, X, Plus, ChevronRight, List, UserPlus, MoreVertical, Share2, Users, Star, Heart, Search, BookOpen, Compass } from 'lucide-react-native';
+import { ArrowLeft, AlertCircle, MapPin, Navigation, Percent, X, Plus, ChevronRight, List, UserPlus, MoreVertical, Share2, Users, Star, Heart, Search, BookOpen, Compass } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { lightColors, darkColors } from '@/constants/colors';
-import { AVAILABLE_VALUES } from '@/mocks/causes';
 import { useUser } from '@/contexts/UserContext';
 import { useData } from '@/contexts/DataContext';
 import { useLibrary } from '@/contexts/LibraryContext';
@@ -521,78 +520,8 @@ export default function BusinessDetailScreen() {
     alignmentStrength: 50
   };
 
-  // Calculate similarity score using new scoring system with normalization
-  // Match the normalization logic from home tab to ensure scores are consistent
-  let similarityScore = 0;
-  let similarityLabel = 'Different';
-  let matchingValues: string[] = [];
-
-  if (business && profile.causes && allBusinesses.length > 0) {
-    // Calculate scores for all businesses
-    const businessesWithScores = allBusinesses.map(b => ({
-      ...b,
-      alignmentScore: calculateSimilarityScore(profile.causes || [], b.causes || [])
-    }));
-
-    // Calculate raw brand scores for reference distribution
-    const rawBrandScores = brands && valuesMatrix
-      ? brands.map(brand => calculateBrandScore(brand.name, profile.causes || [], valuesMatrix))
-      : [];
-
-    // Normalize similarity scores using brand scores as reference distribution
-    // This allows businesses to be compared on the same scale as brands
-    const normalizedBusinesses = rawBrandScores.length > 0
-      ? normalizeBusinessScoresWithBrands(businessesWithScores, rawBrandScores)
-      : normalizeSimilarityScores(businessesWithScores);
-
-    // Find the score for the current business
-    const currentBusinessScore = normalizedBusinesses.find(b => b.id === business.id);
-    similarityScore = currentBusinessScore?.alignmentScore || 50;
-    similarityLabel = getSimilarityLabel(similarityScore);
-
-    // Create maps of user and business values with their stances
-    const userValueMap = new Map(profile.causes.map(c => [c.id, c.type]));
-    const bizValueMap = new Map((business.causes || []).map(c => [c.id, c.type]));
-
-    // Find all value IDs that either user or business has
-    const allValueIds = new Set([...userValueMap.keys(), ...bizValueMap.keys()]);
-
-    const alignedValues: { id: string; userStance: string; bizStance: string }[] = [];
-    const unalignedValues: { id: string; userStance: string; bizStance: string }[] = [];
-
-    allValueIds.forEach(valueId => {
-      const userStance = userValueMap.get(valueId);
-      const bizStance = bizValueMap.get(valueId);
-
-      if (userStance && bizStance) {
-        // Both have this value - check if same stance
-        if (userStance === bizStance) {
-          alignedValues.push({ id: valueId, userStance, bizStance });
-        } else {
-          unalignedValues.push({ id: valueId, userStance, bizStance });
-        }
-      }
-    });
-
-    // Legacy: values that both have (regardless of stance)
-    const userValueIds = new Set(profile.causes.map(c => c.id));
-    const bizValueIds = new Set((business.causes || []).map(c => c.id));
-    matchingValues = [...userValueIds].filter(id => bizValueIds.has(id));
-
-    const isAligned = similarityScore >= 50;
-
-    alignmentData = {
-      isAligned,
-      matchingValues,
-      alignedValues,
-      unalignedValues,
-      alignmentStrength: similarityScore
-    };
-  }
-
-  const alignmentColor = similarityScore >= 60 ? colors.success : similarityScore < 40 ? colors.danger : colors.textSecondary;
-  const AlignmentIcon = similarityScore >= 60 ? TrendingUp : TrendingDown;
-  const alignmentLabel = alignmentData.isAligned ? 'Aligned' : 'Not Aligned';
+  // Note: Similarity score calculation removed - values are no longer associated with user profiles
+  // Businesses are now displayed without personalized alignment scoring
 
   // Get primary location
   const getPrimaryLocation = () => {
@@ -1553,7 +1482,7 @@ export default function BusinessDetailScreen() {
                 userId={business.id}
                 entityType="business"
                 isDarkMode={isDarkMode}
-                userCauses={profile?.causes || []}
+                userCauses={[]}
               />
             )}
           </View>
@@ -1580,7 +1509,7 @@ export default function BusinessDetailScreen() {
                 mode="following"
                 userId={business.id}
                 isDarkMode={isDarkMode}
-                userCauses={profile?.causes || []}
+                userCauses={[]}
               />
             )}
           </View>

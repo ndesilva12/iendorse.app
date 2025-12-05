@@ -17,17 +17,10 @@ export default function Index() {
     console.log('[Index] isSignedIn:', isSignedIn);
     console.log('[Index] hasCompletedOnboarding:', hasCompletedOnboarding);
     console.log('[Index] isNewUser:', isNewUser, '(type:', typeof isNewUser, ')');
-    console.log('[Index] causeCount:', profile.causes.length);
     console.log('[Index] accountType:', profile.accountType);
     console.log('[Index] promoCode:', profile.promoCode);
     console.log('[Index] ===========================');
-  }, [isLoaded, userLoading, isSignedIn, hasCompletedOnboarding, isNewUser, profile.causes.length, profile.accountType, profile.promoCode]);
-
-  useEffect(() => {
-    if (isSignedIn && !userLoading && profile.causes.length > 0 && !hasCompletedOnboarding) {
-      console.log('[Index] ⚠️ MISMATCH: has causes but hasCompletedOnboarding is false');
-    }
-  }, [isSignedIn, userLoading, profile.causes.length, hasCompletedOnboarding]);
+  }, [isLoaded, userLoading, isSignedIn, hasCompletedOnboarding, isNewUser, profile.accountType, profile.promoCode]);
 
   if (!isLoaded || userLoading) {
     console.log('[Index] 🔄 Showing loading state');
@@ -44,10 +37,10 @@ export default function Index() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  // If user has completed onboarding OR has causes, go to home
-  // This ensures users with causes don't get stuck in onboarding loops
-  if (hasCompletedOnboarding || profile.causes.length > 0) {
-    console.log('[Index] ✅ User has completed onboarding or has causes, redirecting to home');
+  // If user has completed onboarding, go to home
+  // Note: values/causes no longer associated with users
+  if (hasCompletedOnboarding) {
+    console.log('[Index] ✅ User has completed onboarding, redirecting to home');
     return <Redirect href="/(tabs)/home" />;
   }
 

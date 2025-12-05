@@ -1199,7 +1199,7 @@ export default function HomeScreen() {
         profileImage={profile?.userDetails?.profileImage || clerkUser?.imageUrl}
         userBusinesses={userBusinesses}
         scoredBrands={scoredBrands}
-        userCauses={profile?.causes || []}
+        userCauses={[]}
         userLocation={userLocation}
         onRequestLocation={requestLocation}
         followingCount={followingCount}
@@ -2866,7 +2866,7 @@ export default function HomeScreen() {
         profileImage={profile?.userDetails?.profileImage || clerkUser?.imageUrl}
         userBusinesses={userBusinesses}
         scoredBrands={scoredBrands}
-        userCauses={profile?.causes || []}
+        userCauses={[]}
         userLocation={userLocation}
         onRequestLocation={requestLocation}
         followingCount={followingCount}

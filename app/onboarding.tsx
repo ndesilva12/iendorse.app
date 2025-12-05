@@ -320,17 +320,8 @@ export default function OnboardingScreen() {
 
   const minValues = 3;
 
-  useEffect(() => {
-    if (profile.causes.length > 0) {
-      setSelectedValues(profile.causes.map(c => ({
-        id: c.id,
-        name: c.name,
-        category: c.category,
-        type: c.type,
-        description: c.description,
-      })));
-    }
-  }, [profile.causes]);
+  // Note: Values are no longer associated with user profiles
+  // The onboarding flow no longer restores previously selected values
 
   const handleSelectPlace = (place: PlaceSearchResult) => {
     setSelectedPlace(place);
