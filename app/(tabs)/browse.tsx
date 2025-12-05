@@ -258,11 +258,12 @@ export default function BrowseScreen() {
       try {
         const following = await getFollowing(clerkUser.id);
         const items: FollowingItem[] = [];
+        const staleFollows: Array<{ id: string; type: 'user' | 'brand' | 'business' }> = [];
 
         for (const item of following) {
           // Use followedType and followedId (not entityType/entityId)
           if (item.followedType === 'user') {
-            // Find user in publicUsers or fetch if needed
+            // Find user in publicUsers
             const user = publicUsers.find(u => u.id === item.followedId);
             if (user) {
               items.push({
@@ -274,15 +275,8 @@ export default function BrowseScreen() {
                 location: user.profile.userDetails?.location,
               });
             } else {
-              // User not found in publicUsers, add with placeholder info
-              items.push({
-                id: item.followedId,
-                type: 'user',
-                name: 'User',
-                description: undefined,
-                profileImage: undefined,
-                location: undefined,
-              });
+              // User not found - mark for cleanup
+              staleFollows.push({ id: item.followedId, type: 'user' });
             }
           } else if (item.followedType === 'business') {
             const business = userBusinesses.find(b => b.id === item.followedId);
@@ -297,16 +291,8 @@ export default function BrowseScreen() {
                 category: business.businessInfo.category,
               });
             } else {
-              // Business not found, add with placeholder info
-              items.push({
-                id: item.followedId,
-                type: 'business',
-                name: 'Business',
-                description: undefined,
-                profileImage: undefined,
-                location: undefined,
-                category: undefined,
-              });
+              // Business not found - mark for cleanup
+              staleFollows.push({ id: item.followedId, type: 'business' });
             }
           } else if (item.followedType === 'brand') {
             const brand = brands?.find(b => b.id === item.followedId);
@@ -321,21 +307,25 @@ export default function BrowseScreen() {
                 website: brand.website,
               });
             } else {
-              // Brand not found, add with placeholder info
-              items.push({
-                id: item.followedId,
-                type: 'brand',
-                name: 'Brand',
-                description: undefined,
-                profileImage: undefined,
-                category: undefined,
-                website: undefined,
-              });
+              // Brand not found - mark for cleanup
+              staleFollows.push({ id: item.followedId, type: 'brand' });
             }
           }
         }
 
         setFollowingItems(items);
+
+        // Clean up stale follow records in background (entities that no longer exist)
+        if (staleFollows.length > 0) {
+          console.log('[Browse] Cleaning up', staleFollows.length, 'stale follow records');
+          for (const stale of staleFollows) {
+            try {
+              await unfollowEntity(clerkUser.id, stale.id, stale.type);
+            } catch (err) {
+              console.error('[Browse] Error cleaning up stale follow:', err);
+            }
+          }
+        }
       } catch (error) {
         console.error('[Browse] Error fetching following:', error);
       } finally {
