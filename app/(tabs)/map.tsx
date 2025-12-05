@@ -185,8 +185,8 @@ export default function MapScreen() {
     loadData();
   }, [clerkUser?.id, library.state.userLists]);
 
-  // Convert endorsement list entries to map markers
-  const mapMarkers = useMemo(() => {
+  // Convert endorsement list entries to map markers (without category filter)
+  const allMarkers = useMemo(() => {
     const markers: MapMarker[] = [];
     let placeCount = 0;
     let businessCount = 0;
@@ -280,35 +280,40 @@ export default function MapScreen() {
     console.log('[Map] Entry breakdown: places:', placeCount, 'businesses:', businessCount, 'brands:', brandCount);
     console.log('[Map] Markers created:', markers.length, 'No location:', noLocationCount);
 
-    // Apply filter
-    let filteredMarkers = markers;
+    return markers;
+  }, [endorsementList, allBusinesses, brands, userLocation]);
+
+  // Get unique categories from ALL markers (before filtering)
+  const availableCategories = useMemo(() => {
+    const cats = new Set<string>();
+    allMarkers.forEach(m => {
+      if (m.category) {
+        cats.add(m.category.toLowerCase());
+      }
+    });
+    return ['all', ...Array.from(cats)];
+  }, [allMarkers]);
+
+  // Apply filters to get displayed markers
+  const mapMarkers = useMemo(() => {
+    let filteredMarkers = allMarkers;
 
     // Local filter: only show markers within 25 miles
     if (activeFilter === 'local') {
-      filteredMarkers = markers.filter(m => m.isLocal === true);
+      filteredMarkers = filteredMarkers.filter(m => m.isLocal === true);
     }
 
     // Apply category filter
     if (selectedCategory !== 'all') {
       filteredMarkers = filteredMarkers.filter(m =>
+        m.category.toLowerCase() === selectedCategory.toLowerCase() ||
         m.category.toLowerCase().includes(selectedCategory.toLowerCase()) ||
         selectedCategory.toLowerCase().includes(m.category.toLowerCase())
       );
     }
 
     return filteredMarkers;
-  }, [endorsementList, allBusinesses, brands, activeFilter, selectedCategory, userLocation]);
-
-  // Get unique categories from markers
-  const availableCategories = useMemo(() => {
-    const cats = new Set<string>();
-    mapMarkers.forEach(m => {
-      if (m.category) {
-        cats.add(m.category.toLowerCase());
-      }
-    });
-    return ['all', ...Array.from(cats)];
-  }, [mapMarkers]);
+  }, [allMarkers, activeFilter, selectedCategory]);
 
   // Calculate map region
   const mapRegion = useMemo(() => {
@@ -432,8 +437,8 @@ export default function MapScreen() {
         {/* Separator */}
         <View style={[styles.filterSeparator, { backgroundColor: colors.border }]} />
 
-        {/* Category filter chips in same row */}
-        {CATEGORIES.filter(cat => availableCategories.includes(cat.id) || cat.id === 'all').map((cat) => (
+        {/* Category filter chips in same row - always show all categories */}
+        {CATEGORIES.map((cat) => (
           <TouchableOpacity
             key={cat.id}
             style={[
@@ -1046,15 +1051,15 @@ const styles = StyleSheet.create({
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1.5,
     gap: 4,
   },
   categoryChipText: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
   mapWrapper: {
     flex: 1,
