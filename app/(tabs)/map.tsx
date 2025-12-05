@@ -311,10 +311,7 @@ export default function MapScreen() {
     <View style={[styles.mainHeaderContainer, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Image
-          source={isDarkMode
-            ? require('@/assets/images/iendorse-logo-dark.png')
-            : require('@/assets/images/iendorse-logo-light.png')
-          }
+          source={require('@/assets/images/endorsing.png')}
           style={styles.headerLogo}
           contentFit="contain"
         />
