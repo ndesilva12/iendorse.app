@@ -21,11 +21,13 @@ import { Image } from 'expo-image';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
 import { useData } from '@/contexts/DataContext';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useLibrary } from '@/contexts/LibraryContext';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { getLogoUrl } from '@/lib/logo';
-import { getList } from '@/services/firebase/listService';
+import { getList, addEntryToList, getEndorsementList } from '@/services/firebase/listService';
 import { getPlacePhotoUrl } from '@/services/firebase/placesService';
-import { UserList, ListEntry } from '@/types/library';
+import { followEntity, isFollowing } from '@/services/firebase/followService';
+import { UserList, ListEntry, BrandListEntry, BusinessListEntry } from '@/types/library';
 import * as Clipboard from 'expo-clipboard';
 import EndorsedBadge from '@/components/EndorsedBadge';
 import MenuButton from '@/components/MenuButton';
@@ -98,6 +100,7 @@ export default function SharedListScreen() {
   const { isDarkMode, clerkUser } = useUser();
   const colors = isDarkMode ? darkColors : lightColors;
   const { brands, values } = useData();
+  const library = useLibrary();
 
   const isSignedIn = !!clerkUser;
 
@@ -111,6 +114,13 @@ export default function SharedListScreen() {
 
   // Map modal state
   const [showMapModal, setShowMapModal] = useState(false);
+
+  // Track user's endorsed and followed items for map popup buttons
+  const [endorsedIds, setEndorsedIds] = useState<Set<string>>(new Set());
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
+
+  // Check if this is the user's own list
+  const isOwnList = list?.userId === clerkUser?.id;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -151,6 +161,114 @@ export default function SharedListScreen() {
       setIsLoading(false);
     }
   };
+
+  // Load user's endorsed items and follow status when viewing another user's list
+  useEffect(() => {
+    const loadUserEndorsementsAndFollows = async () => {
+      if (!clerkUser?.id || !list || isOwnList) return;
+
+      try {
+        // Get user's endorsement list to check what they've already endorsed
+        const endorsementList = library.state.userLists?.find(l => l.isEndorsed);
+        if (endorsementList?.entries) {
+          const endorsed = new Set<string>();
+          endorsementList.entries.forEach(entry => {
+            if (entry.type === 'brand') {
+              endorsed.add((entry as BrandListEntry).brandId);
+            } else if (entry.type === 'business') {
+              endorsed.add((entry as BusinessListEntry).businessId);
+            }
+          });
+          setEndorsedIds(endorsed);
+        }
+
+        // Check follow status for each brand/business in the list
+        const followed = new Set<string>();
+        for (const entry of list.entries) {
+          if (entry.type === 'brand') {
+            const brandEntry = entry as BrandListEntry;
+            const isFollowed = await isFollowing(clerkUser.id, brandEntry.brandId, 'brand');
+            if (isFollowed) followed.add(brandEntry.brandId);
+          } else if (entry.type === 'business') {
+            const businessEntry = entry as BusinessListEntry;
+            const isFollowed = await isFollowing(clerkUser.id, businessEntry.businessId, 'business');
+            if (isFollowed) followed.add(businessEntry.businessId);
+          }
+        }
+        setFollowedIds(followed);
+      } catch (error) {
+        console.error('Error loading endorsements/follows:', error);
+      }
+    };
+
+    loadUserEndorsementsAndFollows();
+  }, [clerkUser?.id, list, isOwnList, library.state.userLists]);
+
+  // Handle endorsing an item from the map popup
+  const handleEndorse = useCallback(async (entry: MapEntry) => {
+    if (!clerkUser?.id || !isSignedIn) {
+      Alert.alert('Sign In Required', 'Please sign in to endorse items.');
+      return;
+    }
+
+    try {
+      // Find the user's endorsement list
+      const endorsementList = library.state.userLists?.find(l => l.isEndorsed);
+      if (!endorsementList) {
+        Alert.alert('Error', 'Could not find your endorsement list.');
+        return;
+      }
+
+      // Create the entry to add
+      let newEntry: BrandListEntry | BusinessListEntry;
+      if (entry.type === 'brand') {
+        newEntry = {
+          id: `brand-${entry.id}-${Date.now()}`,
+          type: 'brand',
+          brandId: entry.id,
+          brandName: entry.name,
+          brandCategory: entry.category,
+          createdAt: new Date(),
+        };
+      } else if (entry.type === 'business') {
+        newEntry = {
+          id: `business-${entry.id}-${Date.now()}`,
+          type: 'business',
+          businessId: entry.id,
+          businessName: entry.name,
+          businessCategory: entry.category,
+          createdAt: new Date(),
+        };
+      } else {
+        return; // Places can't be endorsed this way
+      }
+
+      await addEntryToList(endorsementList.id, newEntry);
+      setEndorsedIds(prev => new Set(prev).add(entry.id));
+      Alert.alert('Success', `${entry.name} has been added to your endorsement list!`);
+    } catch (error) {
+      console.error('Error endorsing item:', error);
+      Alert.alert('Error', 'Failed to endorse this item. Please try again.');
+    }
+  }, [clerkUser?.id, isSignedIn, library.state.userLists]);
+
+  // Handle following an item from the map popup
+  const handleFollow = useCallback(async (entry: MapEntry) => {
+    if (!clerkUser?.id || !isSignedIn) {
+      Alert.alert('Sign In Required', 'Please sign in to follow items.');
+      return;
+    }
+
+    try {
+      const followType = entry.type === 'brand' ? 'brand' : 'business';
+      await followEntity(clerkUser.id, entry.id, followType);
+      setFollowedIds(prev => new Set(prev).add(entry.id));
+      Alert.alert('Success', `You are now following ${entry.name}!`);
+    } catch (error) {
+      console.error('Error following item:', error);
+      Alert.alert('Error', 'Failed to follow this item. Please try again.');
+    }
+  }, [clerkUser?.id, isSignedIn]);
 
   // Get category for an entry
   const getEntryCategory = (entry: ListEntry): string | undefined => {
@@ -857,6 +975,7 @@ export default function SharedListScreen() {
                 <EndorsementMapView
                   entries={mapEntries}
                   mapId="shared-list-map"
+                  isOwnMap={isOwnList}
                   onEntryPress={(entry) => {
                     setShowMapModal(false);
                     if (entry.type === 'place') {
@@ -867,6 +986,10 @@ export default function SharedListScreen() {
                       router.push(`/business/${entry.id}`);
                     }
                   }}
+                  onEndorse={handleEndorse}
+                  onFollow={handleFollow}
+                  endorsedIds={endorsedIds}
+                  followedIds={followedIds}
                 />
               ) : (
                 <View style={styles.mapModalEmpty}>

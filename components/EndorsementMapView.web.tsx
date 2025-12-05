@@ -21,6 +21,12 @@ type Props = {
   userLocation?: { latitude: number; longitude: number } | null;
   onEntryPress?: (entry: MapEntry) => void;
   mapId?: string;
+  // For other users' maps - show endorse/follow buttons
+  isOwnMap?: boolean;
+  onEndorse?: (entry: MapEntry) => void;
+  onFollow?: (entry: MapEntry) => void;
+  endorsedIds?: Set<string>;
+  followedIds?: Set<string>;
 };
 
 // Create marker icon HTML
@@ -35,10 +41,65 @@ function createMarkerIconHtml(index: number): string {
 }
 
 // Create popup content HTML
-function createPopupContentHtml(entry: MapEntry): string {
+function createPopupContentHtml(
+  entry: MapEntry,
+  isOwnMap: boolean = true,
+  isEndorsed: boolean = false,
+  isFollowed: boolean = false
+): string {
   const logoHtml = entry.logoUrl
     ? `<img src="${entry.logoUrl}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover; margin-bottom: 8px;" onerror="this.style.display='none'" />`
     : '';
+
+  // Only show endorse/follow buttons for brand and business types when viewing someone else's map
+  const showEndorseFollow = !isOwnMap && (entry.type === 'brand' || entry.type === 'business');
+
+  const endorseButtonHtml = showEndorseFollow ? `
+    <button
+      onclick="window.dispatchEvent(new CustomEvent('endorse-entry', { detail: '${entry.id}__${entry.type}' }))"
+      style="
+        flex: 1;
+        background-color: ${isEndorsed ? '#22C55E' : '#00aaff'};
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        opacity: ${isEndorsed ? '0.7' : '1'};
+      "
+      ${isEndorsed ? 'disabled' : ''}
+    >
+      ${isEndorsed ? 'Endorsed' : 'Endorse'}
+    </button>
+  ` : '';
+
+  const followButtonHtml = showEndorseFollow ? `
+    <button
+      onclick="window.dispatchEvent(new CustomEvent('follow-entry', { detail: '${entry.id}__${entry.type}' }))"
+      style="
+        flex: 1;
+        background-color: ${isFollowed ? '#6B7280' : 'white'};
+        color: ${isFollowed ? 'white' : '#00aaff'};
+        border: ${isFollowed ? 'none' : '2px solid #00aaff'};
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      "
+    >
+      ${isFollowed ? 'Following' : 'Follow'}
+    </button>
+  ` : '';
+
+  const actionButtonsHtml = showEndorseFollow ? `
+    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+      ${endorseButtonHtml}
+      ${followButtonHtml}
+    </div>
+  ` : '';
 
   return `
     <div style="min-width: 200px; padding: 12px;">
@@ -56,6 +117,7 @@ function createPopupContentHtml(entry: MapEntry): string {
           📍 ${entry.address}
         </div>
       ` : ''}
+      ${actionButtonsHtml}
       <button
         onclick="window.dispatchEvent(new CustomEvent('navigate-to-entry', { detail: '${entry.id}__${entry.type}' }))"
         style="
@@ -76,17 +138,37 @@ function createPopupContentHtml(entry: MapEntry): string {
   `;
 }
 
-export default function EndorsementMapView({ entries, userLocation, onEntryPress, mapId = 'endorsement-map' }: Props) {
+export default function EndorsementMapView({
+  entries,
+  userLocation,
+  onEntryPress,
+  mapId = 'endorsement-map',
+  isOwnMap = true,
+  onEndorse,
+  onFollow,
+  endorsedIds = new Set(),
+  followedIds = new Set(),
+}: Props) {
   const mapRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const isInitializedRef = useRef(false);
   const fitBoundsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const entriesRef = useRef(entries);
   const onEntryPressRef = useRef(onEntryPress);
+  const onEndorseRef = useRef(onEndorse);
+  const onFollowRef = useRef(onFollow);
+  const isOwnMapRef = useRef(isOwnMap);
+  const endorsedIdsRef = useRef(endorsedIds);
+  const followedIdsRef = useRef(followedIds);
 
   // Keep refs updated
   entriesRef.current = entries;
   onEntryPressRef.current = onEntryPress;
+  onEndorseRef.current = onEndorse;
+  onFollowRef.current = onFollow;
+  isOwnMapRef.current = isOwnMap;
+  endorsedIdsRef.current = endorsedIds;
+  followedIdsRef.current = followedIds;
 
   // Load Leaflet CSS once
   useEffect(() => {
@@ -173,6 +255,9 @@ export default function EndorsementMapView({ entries, userLocation, onEntryPress
 
         if (!markersRef.current.has(markerId)) {
           try {
+            const isEndorsed = endorsedIdsRef.current.has(entry.id);
+            const isFollowed = followedIdsRef.current.has(entry.id);
+
             const marker = L.marker([entry.location.lat, entry.location.lng], {
               icon: L.divIcon({
                 className: 'endorsement-marker',
@@ -182,7 +267,7 @@ export default function EndorsementMapView({ entries, userLocation, onEntryPress
               }),
             })
               .addTo(mapRef.current)
-              .bindPopup(createPopupContentHtml(entry), {
+              .bindPopup(createPopupContentHtml(entry, isOwnMapRef.current, isEndorsed, isFollowed), {
                 maxWidth: 280,
                 className: 'endorsement-popup'
               });
@@ -275,9 +360,35 @@ export default function EndorsementMapView({ entries, userLocation, onEntryPress
       }
     };
 
+    const handleEndorse = (event: any) => {
+      const callback = onEndorseRef.current;
+      if (callback) {
+        const [id, type] = event.detail.split('__');
+        const entry = entriesRef.current.find(e => e.id === id && e.type === type);
+        if (entry) {
+          callback(entry);
+        }
+      }
+    };
+
+    const handleFollow = (event: any) => {
+      const callback = onFollowRef.current;
+      if (callback) {
+        const [id, type] = event.detail.split('__');
+        const entry = entriesRef.current.find(e => e.id === id && e.type === type);
+        if (entry) {
+          callback(entry);
+        }
+      }
+    };
+
     window.addEventListener('navigate-to-entry', handleNavigate);
+    window.addEventListener('endorse-entry', handleEndorse);
+    window.addEventListener('follow-entry', handleFollow);
     return () => {
       window.removeEventListener('navigate-to-entry', handleNavigate);
+      window.removeEventListener('endorse-entry', handleEndorse);
+      window.removeEventListener('follow-entry', handleFollow);
     };
   }, []);
 

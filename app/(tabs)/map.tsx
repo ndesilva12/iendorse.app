@@ -36,24 +36,6 @@ import { getEndorsementList } from '@/services/firebase/listService';
 import { getLogoUrl } from '@/lib/logo';
 import { ListEntry, BrandListEntry, BusinessListEntry, PlaceListEntry } from '@/types/library';
 
-// Categories for filtering
-const CATEGORIES = [
-  { id: 'all', label: 'All', color: '#3B82F6' },
-  { id: 'technology', label: 'Technology', color: '#3B82F6' },
-  { id: 'retail', label: 'Retail', color: '#10B981' },
-  { id: 'food_beverage', label: 'Food & Beverage', color: '#F59E0B' },
-  { id: 'food', label: 'Food', color: '#F59E0B' },
-  { id: 'restaurant', label: 'Restaurant', color: '#F59E0B' },
-  { id: 'finance', label: 'Finance', color: '#6366F1' },
-  { id: 'automotive', label: 'Automotive', color: '#EF4444' },
-  { id: 'entertainment', label: 'Entertainment', color: '#EC4899' },
-  { id: 'health_wellness', label: 'Health & Wellness', color: '#14B8A6' },
-  { id: 'health', label: 'Health', color: '#14B8A6' },
-  { id: 'fashion', label: 'Fashion', color: '#8B5CF6' },
-  { id: 'travel', label: 'Travel', color: '#06B6D4' },
-  { id: 'services', label: 'Services', color: '#6B7280' },
-  { id: 'other', label: 'Other', color: '#6B7280' },
-];
 
 // Map marker data interface
 interface MapMarker {
@@ -127,6 +109,7 @@ export default function MapScreen() {
   const mapInitializedRef = useRef(false);
   const hasUserChangedFilterRef = useRef(false);
   const previousFilterRef = useRef<'endorsements' | 'local'>('endorsements');
+  const dataLoadedRef = useRef(false);
 
   // Fetch user location
   useEffect(() => {
@@ -150,31 +133,34 @@ export default function MapScreen() {
   }, []);
 
   // Get endorsement list from library context (same as home tab)
+  // Only load once when clerkUser is available to prevent data reset on context updates
   useEffect(() => {
     const loadData = async () => {
-      if (!clerkUser?.id) return;
+      if (!clerkUser?.id || dataLoadedRef.current) return;
 
       setLoading(true);
       try {
-        // Get endorsement list from library context
-        const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
-        if (endorsementListData?.entries) {
-          console.log('[Map] Found endorsement list with', endorsementListData.entries.length, 'entries');
-          setEndorsementList(endorsementListData.entries);
-        } else {
-          console.log('[Map] No endorsement list found, trying direct fetch');
-          // Fallback to direct fetch
-          const list = await getEndorsementList(clerkUser.id);
-          if (list) {
-            console.log('[Map] Direct fetch found', list.entries?.length || 0, 'entries');
-            setEndorsementList(list.entries || []);
-          }
-        }
-
-        // Fetch all businesses for location data
+        // Fetch all businesses for location data first
         const businesses = await getAllUserBusinesses();
         console.log('[Map] Found', businesses.length, 'businesses');
         setAllBusinesses(businesses);
+
+        // Get endorsement list from library context
+        const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
+        if (endorsementListData?.entries && endorsementListData.entries.length > 0) {
+          console.log('[Map] Found endorsement list with', endorsementListData.entries.length, 'entries');
+          setEndorsementList(endorsementListData.entries);
+          dataLoadedRef.current = true;
+        } else {
+          console.log('[Map] No endorsement list found in context, trying direct fetch');
+          // Fallback to direct fetch
+          const list = await getEndorsementList(clerkUser.id);
+          if (list && list.entries && list.entries.length > 0) {
+            console.log('[Map] Direct fetch found', list.entries.length, 'entries');
+            setEndorsementList(list.entries);
+            dataLoadedRef.current = true;
+          }
+        }
       } catch (error) {
         console.error('[Map] Error fetching data:', error);
       } finally {
@@ -183,17 +169,37 @@ export default function MapScreen() {
     };
 
     loadData();
-  }, [clerkUser?.id, library.state.userLists]);
+  }, [clerkUser?.id]);
 
-  // Convert endorsement list entries to map markers
-  const mapMarkers = useMemo(() => {
+  // Update endorsement list when library context has new data (but don't clear existing data)
+  useEffect(() => {
+    if (!dataLoadedRef.current) return; // Don't update until initial load is done
+
+    const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
+    if (endorsementListData?.entries && endorsementListData.entries.length > 0) {
+      console.log('[Map] Updating endorsement list from context:', endorsementListData.entries.length, 'entries');
+      setEndorsementList(endorsementListData.entries);
+    }
+  }, [library.state.userLists]);
+
+  // Store previous valid markers to prevent flashing empty state
+  const prevMarkersRef = useRef<MapMarker[]>([]);
+
+  // Convert endorsement list entries to map markers (without category filter)
+  const allMarkers = useMemo(() => {
+    // Don't process if we don't have the required data yet
+    if (endorsementList.length === 0) {
+      console.log('[Map] Skipping marker creation - no endorsement entries, returning previous:', prevMarkersRef.current.length);
+      return prevMarkersRef.current;
+    }
+
     const markers: MapMarker[] = [];
     let placeCount = 0;
     let businessCount = 0;
     let brandCount = 0;
     let noLocationCount = 0;
 
-    console.log('[Map] Processing', endorsementList.length, 'endorsement entries');
+    console.log('[Map] Processing', endorsementList.length, 'endorsement entries, brands:', brands.length, 'businesses:', allBusinesses.length);
 
     // Process all endorsement list entries
     endorsementList.forEach((entry) => {
@@ -255,15 +261,20 @@ export default function MapScreen() {
             ? calculateDistance(userLocation.latitude, userLocation.longitude, placeEntry.location.lat, placeEntry.location.lng)
             : undefined;
 
+          // Debug: log place category values
+          if (placeCount <= 5) {
+            console.log('[Map] Place category debug:', placeEntry.placeName, 'placeCategory:', placeEntry.placeCategory, 'raw entry:', JSON.stringify(entry).substring(0, 200));
+          }
+
           marker = {
             id: placeEntry.placeId,
             type: 'place',
             name: placeEntry.placeName,
-            category: placeEntry.category || 'other',
+            category: placeEntry.placeCategory || 'other',
             latitude: placeEntry.location.lat,
             longitude: placeEntry.location.lng,
-            logoUrl: placeEntry.imageUrl,
-            address: placeEntry.address,
+            logoUrl: placeEntry.logoUrl,
+            address: placeEntry.placeAddress,
             distance,
             isLocal: distance ? distance <= 25 : false,
           };
@@ -280,35 +291,117 @@ export default function MapScreen() {
     console.log('[Map] Entry breakdown: places:', placeCount, 'businesses:', businessCount, 'brands:', brandCount);
     console.log('[Map] Markers created:', markers.length, 'No location:', noLocationCount);
 
-    // Apply filter
-    let filteredMarkers = markers;
+    // Store valid markers for future reference
+    if (markers.length > 0) {
+      prevMarkersRef.current = markers;
+    }
+
+    return markers;
+  }, [endorsementList, allBusinesses, brands, userLocation]);
+
+  // Helper function to get a color for a category
+  const getCategoryColor = useCallback((category: string): string => {
+    const colorMap: Record<string, string> = {
+      restaurant: '#F59E0B',
+      food: '#F59E0B',
+      cafe: '#F59E0B',
+      bar: '#F59E0B',
+      bakery: '#F59E0B',
+      meal_delivery: '#F59E0B',
+      meal_takeaway: '#F59E0B',
+      retail: '#10B981',
+      store: '#10B981',
+      shopping_mall: '#10B981',
+      grocery_or_supermarket: '#10B981',
+      supermarket: '#10B981',
+      technology: '#3B82F6',
+      electronics_store: '#3B82F6',
+      finance: '#6366F1',
+      bank: '#6366F1',
+      atm: '#6366F1',
+      automotive: '#EF4444',
+      car_dealer: '#EF4444',
+      car_repair: '#EF4444',
+      gas_station: '#EF4444',
+      entertainment: '#EC4899',
+      movie_theater: '#EC4899',
+      amusement_park: '#EC4899',
+      health: '#14B8A6',
+      hospital: '#14B8A6',
+      pharmacy: '#14B8A6',
+      doctor: '#14B8A6',
+      gym: '#14B8A6',
+      spa: '#14B8A6',
+      fashion: '#8B5CF6',
+      clothing_store: '#8B5CF6',
+      shoe_store: '#8B5CF6',
+      travel: '#06B6D4',
+      lodging: '#06B6D4',
+      hotel: '#06B6D4',
+      airport: '#06B6D4',
+      services: '#6B7280',
+      other: '#6B7280',
+    };
+    return colorMap[category.toLowerCase()] || '#6B7280';
+  }, []);
+
+  // Get unique categories from ALL markers (before filtering) and create display-friendly labels
+  const availableCategories = useMemo(() => {
+    const catCounts: Record<string, number> = {};
+    allMarkers.forEach(m => {
+      if (m.category) {
+        const cat = m.category.toLowerCase();
+        catCounts[cat] = (catCounts[cat] || 0) + 1;
+      }
+    });
+    console.log('[Map] Available categories with counts:', JSON.stringify(catCounts));
+
+    // Sort by count (most common first) and create category objects
+    const sortedCats = Object.entries(catCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, count]) => ({
+        id,
+        label: id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), // Convert to Title Case
+        count,
+        color: getCategoryColor(id),
+      }));
+
+    return [{ id: 'all', label: 'All', count: allMarkers.length, color: '#3B82F6' }, ...sortedCats];
+  }, [allMarkers, getCategoryColor]);
+
+  // Apply filters to get displayed markers
+  const mapMarkers = useMemo(() => {
+    console.log('[Map] Computing mapMarkers - allMarkers:', allMarkers.length, 'activeFilter:', activeFilter, 'selectedCategory:', JSON.stringify(selectedCategory));
+
+    let filteredMarkers = [...allMarkers]; // Create a copy to avoid mutation issues
 
     // Local filter: only show markers within 25 miles
     if (activeFilter === 'local') {
-      filteredMarkers = markers.filter(m => m.isLocal === true);
+      filteredMarkers = filteredMarkers.filter(m => m.isLocal === true);
+      console.log('[Map] After local filter:', filteredMarkers.length);
     }
 
-    // Apply category filter
-    if (selectedCategory !== 'all') {
-      filteredMarkers = filteredMarkers.filter(m =>
-        m.category.toLowerCase().includes(selectedCategory.toLowerCase()) ||
-        selectedCategory.toLowerCase().includes(m.category.toLowerCase())
-      );
+    // Apply category filter - only if not 'all' (case insensitive check)
+    const isAllCategory = selectedCategory.toLowerCase() === 'all';
+    console.log('[Map] isAllCategory:', isAllCategory, 'selectedCategory:', selectedCategory);
+
+    if (!isAllCategory) {
+      const beforeCount = filteredMarkers.length;
+      filteredMarkers = filteredMarkers.filter(m => {
+        const markerCat = (m.category || '').toLowerCase();
+        const selectedCat = selectedCategory.toLowerCase();
+        return markerCat === selectedCat ||
+          markerCat.includes(selectedCat) ||
+          selectedCat.includes(markerCat);
+      });
+      console.log('[Map] Category filter "' + selectedCategory + '":', beforeCount, '->', filteredMarkers.length);
+    } else {
+      console.log('[Map] Showing ALL markers (no category filter):', filteredMarkers.length);
     }
 
+    console.log('[Map] Final mapMarkers count:', filteredMarkers.length);
     return filteredMarkers;
-  }, [endorsementList, allBusinesses, brands, activeFilter, selectedCategory, userLocation]);
-
-  // Get unique categories from markers
-  const availableCategories = useMemo(() => {
-    const cats = new Set<string>();
-    mapMarkers.forEach(m => {
-      if (m.category) {
-        cats.add(m.category.toLowerCase());
-      }
-    });
-    return ['all', ...Array.from(cats)];
-  }, [mapMarkers]);
+  }, [allMarkers, activeFilter, selectedCategory]);
 
   // Calculate map region
   const mapRegion = useMemo(() => {
@@ -432,8 +525,8 @@ export default function MapScreen() {
         {/* Separator */}
         <View style={[styles.filterSeparator, { backgroundColor: colors.border }]} />
 
-        {/* Category filter chips in same row */}
-        {CATEGORIES.filter(cat => availableCategories.includes(cat.id) || cat.id === 'all').map((cat) => (
+        {/* Category filter chips in same row - dynamically generated from actual data */}
+        {availableCategories.map((cat) => (
           <TouchableOpacity
             key={cat.id}
             style={[
@@ -456,71 +549,6 @@ export default function MapScreen() {
         ))}
       </ScrollView>
 
-      {/* Collapsible markers list for web */}
-      {Platform.OS === 'web' && mapMarkers.length > 0 && (
-        <TouchableOpacity
-          style={[styles.markersListToggle, { borderTopColor: colors.border }]}
-          onPress={() => setShowMarkersList(!showMarkersList)}
-        >
-          <Text style={[styles.markersListToggleText, { color: colors.text }]}>
-            {mapMarkers.length} Location{mapMarkers.length !== 1 ? 's' : ''}
-          </Text>
-          {showMarkersList ? (
-            <ChevronUp size={18} color={colors.textSecondary} />
-          ) : (
-            <ChevronDown size={18} color={colors.textSecondary} />
-          )}
-        </TouchableOpacity>
-      )}
-
-      {/* Expanded markers list for web */}
-      {Platform.OS === 'web' && showMarkersList && mapMarkers.length > 0 && (
-        <ScrollView
-          style={[styles.markersListExpanded, { borderTopColor: colors.border }]}
-          showsVerticalScrollIndicator={true}
-        >
-          {mapMarkers.slice(0, 20).map((marker) => (
-            <TouchableOpacity
-              key={marker.id}
-              style={[styles.markerListItem, { borderBottomColor: colors.border }]}
-              onPress={() => {
-                if (marker.type === 'business') {
-                  router.push(`/business/${marker.id}`);
-                } else if (marker.type === 'brand') {
-                  router.push(`/brand/${marker.id}`);
-                } else if (marker.type === 'place') {
-                  router.push(`/place/${marker.id}`);
-                }
-              }}
-            >
-              <View style={[styles.markerListLogo, { backgroundColor: '#FFFFFF' }]}>
-                {marker.logoUrl ? (
-                  <Image
-                    source={{ uri: marker.logoUrl }}
-                    style={styles.markerListLogoImage}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <MapPin size={16} color={colors.primary} />
-                )}
-              </View>
-              <View style={styles.markerListInfo}>
-                <Text style={[styles.markerListName, { color: colors.text }]} numberOfLines={1}>
-                  {marker.name}
-                </Text>
-                <Text style={[styles.markerListCategory, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {marker.category}{marker.distance ? ` • ${marker.distance.toFixed(1)} mi` : ''}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-          {mapMarkers.length > 20 && (
-            <Text style={[styles.markersListMore, { color: colors.textSecondary }]}>
-              +{mapMarkers.length - 20} more locations
-            </Text>
-          )}
-        </ScrollView>
-      )}
     </View>
   );
 
@@ -779,6 +807,66 @@ export default function MapScreen() {
               </Text>
             </View>
           )}
+          {/* Floating locations list popup */}
+          {mapMarkers.length > 0 && (
+            <View style={[styles.floatingListContainer, { backgroundColor: colors.background }]}>
+              <TouchableOpacity
+                style={[styles.floatingListHeader, { borderBottomColor: showMarkersList ? colors.border : 'transparent' }]}
+                onPress={() => setShowMarkersList(!showMarkersList)}
+              >
+                <Text style={[styles.floatingListTitle, { color: colors.text }]}>
+                  {mapMarkers.length} Location{mapMarkers.length !== 1 ? 's' : ''}
+                </Text>
+                {showMarkersList ? (
+                  <ChevronUp size={18} color={colors.textSecondary} />
+                ) : (
+                  <ChevronDown size={18} color={colors.textSecondary} />
+                )}
+              </TouchableOpacity>
+              {showMarkersList && (
+                <ScrollView
+                  style={styles.floatingListContent}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {mapMarkers.slice(0, 30).map((marker) => (
+                    <TouchableOpacity
+                      key={marker.id}
+                      style={[styles.floatingListItem, { borderBottomColor: colors.border }]}
+                      onPress={() => {
+                        if (marker.type === 'business') {
+                          router.push(`/business/${marker.id}`);
+                        } else if (marker.type === 'brand') {
+                          router.push(`/brand/${marker.id}`);
+                        } else if (marker.type === 'place') {
+                          router.push(`/place/${marker.id}`);
+                        }
+                      }}
+                    >
+                      <View style={[styles.floatingListLogo, { backgroundColor: '#F3F4F6' }]}>
+                        {marker.logoUrl ? (
+                          <Image
+                            source={{ uri: marker.logoUrl }}
+                            style={styles.floatingListLogoImage}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <MapPin size={14} color={colors.primary} />
+                        )}
+                      </View>
+                      <Text style={[styles.floatingListName, { color: colors.text }]} numberOfLines={1}>
+                        {marker.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  {mapMarkers.length > 30 && (
+                    <Text style={[styles.floatingListMore, { color: colors.textSecondary }]}>
+                      +{mapMarkers.length - 30} more
+                    </Text>
+                  )}
+                </ScrollView>
+              )}
+            </View>
+          )}
         </View>
       );
     }
@@ -990,71 +1078,78 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  markersListToggle: {
+  floatingListContainer: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 220,
+    maxHeight: 350,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+    overflow: 'hidden',
+  },
+  floatingListHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    borderTopWidth: 1,
+    borderBottomWidth: 1,
   },
-  markersListToggleText: {
+  floatingListTitle: {
     fontSize: 14,
     fontWeight: '600',
   },
-  markersListExpanded: {
-    maxHeight: 250,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
+  floatingListContent: {
+    maxHeight: 280,
   },
-  markerListItem: {
+  floatingListItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    gap: 10,
+    gap: 8,
   },
-  markerListLogo: {
-    width: 36,
-    height: 36,
+  floatingListLogo: {
+    width: 28,
+    height: 28,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  markerListLogoImage: {
+  floatingListLogoImage: {
     width: '100%',
     height: '100%',
   },
-  markerListInfo: {
+  floatingListName: {
     flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  markerListName: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  markerListCategory: {
-    fontSize: 12,
-    textTransform: 'capitalize',
-  },
-  markersListMore: {
-    fontSize: 12,
+  floatingListMore: {
+    fontSize: 11,
     textAlign: 'center',
     paddingVertical: 8,
   },
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1.5,
     gap: 4,
   },
   categoryChipText: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
   mapWrapper: {
     flex: 1,
