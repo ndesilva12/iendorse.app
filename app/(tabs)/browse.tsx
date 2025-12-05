@@ -852,21 +852,14 @@ export default function BrowseScreen() {
     global: { bg: colors.primary + '15', border: colors.primary },
     local: { bg: colors.success + '15', border: colors.success },
     values: { bg: colors.danger + '15', border: colors.danger },
-    users: { bg: '#8B5CF6' + '15', border: '#8B5CF6' }, // purple
-    following: { bg: '#EC4899' + '15', border: '#EC4899' }, // pink
-    search: { bg: '#06B6D4' + '15', border: '#06B6D4' }, // cyan
+    users: { bg: '#ADFF2F' + '15', border: '#ADFF2F' }, // neon lime green
+    following: { bg: '#ADFF2F' + '15', border: '#ADFF2F' }, // neon lime green
+    search: { bg: '#FFFFFF' + '15', border: '#FFFFFF' }, // white
   };
 
   // Render section blocks
   const renderSectionBlocks = () => {
-    const globalCount = allSupport.length;
-    const localCount = userBusinesses.length;
-    // Count total available values for browsing (not user's selected values)
-    const valuesCount = Object.values(availableValues).reduce((total, values) => total + (values?.length || 0), 0);
-    const usersCount = publicUsers.length;
-    const followingCount = followingItems.length;
-
-    const SectionBox = ({ section, label, count, Icon }: { section: BrowseSection; label: string; count: number; Icon: any }) => {
+    const SectionBox = ({ section, label, Icon }: { section: BrowseSection; label: string; Icon: any }) => {
       const isSelected = selectedSection === section;
       const sectionColor = sectionColors[section];
 
@@ -883,14 +876,9 @@ export default function BrowseScreen() {
           onPress={() => setSelectedSection(section)}
           activeOpacity={0.7}
         >
-          <View style={styles.sectionBoxRow}>
-            <Icon size={16} color={isSelected ? sectionColor.border : colors.textSecondary} strokeWidth={2} />
-            <Text style={[styles.sectionLabelCompact, { color: isSelected ? sectionColor.border : colors.text }]} numberOfLines={1}>
-              {label}
-            </Text>
-          </View>
-          <Text style={[styles.sectionCountCompact, { color: colors.textSecondary }]}>
-            {section === 'search' ? '' : count}
+          <Icon size={22} color={isSelected ? sectionColor.border : colors.textSecondary} strokeWidth={2} />
+          <Text style={[styles.sectionLabelCompact, { color: isSelected ? sectionColor.border : colors.text }]} numberOfLines={1}>
+            {label}
           </Text>
         </TouchableOpacity>
       );
@@ -901,25 +889,25 @@ export default function BrowseScreen() {
         {/* First row: Global, Local, Values */}
         <View style={styles.sectionRow}>
           <View style={styles.sectionThird}>
-            <SectionBox section="global" label="Global" count={globalCount} Icon={Target} />
+            <SectionBox section="global" label="Global" Icon={Target} />
           </View>
           <View style={styles.sectionThird}>
-            <SectionBox section="local" label="Local" count={localCount} Icon={MapPin} />
+            <SectionBox section="local" label="Local" Icon={MapPin} />
           </View>
           <View style={styles.sectionThird}>
-            <SectionBox section="values" label="Values" count={valuesCount} Icon={Heart} />
+            <SectionBox section="values" label="Values" Icon={Heart} />
           </View>
         </View>
         {/* Second row: Users, Following, Search */}
         <View style={[styles.sectionRow, { marginTop: 8 }]}>
           <View style={styles.sectionThird}>
-            <SectionBox section="users" label="Users" count={usersCount} Icon={Users} />
+            <SectionBox section="users" label="Users" Icon={Users} />
           </View>
           <View style={styles.sectionThird}>
-            <SectionBox section="following" label="Following" count={followingCount} Icon={UserPlus} />
+            <SectionBox section="following" label="Following" Icon={UserPlus} />
           </View>
           <View style={styles.sectionThird}>
-            <SectionBox section="search" label="Search" count={0} Icon={Search} />
+            <SectionBox section="search" label="Search" Icon={Search} />
           </View>
         </View>
       </View>
@@ -1784,12 +1772,12 @@ const styles = StyleSheet.create({
   },
   // Compact section box styles (2/3 size)
   sectionBoxCompact: {
-    padding: 8,
+    padding: 10,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    minHeight: 54,
+    gap: 4,
+    minHeight: 60,
   },
   sectionBoxRow: {
     flexDirection: 'row',
@@ -1797,7 +1785,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   sectionLabelCompact: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600' as const,
   },
   sectionCountCompact: {
