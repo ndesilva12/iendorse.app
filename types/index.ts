@@ -175,7 +175,7 @@ export interface ValueCodeCustomer {
 export interface UserProfile {
   id?: string; // User ID from Clerk
   accountType?: AccountType; // Default: 'individual'
-  causes: Cause[];
+  causes?: Cause[]; // DEPRECATED - no longer used, kept for backwards compatibility
   searchHistory: string[];
   promoCode?: string;
   totalSavings?: number; // Total discount amount saved through transactions
