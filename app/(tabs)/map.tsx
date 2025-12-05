@@ -98,7 +98,7 @@ export default function MapScreen() {
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'endorsements' | 'local'>('endorsements');
+  const [activeFilter, setActiveFilter] = useState<'endorsements'>('endorsements');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showMarkersList, setShowMarkersList] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -108,7 +108,7 @@ export default function MapScreen() {
   const markersLayerRef = useRef<any>(null);
   const mapInitializedRef = useRef(false);
   const hasUserChangedFilterRef = useRef(false);
-  const previousFilterRef = useRef<'endorsements' | 'local'>('endorsements');
+  const previousFilterRef = useRef<'endorsements'>('endorsements');
   const dataLoadedRef = useRef(false);
 
   // Fetch user location
@@ -375,12 +375,6 @@ export default function MapScreen() {
 
     let filteredMarkers = [...allMarkers]; // Create a copy to avoid mutation issues
 
-    // Local filter: only show markers within 25 miles
-    if (activeFilter === 'local') {
-      filteredMarkers = filteredMarkers.filter(m => m.isLocal === true);
-      console.log('[Map] After local filter:', filteredMarkers.length);
-    }
-
     // Apply category filter - only if not 'all' (case insensitive check)
     const isAllCategory = selectedCategory.toLowerCase() === 'all';
     console.log('[Map] isAllCategory:', isAllCategory, 'selectedCategory:', selectedCategory);
@@ -495,27 +489,6 @@ export default function MapScreen() {
             Endorsements
           </Text>
           {activeFilter === 'endorsements' && (
-            <View style={[styles.filterCount, { backgroundColor: colors.primary }]}>
-              <Text style={styles.filterCountText}>{mapMarkers.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            activeFilter === 'local' && styles.filterButtonActive,
-            { borderColor: activeFilter === 'local' ? colors.primary : colors.border }
-          ]}
-          onPress={() => setActiveFilter('local')}
-        >
-          <Text style={[
-            styles.filterButtonText,
-            { color: activeFilter === 'local' ? colors.primary : colors.text }
-          ]}>
-            Local (25mi)
-          </Text>
-          {activeFilter === 'local' && (
             <View style={[styles.filterCount, { backgroundColor: colors.primary }]}>
               <Text style={styles.filterCountText}>{mapMarkers.length}</Text>
             </View>
@@ -668,17 +641,6 @@ export default function MapScreen() {
     // Clear existing markers
     markersLayerRef.current.clearLayers();
 
-    // Add local radius circle if local filter is active
-    if (activeFilter === 'local' && userLocation) {
-      L.circle([userLocation.latitude, userLocation.longitude], {
-        radius: 25 * 1609.34, // 25 miles in meters
-        color: 'rgba(59, 130, 246, 0.5)',
-        fillColor: 'rgba(59, 130, 246, 0.1)',
-        fillOpacity: 0.2,
-        weight: 2,
-      }).addTo(markersLayerRef.current);
-    }
-
     // Add endorsement markers (green)
     mapMarkers.forEach((marker) => {
       const markerColor = '#22C55E';
@@ -744,27 +706,7 @@ export default function MapScreen() {
         });
     });
 
-    // Only fit bounds when user switches to local filter (to show local area)
-    // Don't fit bounds on initial load to avoid zooming out to show worldwide markers
-    const filterChanged = previousFilterRef.current !== activeFilter;
-    if (filterChanged) {
-      hasUserChangedFilterRef.current = true;
-      previousFilterRef.current = activeFilter;
-    }
-
-    // Fit map bounds only for local filter OR when user explicitly changed filter
-    if (mapMarkers.length > 0 && activeFilter === 'local' && userLocation) {
-      // For local filter, fit to show the local radius area
-      const bounds = L.latLngBounds(mapMarkers.map(m => [m.latitude, m.longitude]));
-      bounds.extend([userLocation.latitude, userLocation.longitude]);
-      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
-    } else if (hasUserChangedFilterRef.current && activeFilter === 'endorsements' && mapMarkers.length > 0) {
-      // When switching back to endorsements, reset to initial zoom centered on user
-      if (userLocation) {
-        mapInstanceRef.current.setView([userLocation.latitude, userLocation.longitude], 9);
-      }
-    }
-    // On initial load with endorsements filter, keep the initial zoom (level 9) and don't fit all worldwide markers
+    // Keep the initial zoom (level 9) and don't fit all worldwide markers
   }, [mapMarkers, activeFilter, userLocation, mapReady]);
 
   // Cleanup map on unmount
@@ -892,17 +834,6 @@ export default function MapScreen() {
                 <MapPin size={32} color="#3B82F6" fill="#3B82F6" strokeWidth={1.5} />
               </View>
             </Marker>
-          )}
-
-          {/* Local radius circle */}
-          {activeFilter === 'local' && userLocation && (
-            <Circle
-              center={userLocation}
-              radius={25 * 1609.34} // 25 miles in meters
-              strokeColor="rgba(59, 130, 246, 0.5)"
-              fillColor="rgba(59, 130, 246, 0.1)"
-              strokeWidth={2}
-            />
           )}
 
           {/* Business/Brand markers */}

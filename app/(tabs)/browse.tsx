@@ -1405,7 +1405,7 @@ export default function BrowseScreen() {
           <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundSecondary }]}>
             <Search size={22} color={colors.primary} strokeWidth={2} />
             <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
+              style={[styles.searchInput, { color: colors.primary, outlineStyle: 'none' } as any]}
               placeholder="Search"
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}

@@ -4151,17 +4151,6 @@ export default function UnifiedLibrary({
               </View>
             )}
 
-            {/* Map button - show if there are mappable entries */}
-            {mapEntries.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setShowMapModal(true)}
-                style={[styles.mapButton, { backgroundColor: 'transparent', borderColor: colors.primary }]}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.mapButtonText, { color: colors.primary }]}>Map</Text>
-              </TouchableOpacity>
-            )}
-
             {/* Add button - on far right (only for edit mode) */}
             {canEdit && (
               <TouchableOpacity
