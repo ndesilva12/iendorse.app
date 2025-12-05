@@ -700,21 +700,22 @@ export default function MapScreen() {
     // Clear existing markers
     markersLayerRef.current.clearLayers();
 
-    // Add endorsement markers (app blue color)
+    // Add endorsement markers
     mapMarkers.forEach((marker) => {
-      const markerColor = '#00aaff'; // App blue color
+      const markerColor = marker.rank ? '#1e3a5f' : '#00aaff'; // Navy blue for ranked, app blue for others
       const distanceText = marker.distance !== undefined
         ? marker.distance < 1
           ? `${(marker.distance * 5280).toFixed(0)} ft away`
           : `${marker.distance.toFixed(1)} mi away`
         : '';
 
-      // Create marker HTML - show rank number inside marker if ranked, otherwise plain marker
+      // Create marker HTML - use same map pin shape for all, with number inside for ranked
       const markerHtml = marker.rank
-        ? `<div style="position: relative; display: flex; flex-direction: column; align-items: center;">
-            <div style="background-color: ${markerColor}; color: white; font-size: 11px; font-weight: 700; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${marker.rank}</div>
-            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${markerColor}; margin-top: -2px;"></div>
-          </div>`
+        ? `<svg width="28" height="40" viewBox="0 0 28 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14z" fill="${markerColor}"/>
+            <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14z" stroke="white" stroke-width="2"/>
+            <text x="14" y="18" text-anchor="middle" fill="white" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">${marker.rank}</text>
+          </svg>`
         : `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
             <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
@@ -724,15 +725,15 @@ export default function MapScreen() {
         icon: L.divIcon({
           className: 'endorsement-marker',
           html: markerHtml,
-          iconSize: marker.rank ? [24, 32] : [20, 28],
-          iconAnchor: marker.rank ? [12, 32] : [10, 28],
+          iconSize: marker.rank ? [28, 40] : [20, 28],
+          iconAnchor: marker.rank ? [14, 40] : [10, 28],
         }),
       })
         .addTo(markersLayerRef.current)
         .bindPopup(`
           <div style="min-width: 220px; padding: 12px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-              ${marker.rank ? `<span style="background-color: #00aaff; color: white; font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 6px;">#${marker.rank}</span>` : ''}
+              ${marker.rank ? `<span style="background-color: #1e3a5f; color: white; font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 6px;">#${marker.rank}</span>` : ''}
               <span style="font-size: 16px; font-weight: bold; color: #1f2937;">${marker.name}</span>
             </div>
             <div style="font-size: 13px; color: #6b7280; margin-bottom: 8px; text-transform: capitalize;">
@@ -934,11 +935,11 @@ export default function MapScreen() {
             >
               <View style={styles.businessMarker}>
                 {marker.rank ? (
-                  <View style={styles.rankedMarker}>
-                    <View style={styles.rankedMarkerCircle}>
-                      <Text style={styles.rankedMarkerText}>{marker.rank}</Text>
+                  <View style={styles.rankedMarkerPin}>
+                    <View style={styles.rankedMarkerPinHead}>
+                      <Text style={styles.rankedMarkerPinText}>{marker.rank}</Text>
                     </View>
-                    <View style={styles.rankedMarkerPointer} />
+                    <View style={styles.rankedMarkerPinTail} />
                   </View>
                 ) : (
                   <MapPin size={28} color="#00aaff" fill="#00aaff" strokeWidth={1.5} />
@@ -1232,14 +1233,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rankedMarker: {
+  rankedMarkerPin: {
     alignItems: 'center',
   },
-  rankedMarkerCircle: {
-    backgroundColor: '#00aaff',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
+  rankedMarkerPinHead: {
+    backgroundColor: '#1e3a5f',
+    borderRadius: 14,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -1250,21 +1251,21 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-  rankedMarkerText: {
-    fontSize: 11,
+  rankedMarkerPinText: {
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  rankedMarkerPointer: {
+  rankedMarkerPinTail: {
     width: 0,
     height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 12,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#00aaff',
-    marginTop: -2,
+    borderTopColor: '#1e3a5f',
+    marginTop: -3,
   },
   selectionContainer: {
     position: 'absolute',
@@ -1336,7 +1337,7 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   rankBadge: {
-    backgroundColor: '#00aaff',
+    backgroundColor: '#1e3a5f',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
