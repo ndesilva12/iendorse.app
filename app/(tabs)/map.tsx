@@ -125,6 +125,8 @@ export default function MapScreen() {
   const mapInstanceRef = useRef<any>(null);
   const markersLayerRef = useRef<any>(null);
   const mapInitializedRef = useRef(false);
+  const hasUserChangedFilterRef = useRef(false);
+  const previousFilterRef = useRef<'endorsements' | 'local'>('endorsements');
 
   // Fetch user location
   useEffect(() => {
@@ -217,7 +219,7 @@ export default function MapScreen() {
             logoUrl: business.businessInfo.logoUrl || (business.businessInfo.website ? getLogoUrl(business.businessInfo.website) : undefined),
             address: business.businessInfo.location,
             distance,
-            isLocal: distance ? distance <= 50 : false,
+            isLocal: distance ? distance <= 25 : false,
           };
         }
       } else if (entry.type === 'brand') {
@@ -240,7 +242,7 @@ export default function MapScreen() {
             logoUrl: brand.exampleImageUrl || (brand.website ? getLogoUrl(brand.website) : undefined),
             address: brand.location,
             distance,
-            isLocal: distance ? distance <= 50 : false,
+            isLocal: distance ? distance <= 25 : false,
           };
         }
       } else if (entry.type === 'place') {
@@ -263,7 +265,7 @@ export default function MapScreen() {
             logoUrl: placeEntry.imageUrl,
             address: placeEntry.address,
             distance,
-            isLocal: distance ? distance <= 50 : false,
+            isLocal: distance ? distance <= 25 : false,
           };
         }
       }
@@ -281,7 +283,7 @@ export default function MapScreen() {
     // Apply filter
     let filteredMarkers = markers;
 
-    // Local filter: only show markers within 50 miles
+    // Local filter: only show markers within 25 miles
     if (activeFilter === 'local') {
       filteredMarkers = markers.filter(m => m.isLocal === true);
     }
@@ -418,7 +420,7 @@ export default function MapScreen() {
             styles.filterButtonText,
             { color: activeFilter === 'local' ? colors.primary : colors.text }
           ]}>
-            Local (50mi)
+            Local (25mi)
           </Text>
           {activeFilter === 'local' && (
             <View style={[styles.filterCount, { backgroundColor: colors.primary }]}>
@@ -565,10 +567,10 @@ export default function MapScreen() {
       const centerLat = userLocation?.latitude || 37.7749;
       const centerLng = userLocation?.longitude || -122.4194;
 
-      // Initialize map
+      // Initialize map - zoom level 9 covers about half of Massachusetts (~50 miles)
       const map = L.map('endorsement-map', {
         center: [centerLat, centerLng],
-        zoom: 10,
+        zoom: 9,
       });
       mapInstanceRef.current = map;
 
@@ -641,7 +643,7 @@ export default function MapScreen() {
     // Add local radius circle if local filter is active
     if (activeFilter === 'local' && userLocation) {
       L.circle([userLocation.latitude, userLocation.longitude], {
-        radius: 50 * 1609.34, // 50 miles in meters
+        radius: 25 * 1609.34, // 25 miles in meters
         color: 'rgba(59, 130, 246, 0.5)',
         fillColor: 'rgba(59, 130, 246, 0.1)',
         fillOpacity: 0.2,
@@ -714,14 +716,27 @@ export default function MapScreen() {
         });
     });
 
-    // Fit map bounds to show all markers (only if we have markers)
-    if (mapMarkers.length > 0) {
-      const bounds = L.latLngBounds(mapMarkers.map(m => [m.latitude, m.longitude]));
-      if (userLocation) {
-        bounds.extend([userLocation.latitude, userLocation.longitude]);
-      }
-      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+    // Only fit bounds when user switches to local filter (to show local area)
+    // Don't fit bounds on initial load to avoid zooming out to show worldwide markers
+    const filterChanged = previousFilterRef.current !== activeFilter;
+    if (filterChanged) {
+      hasUserChangedFilterRef.current = true;
+      previousFilterRef.current = activeFilter;
     }
+
+    // Fit map bounds only for local filter OR when user explicitly changed filter
+    if (mapMarkers.length > 0 && activeFilter === 'local' && userLocation) {
+      // For local filter, fit to show the local radius area
+      const bounds = L.latLngBounds(mapMarkers.map(m => [m.latitude, m.longitude]));
+      bounds.extend([userLocation.latitude, userLocation.longitude]);
+      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+    } else if (hasUserChangedFilterRef.current && activeFilter === 'endorsements' && mapMarkers.length > 0) {
+      // When switching back to endorsements, reset to initial zoom centered on user
+      if (userLocation) {
+        mapInstanceRef.current.setView([userLocation.latitude, userLocation.longitude], 9);
+      }
+    }
+    // On initial load with endorsements filter, keep the initial zoom (level 9) and don't fit all worldwide markers
   }, [mapMarkers, activeFilter, userLocation, mapReady]);
 
   // Cleanup map on unmount
@@ -795,7 +810,7 @@ export default function MapScreen() {
           {activeFilter === 'local' && userLocation && (
             <Circle
               center={userLocation}
-              radius={50 * 1609.34} // 50 miles in meters
+              radius={25 * 1609.34} // 25 miles in meters
               strokeColor="rgba(59, 130, 246, 0.5)"
               fillColor="rgba(59, 130, 246, 0.1)"
               strokeWidth={2}
@@ -881,7 +896,7 @@ export default function MapScreen() {
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             {activeFilter === 'endorsements'
               ? 'Add businesses with locations to your endorsement list to see them on the map.'
-              : 'No businesses found within 50 miles of your location.'}
+              : 'No businesses found within 25 miles of your location.'}
           </Text>
         </View>
       );
