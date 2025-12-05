@@ -304,6 +304,18 @@ export default function AdminDashboard() {
             </Text>
           </TouchableOpacity>
 
+          {/* Contact Submissions */}
+          <TouchableOpacity
+            style={[styles.card, styles.highlightCard]}
+            onPress={() => router.push('/admin/contact-submissions')}
+          >
+            <Text style={styles.cardIcon}>💬</Text>
+            <Text style={styles.cardTitle}>Contact Submissions</Text>
+            <Text style={styles.cardDescription}>
+              View and respond to user contact form messages
+            </Text>
+          </TouchableOpacity>
+
           {/* Google Places API Usage */}
           <TouchableOpacity
             style={[styles.card, styles.apiCard]}

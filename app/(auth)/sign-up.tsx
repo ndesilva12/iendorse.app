@@ -9,6 +9,7 @@ import { User, Building2, LogOut } from 'lucide-react-native';
 import { AccountType } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { findUserByReferralCode, recordReferral } from '@/services/firebase/referralService';
+import ContactModal from '@/components/ContactModal';
 
 const REFERRAL_CODE_KEY = '@iendorse:referral_code';
 
@@ -35,6 +36,7 @@ export default function SignUpScreen() {
   const [consentChecked, setConsentChecked] = React.useState(false);
   const [selectedAccountType, setSelectedAccountType] = React.useState<AccountType>('individual');
   const [storedReferralCode, setStoredReferralCode] = React.useState<string | null>(null);
+  const [showContactModal, setShowContactModal] = React.useState(false);
   const consentScrollRef = React.useRef<ScrollView>(null);
 
   // Check for stored referral code from invite link
@@ -624,6 +626,11 @@ export default function SignUpScreen() {
               <Text style={styles.buttonText}>Continue</Text>
             )}
           </TouchableOpacity>
+          <View style={styles.contactContainer}>
+            <TouchableOpacity onPress={() => setShowContactModal(true)}>
+              <Text style={[styles.contactText, { color: colors.primary }]}>Contact</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.linkContainer}>
             <Text style={[styles.linkText, { color: colors.textSecondary }]}>Already have an account? </Text>
             <TouchableOpacity onPress={() => {
@@ -732,6 +739,14 @@ export default function SignUpScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Contact Modal */}
+      <ContactModal
+        visible={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        isDarkMode={isDarkMode}
+        requireContactInfo={true}
+      />
     </SafeAreaView>
   );
 }
@@ -855,6 +870,14 @@ const styles = StyleSheet.create({
   link: {
     color: darkColors.primary,
     fontSize: 14,
+    fontWeight: '600',
+  },
+  contactContainer: {
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  contactText: {
+    fontSize: 15,
     fontWeight: '600',
   },
   // Consent Modal Styles

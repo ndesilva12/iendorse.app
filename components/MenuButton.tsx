@@ -1,5 +1,5 @@
 import { useRouter, useSegments } from 'expo-router';
-import { Menu, LogOut, User, Gift } from 'lucide-react-native';
+import { Menu, LogOut, User, Gift, MessageCircle } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   View,
@@ -20,6 +20,7 @@ import { useClerk } from '@clerk/clerk-expo';
 import { useReferralCode } from '@/hooks/useReferralCode';
 import { getReferralLink } from '@/services/firebase/referralService';
 import * as Clipboard from 'expo-clipboard';
+import ContactModal from '@/components/ContactModal';
 
 export default function MenuButton() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function MenuButton() {
   const { signOut } = useClerk();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
   const { referralCode } = useReferralCode();
   const isBusiness = profile.accountType === 'business';
 
@@ -69,6 +71,11 @@ export default function MenuButton() {
   const handleInvite = () => {
     setIsMenuVisible(false);
     setShowInviteModal(true);
+  };
+
+  const handleContact = () => {
+    setIsMenuVisible(false);
+    setShowContactModal(true);
   };
 
   const handleCopyInviteLink = async () => {
@@ -181,6 +188,18 @@ export default function MenuButton() {
                 </View>
               </TouchableOpacity>
 
+              {/* Contact menu item */}
+              <TouchableOpacity
+                style={[styles.menuItem, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
+                onPress={handleContact}
+                activeOpacity={0.7}
+              >
+                <View style={styles.menuItemLeft}>
+                  <MessageCircle size={26} color={colors.primary} strokeWidth={2} />
+                  <Text style={[styles.menuItemTitle, { color: colors.text }]}>Contact</Text>
+                </View>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={handleSignOut}
@@ -268,6 +287,16 @@ export default function MenuButton() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Contact Modal */}
+      <ContactModal
+        visible={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        isDarkMode={isDarkMode}
+        userId={clerkUser?.id}
+        userName={clerkUser?.firstName ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim() : undefined}
+        userEmail={clerkUser?.emailAddresses[0]?.emailAddress}
+      />
     </>
   );
 }
