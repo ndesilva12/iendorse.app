@@ -119,6 +119,7 @@ export default function MapScreen() {
   const [activeFilter, setActiveFilter] = useState<'endorsements' | 'local'>('endorsements');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showMarkersList, setShowMarkersList] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   // Refs for map state management
   const mapInstanceRef = useRef<any>(null);
@@ -596,6 +597,10 @@ export default function MapScreen() {
           }),
         }).addTo(map).bindPopup('You are here');
       }
+
+      // Signal that map is ready for markers
+      console.log('[Map] Map initialized, ready for markers');
+      setMapReady(true);
     };
 
     // Initialize after a short delay to ensure DOM is ready
@@ -623,12 +628,12 @@ export default function MapScreen() {
 
   // Update markers when data changes (separate from map initialization)
   useEffect(() => {
-    if (Platform.OS !== 'web' || !mapInstanceRef.current || !markersLayerRef.current) return;
+    if (Platform.OS !== 'web' || !mapReady || !mapInstanceRef.current || !markersLayerRef.current) return;
 
     const L = (window as any).L;
     if (!L) return;
 
-    console.log('[Map] Updating markers:', mapMarkers.length);
+    console.log('[Map] Updating markers:', mapMarkers.length, 'mapReady:', mapReady);
 
     // Clear existing markers
     markersLayerRef.current.clearLayers();
@@ -717,7 +722,7 @@ export default function MapScreen() {
       }
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
     }
-  }, [mapMarkers, activeFilter, userLocation]);
+  }, [mapMarkers, activeFilter, userLocation, mapReady]);
 
   // Cleanup map on unmount
   useEffect(() => {
@@ -727,6 +732,7 @@ export default function MapScreen() {
         mapInstanceRef.current = null;
         markersLayerRef.current = null;
         mapInitializedRef.current = false;
+        setMapReady(false);
       }
     };
   }, []);
@@ -749,6 +755,15 @@ export default function MapScreen() {
       return (
         <View style={styles.mapContainer}>
           <div id="endorsement-map" style={{ width: '100%', height: '100%' }} />
+          {/* Show loading overlay while map initializes */}
+          {!mapReady && (
+            <View style={[styles.mapLoadingOverlay, { backgroundColor: colors.background }]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary, marginTop: 12 }]}>
+                Loading {mapMarkers.length} location{mapMarkers.length !== 1 ? 's' : ''}...
+              </Text>
+            </View>
+          )}
         </View>
       );
     }
@@ -1035,6 +1050,16 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     position: 'relative',
+  },
+  mapLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
   loadingContainer: {
     flex: 1,
