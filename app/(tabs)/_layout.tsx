@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from "expo-router";
-import { BookOpen, DollarSign, User, Home } from "lucide-react-native";
+import { BookOpen, DollarSign, MapPin, User, Home } from "lucide-react-native";
 import React from "react";
 import { Platform, useWindowDimensions, StyleSheet, StatusBar, View, Text, ActivityIndicator } from "react-native";
 import { lightColors, darkColors } from "@/constants/colors";
@@ -125,7 +125,8 @@ export default function TabLayout() {
             <Tabs.Screen
               name="map"
               options={{
-                href: null, // Hide from tab bar but keep route accessible
+                title: "Map",
+                tabBarIcon: renderTabIconWithLabel(MapPin, "Map", colors.primary),
               }}
             />
             <Tabs.Screen
