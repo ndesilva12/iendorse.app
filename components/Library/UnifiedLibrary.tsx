@@ -1949,9 +1949,10 @@ export default function UnifiedLibrary({
           const businessWebsite = fullBusiness?.businessInfo?.website || (entry as any).website || '';
           const logoUrl = fullBusiness?.businessInfo?.logoUrl || (entry as any).logoUrl || (entry as any).logo || (businessWebsite ? getLogoUrl(businessWebsite) : getLogoUrl(''));
           // Get discount percentage if available - only show if business accepts discounts
+          // Use customerDiscountPercent (lowest tier) for consistent display across the app
           const acceptsDiscounts = fullBusiness?.businessInfo?.acceptsStandDiscounts === true;
           const discountPercent = acceptsDiscounts
-            ? (fullBusiness?.businessInfo?.endorsementDiscountPercent || fullBusiness?.businessInfo?.customerDiscountPercent)
+            ? fullBusiness?.businessInfo?.customerDiscountPercent
             : undefined;
 
           // Endorsement section: render as card with position-based background
