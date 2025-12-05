@@ -1,5 +1,5 @@
 import { useRouter, useSegments } from 'expo-router';
-import { Menu, LogOut, User, Heart, Gift } from 'lucide-react-native';
+import { Menu, LogOut, User, Gift } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   View,
@@ -64,11 +64,6 @@ export default function MenuButton() {
   const handleNavigateToSettings = () => {
     setIsMenuVisible(false);
     router.push('/settings');
-  };
-
-  const handleUpdateValues = () => {
-    setIsMenuVisible(false);
-    router.push('/onboarding');
   };
 
   const handleInvite = () => {
@@ -171,18 +166,6 @@ export default function MenuButton() {
                 <View style={styles.menuItemLeft}>
                   <User size={26} color={colors.primary} strokeWidth={2} />
                   <Text style={[styles.menuItemTitle, { color: colors.text }]}>Settings</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Update My Values menu item */}
-              <TouchableOpacity
-                style={[styles.menuItem, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
-                onPress={handleUpdateValues}
-                activeOpacity={0.7}
-              >
-                <View style={styles.menuItemLeft}>
-                  <Heart size={26} color={colors.primary} strokeWidth={2} />
-                  <Text style={[styles.menuItemTitle, { color: colors.text }]}>Update My Values</Text>
                 </View>
               </TouchableOpacity>
 

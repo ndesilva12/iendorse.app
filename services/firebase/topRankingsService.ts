@@ -382,3 +382,38 @@ export async function getBusinessesEndorsementCounts(businessIds: string[]): Pro
     return new Map();
   }
 }
+
+/**
+ * Get the endorsement count for a specific brand
+ * @param brandId - The brand ID to check
+ * @returns The endorsement count for this brand
+ */
+export async function getBrandEndorsementCount(brandId: string): Promise<number> {
+  try {
+    // Fetch all user lists from Firebase
+    const userListsRef = collection(db, 'userLists');
+    const userListsSnapshot = await getDocs(userListsRef);
+
+    let endorsementCount = 0;
+
+    // Process each list
+    userListsSnapshot.forEach((docSnap) => {
+      const listData = docSnap.data();
+
+      // Only process lists that have entries
+      if (!listData.entries || !Array.isArray(listData.entries)) return;
+
+      // Check if this brand is in the list
+      listData.entries.forEach((entry: any) => {
+        if (entry.type === 'brand' && entry.brandId === brandId) {
+          endorsementCount += 1;
+        }
+      });
+    });
+
+    return endorsementCount;
+  } catch (error) {
+    console.error('[TopRankings] Error getting brand endorsement count:', error);
+    return 0;
+  }
+}

@@ -77,6 +77,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import * as Clipboard from 'expo-clipboard';
 import MenuButton from '@/components/MenuButton';
@@ -139,6 +140,7 @@ export default function HomeScreen() {
   const { profile, isDarkMode, clerkUser, markIntroAsSeen, isLoading: isProfileLoading } = useUser();
   const library = useLibrary();
   const colors = isDarkMode ? darkColors : lightColors;
+  const insets = useSafeAreaInsets();
   const { referralCode } = useReferralCode();
   const [mainView, setMainView] = useState<MainView>('myLibrary');
   const [forYouSubsection, setForYouSubsection] = useState<ForYouSubsection>('aligned');
@@ -158,6 +160,9 @@ export default function HomeScreen() {
   const [followingList, setFollowingList] = useState<Array<{ id: string; name: string; profileImage?: string; location?: string; type: 'user' | 'brand' | 'business' }>>([]);
   const [followersList, setFollowersList] = useState<Array<{ id: string; name: string; profileImage?: string; location?: string }>>([]);
   const [isLoadingFollowData, setIsLoadingFollowData] = useState(false);
+  const [followersSearchQuery, setFollowersSearchQuery] = useState('');
+  const [followingDisplayCount, setFollowingDisplayCount] = useState(10);
+  const [followersDisplayCount, setFollowersDisplayCount] = useState(10);
   const [localDistance, setLocalDistance] = useState<LocalDistanceOption>(null);
   const [userBusinesses, setUserBusinesses] = useState<BusinessUser[]>([]);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -2939,42 +2944,7 @@ export default function HomeScreen() {
     );
   }
 
-  // Check if profile exists and has causes - BUT still show library if they have an endorsement list
-  if (!profile || (!profile.causes || profile.causes.length === 0)) {
-    // Check if user has an endorsement list - if so, still show the library
-    if (userPersonalList && userPersonalList.entries && userPersonalList.entries.length > 0) {
-      // User has endorsements but no causes set - show library with just endorsements
-      // The aligned/unaligned lists will be empty but endorsements will show
-    } else {
-      // No endorsements and no causes - show onboarding screen
-      return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-          <View style={[styles.header, { backgroundColor: colors.background }]}>
-            <Image
-              source={require('@/assets/images/endorsing.png')}
-              style={styles.headerLogo}
-              resizeMode="contain"
-            />
-            <MenuButton />
-          </View>
-          <View style={styles.emptyContainer}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: colors.neutralLight }]}>
-              <Target size={48} color={colors.textLight} strokeWidth={1.5} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>Set Your Values First</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              Complete your profile to see personalized brand recommendations
-            </Text>
-            <TouchableOpacity style={[styles.emptyButton, { backgroundColor: colors.primary }]} onPress={() => router.push('/onboarding')} activeOpacity={0.7}>
-              <Text style={[styles.emptyButtonText, { color: colors.white }]}>Get Started</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
-    }
-  }
-
+  // Always show the library view - users no longer need values to use the app
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
@@ -4891,12 +4861,12 @@ export default function HomeScreen() {
       >
         <View style={styles.followersModalOverlay}>
           <View style={[styles.followersModalContent, { backgroundColor: colors.background }]}>
-            {/* Header */}
-            <View style={[styles.followersModalHeader, { borderBottomColor: colors.border }]}>
+            {/* Header - add safe area padding for mobile */}
+            <View style={[styles.followersModalHeader, { borderBottomColor: colors.border, paddingTop: isMobileScreen ? insets.top + 16 : 16 }]}>
               <Text style={[styles.followersModalTitle, { color: colors.text }]}>
                 {followersModalTab === 'following' ? 'Following' : 'Followers'}
               </Text>
-              <TouchableOpacity onPress={() => setShowFollowersModal(false)} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => { setShowFollowersModal(false); setFollowersSearchQuery(''); }} activeOpacity={0.7}>
                 <X size={24} color={colors.text} strokeWidth={2} />
               </TouchableOpacity>
             </View>
@@ -4911,6 +4881,7 @@ export default function HomeScreen() {
                 ]}
                 onPress={() => {
                   setFollowersModalTab('following');
+                  setFollowersSearchQuery('');
                   loadFollowersData('following');
                 }}
                 activeOpacity={0.7}
@@ -4930,6 +4901,7 @@ export default function HomeScreen() {
                 ]}
                 onPress={() => {
                   setFollowersModalTab('followers');
+                  setFollowersSearchQuery('');
                   loadFollowersData('followers');
                 }}
                 activeOpacity={0.7}
@@ -4943,6 +4915,27 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Search Input */}
+            <View style={[styles.followersSearchContainer, { borderBottomColor: colors.border }]}>
+              <View style={[styles.followersSearchInputWrapper, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Search size={18} color={colors.textSecondary} strokeWidth={2} />
+                <TextInput
+                  style={[styles.followersSearchInput, { color: colors.text }]}
+                  placeholder={`Search ${followersModalTab}...`}
+                  placeholderTextColor={colors.textSecondary}
+                  value={followersSearchQuery}
+                  onChangeText={setFollowersSearchQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {followersSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setFollowersSearchQuery('')} activeOpacity={0.7}>
+                    <X size={18} color={colors.textSecondary} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
             {/* Content */}
             <ScrollView style={styles.followersModalList} showsVerticalScrollIndicator={false}>
               {isLoadingFollowData ? (
@@ -4953,100 +4946,142 @@ export default function HomeScreen() {
               ) : (
                 <>
                   {followersModalTab === 'following' ? (
-                    followingList.length === 0 ? (
+                    (() => {
+                      const filteredFollowing = followingList.filter(item =>
+                        item.name.toLowerCase().includes(followersSearchQuery.toLowerCase()) ||
+                        (item.location && item.location.toLowerCase().includes(followersSearchQuery.toLowerCase()))
+                      );
+                      const displayedFollowing = filteredFollowing.slice(0, followingDisplayCount);
+                      return filteredFollowing.length === 0 ? (
                       <View style={styles.followersModalEmpty}>
                         <Text style={[styles.followersModalEmptyText, { color: colors.textSecondary }]}>
-                          Not following anyone yet
+                          {followersSearchQuery ? 'No results found' : 'Not following anyone yet'}
                         </Text>
                       </View>
                     ) : (
-                      followingList.map((item) => (
-                        <TouchableOpacity
-                          key={item.id}
-                          style={[styles.followersModalItem, { borderBottomColor: colors.border }]}
-                          onPress={() => {
-                            setShowFollowersModal(false);
-                            if (item.type === 'user') {
-                              router.push(`/user/${item.id}`);
-                            } else if (item.type === 'brand') {
-                              router.push(`/brand/${item.id}`);
-                            } else if (item.type === 'business') {
-                              router.push(`/business/${item.id}`);
-                            }
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={[styles.followersModalItemImage, { backgroundColor: colors.backgroundSecondary }]}>
-                            {item.profileImage ? (
-                              <Image
-                                source={{ uri: item.profileImage }}
-                                style={styles.followersModalItemImageInner}
-                              />
-                            ) : (
-                              <User size={24} color={colors.textSecondary} strokeWidth={2} />
-                            )}
-                          </View>
-                          <View style={styles.followersModalItemInfo}>
-                            <Text style={[styles.followersModalItemName, { color: colors.text }]} numberOfLines={1}>
-                              {item.name}
+                      <>
+                        {displayedFollowing.map((item) => (
+                          <TouchableOpacity
+                            key={item.id}
+                            style={[styles.followersModalItem, { borderBottomColor: colors.border }]}
+                            onPress={() => {
+                              setShowFollowersModal(false);
+                              setFollowersSearchQuery('');
+                              if (item.type === 'user') {
+                                router.push(`/user/${item.id}`);
+                              } else if (item.type === 'brand') {
+                                router.push(`/brand/${item.id}`);
+                              } else if (item.type === 'business') {
+                                router.push(`/business/${item.id}`);
+                              }
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.followersModalItemImage, { backgroundColor: colors.backgroundSecondary }]}>
+                              {item.profileImage ? (
+                                <Image
+                                  source={{ uri: item.profileImage }}
+                                  style={styles.followersModalItemImageInner}
+                                />
+                              ) : (
+                                <User size={24} color={colors.textSecondary} strokeWidth={2} />
+                              )}
+                            </View>
+                            <View style={styles.followersModalItemInfo}>
+                              <Text style={[styles.followersModalItemName, { color: colors.text }]} numberOfLines={1}>
+                                {item.name}
+                              </Text>
+                              {item.location && (
+                                <Text style={[styles.followersModalItemLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+                                  {item.location}
+                                </Text>
+                              )}
+                              {item.type !== 'user' && (
+                                <Text style={[styles.followersModalItemType, { color: colors.primary }]}>
+                                  {item.type === 'brand' ? 'Brand' : 'Business'}
+                                </Text>
+                              )}
+                            </View>
+                            <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+                          </TouchableOpacity>
+                        ))}
+                        {filteredFollowing.length > followingDisplayCount && (
+                          <TouchableOpacity
+                            style={[styles.loadMoreButton, { backgroundColor: colors.backgroundSecondary, marginVertical: 12 }]}
+                            onPress={() => setFollowingDisplayCount(followingDisplayCount + 10)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+                              Load More ({filteredFollowing.length - followingDisplayCount} remaining)
                             </Text>
-                            {item.location && (
-                              <Text style={[styles.followersModalItemLocation, { color: colors.textSecondary }]} numberOfLines={1}>
-                                {item.location}
-                              </Text>
-                            )}
-                            {item.type !== 'user' && (
-                              <Text style={[styles.followersModalItemType, { color: colors.primary }]}>
-                                {item.type === 'brand' ? 'Brand' : 'Business'}
-                              </Text>
-                            )}
-                          </View>
-                          <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
-                        </TouchableOpacity>
-                      ))
-                    )
+                          </TouchableOpacity>
+                        )}
+                      </>
+                    );
+                    })()
                   ) : (
-                    followersList.length === 0 ? (
+                    (() => {
+                      const filteredFollowers = followersList.filter(item =>
+                        item.name.toLowerCase().includes(followersSearchQuery.toLowerCase()) ||
+                        (item.location && item.location.toLowerCase().includes(followersSearchQuery.toLowerCase()))
+                      );
+                      const displayedFollowers = filteredFollowers.slice(0, followersDisplayCount);
+                      return filteredFollowers.length === 0 ? (
                       <View style={styles.followersModalEmpty}>
                         <Text style={[styles.followersModalEmptyText, { color: colors.textSecondary }]}>
-                          No followers yet
+                          {followersSearchQuery ? 'No results found' : 'No followers yet'}
                         </Text>
                       </View>
                     ) : (
-                      followersList.map((item) => (
-                        <TouchableOpacity
-                          key={item.id}
-                          style={[styles.followersModalItem, { borderBottomColor: colors.border }]}
-                          onPress={() => {
-                            setShowFollowersModal(false);
-                            router.push(`/user/${item.id}`);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={[styles.followersModalItemImage, { backgroundColor: colors.backgroundSecondary }]}>
-                            {item.profileImage ? (
-                              <Image
-                                source={{ uri: item.profileImage }}
-                                style={styles.followersModalItemImageInner}
-                              />
-                            ) : (
-                              <User size={24} color={colors.textSecondary} strokeWidth={2} />
-                            )}
-                          </View>
-                          <View style={styles.followersModalItemInfo}>
-                            <Text style={[styles.followersModalItemName, { color: colors.text }]} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            {item.location && (
-                              <Text style={[styles.followersModalItemLocation, { color: colors.textSecondary }]} numberOfLines={1}>
-                                {item.location}
+                      <>
+                        {displayedFollowers.map((item) => (
+                          <TouchableOpacity
+                            key={item.id}
+                            style={[styles.followersModalItem, { borderBottomColor: colors.border }]}
+                            onPress={() => {
+                              setShowFollowersModal(false);
+                              setFollowersSearchQuery('');
+                              router.push(`/user/${item.id}`);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.followersModalItemImage, { backgroundColor: colors.backgroundSecondary }]}>
+                              {item.profileImage ? (
+                                <Image
+                                  source={{ uri: item.profileImage }}
+                                  style={styles.followersModalItemImageInner}
+                                />
+                              ) : (
+                                <User size={24} color={colors.textSecondary} strokeWidth={2} />
+                              )}
+                            </View>
+                            <View style={styles.followersModalItemInfo}>
+                              <Text style={[styles.followersModalItemName, { color: colors.text }]} numberOfLines={1}>
+                                {item.name}
                               </Text>
-                            )}
-                          </View>
-                          <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
-                        </TouchableOpacity>
-                      ))
-                    )
+                              {item.location && (
+                                <Text style={[styles.followersModalItemLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+                                  {item.location}
+                                </Text>
+                              )}
+                            </View>
+                            <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+                          </TouchableOpacity>
+                        ))}
+                        {filteredFollowers.length > followersDisplayCount && (
+                          <TouchableOpacity
+                            style={[styles.loadMoreButton, { backgroundColor: colors.backgroundSecondary, marginVertical: 12 }]}
+                            onPress={() => setFollowersDisplayCount(followersDisplayCount + 10)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+                              Load More ({filteredFollowers.length - followersDisplayCount} remaining)
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </>
+                    );
+                    })()
                   )}
                 </>
               )}
@@ -7193,6 +7228,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
+  },
+  followersSearchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  followersSearchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  followersSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
   },
   followersModalTitle: {
     fontSize: 18,

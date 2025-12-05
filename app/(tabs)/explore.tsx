@@ -377,11 +377,13 @@ export default function SearchScreen() {
   const [loadingMoreUsers, setLoadingMoreUsers] = useState(false);
   const [showAllUsers, setShowAllUsers] = useState(false);
   const [followingItems, setFollowingItems] = useState<FollowingItem[]>([]);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [followingDisplayCount, setFollowingDisplayCount] = useState(10);
   const [topBusinessItems, setTopBusinessItems] = useState<TopBusinessItem[]>([]);
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
   const [loadingMoreBusinesses, setLoadingMoreBusinesses] = useState(false);
   const [showAllBusinesses, setShowAllBusinesses] = useState(false);
-  const [activeTab, setActiveTab] = useState<'topBusinesses' | 'topUsers'>('topUsers');
+  const [activeTab, setActiveTab] = useState<'following' | 'topUsers'>('topUsers');
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
   const [scannedInfo, setScannedInfo] = useState<{productName: string; brandName: string; imageUrl?: string; notInDatabase: boolean} | null>(null);
@@ -510,6 +512,7 @@ export default function SearchScreen() {
     const fetchFollowingItems = async () => {
       if (!clerkUser?.id || activeTab !== 'following') return;
 
+      setLoadingFollowing(true);
       try {
         const followingEntities = await getFollowing(clerkUser.id);
         const items: FollowingItem[] = [];
@@ -610,6 +613,8 @@ export default function SearchScreen() {
         setFollowingItems(items);
       } catch (error) {
         console.error('Error fetching following items:', error);
+      } finally {
+        setLoadingFollowing(false);
       }
     };
     fetchFollowingItems();
@@ -1485,18 +1490,18 @@ export default function SearchScreen() {
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'topBusinesses' && styles.activeTab,
-            activeTab === 'topBusinesses' && { borderBottomColor: colors.primary }
+            activeTab === 'following' && styles.activeTab,
+            activeTab === 'following' && { borderBottomColor: colors.primary }
           ]}
-          onPress={() => setActiveTab('topBusinesses')}
+          onPress={() => setActiveTab('following')}
           activeOpacity={0.7}
         >
           <Text style={[
             styles.tabText,
-            { color: activeTab === 'topBusinesses' ? colors.primary : colors.textSecondary },
-            activeTab === 'topBusinesses' && styles.activeTabText
+            { color: activeTab === 'following' ? colors.primary : colors.textSecondary },
+            activeTab === 'following' && styles.activeTabText
           ]}>
-            Top Businesses
+            Following
           </Text>
         </TouchableOpacity>
       </View>
@@ -1720,16 +1725,61 @@ export default function SearchScreen() {
       {renderSectionTitle()}
 
       {query.trim().length === 0 ? (
-        activeTab === 'topBusinesses' ? (
+        activeTab === 'following' ? (
           <FlatList
-            key="top-businesses-list"
-            data={topBusinessItems}
-            renderItem={renderTopBusinessItem}
+            key="following-list"
+            data={followingItems.slice(0, followingDisplayCount)}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.userCard, { backgroundColor: 'transparent', borderColor: 'transparent' }]}
+                onPress={() => {
+                  if (item.type === 'user') {
+                    router.push(`/user/${item.id}`);
+                  } else if (item.type === 'business') {
+                    router.push(`/business/${item.id}`);
+                  } else if (item.type === 'brand') {
+                    router.push(`/brand/${item.id}`);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.userCardContent}>
+                  {item.profileImage ? (
+                    <Image
+                      source={{ uri: item.profileImage }}
+                      style={styles.userCardImage}
+                      contentFit="cover"
+                      transition={200}
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <View style={[styles.userCardImagePlaceholder, { backgroundColor: colors.primary }]}>
+                      <Text style={[styles.userCardImageText, { color: colors.white }]}>
+                        {item.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.userCardInfo}>
+                    <Text style={[styles.userCardName, { color: colors.text }]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={[styles.userCardLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {item.type === 'user' ? (item.location || 'User') : (item.category || item.type)}
+                    </Text>
+                    {item.description && (
+                      <Text style={[styles.userCardBio, { color: colors.textSecondary }]} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
             keyExtractor={item => `${item.type}-${item.id}`}
             contentContainerStyle={[styles.userListContainer, { paddingBottom: 100 }]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              loadingBusinesses ? (
+              loadingFollowing ? (
                 <View style={styles.loadingState}>
                   <ActivityIndicator size="large" color={colors.primary} />
                   <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
@@ -1739,25 +1789,22 @@ export default function SearchScreen() {
                   <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
                     <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
                   </View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No Endorsements Yet</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Not Following Anyone</Text>
                   <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                    Be the first to endorse a business or brand!
+                    Follow users, businesses, and brands to see them here
                   </Text>
                 </View>
               )
             }
             ListFooterComponent={
-              !showAllBusinesses && topBusinessItems.length > 0 ? (
+              followingItems.length > followingDisplayCount ? (
                 <TouchableOpacity
                   style={[styles.showMoreButton, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={loadMoreBusinesses}
-                  disabled={loadingMoreBusinesses}
+                  onPress={() => setFollowingDisplayCount(followingDisplayCount + 10)}
                 >
-                  {loadingMoreBusinesses ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Text style={[styles.showMoreText, { color: colors.primary }]}>Show More</Text>
-                  )}
+                  <Text style={[styles.showMoreText, { color: colors.primary }]}>
+                    Show More ({followingItems.length - followingDisplayCount} remaining)
+                  </Text>
                 </TouchableOpacity>
               ) : null
             }

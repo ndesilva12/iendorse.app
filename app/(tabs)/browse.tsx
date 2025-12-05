@@ -22,7 +22,6 @@ import { useData } from '@/contexts/DataContext';
 import { CauseCategory, Cause, Product } from '@/types';
 import { useFocusEffect } from '@react-navigation/native';
 import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
-import { calculateBrandScore, normalizeBrandScores } from '@/lib/scoring';
 import { getLogoUrl } from '@/lib/logo';
 import LocalBusinessView from '@/components/Library/LocalBusinessView';
 import { getTopBrands } from '@/services/firebase/topRankingsService';
@@ -123,9 +122,7 @@ export default function BrowseScreen() {
   const hasUnsavedChanges = useRef(false);
 
   // Global section state
-  const [globalSubsection, setGlobalSubsection] = useState<'aligned' | 'unaligned'>('aligned');
-  const [alignedLoadCount, setAlignedLoadCount] = useState(10);
-  const [unalignedLoadCount, setUnalignedLoadCount] = useState(10);
+  const [globalLoadCount, setGlobalLoadCount] = useState(10);
   const [followedBrands, setFollowedBrands] = useState<Set<string>>(new Set());
 
   // Item options modal state
@@ -160,26 +157,23 @@ export default function BrowseScreen() {
     fetchUserBusinesses();
   }, [fetchUserBusinesses]);
 
-  // Fetch top brands for endorsement-based ordering when user has no causes
+  // Fetch top brands for endorsement-based ordering (always fetch - values feature removed)
   useEffect(() => {
     const fetchTopBrandsForOrdering = async () => {
-      // Only fetch if user has no causes (like business accounts)
-      if (!profile.causes || profile.causes.length === 0) {
-        try {
-          const topBrands = await getTopBrands(200);
-          const endorsementMap = new Map<string, number>();
-          topBrands.forEach((item, index) => {
-            // Use the score as endorsement ranking (higher score = more endorsements)
-            endorsementMap.set(item.id, item.score);
-          });
-          setTopBrandsData(endorsementMap);
-        } catch (error) {
-          console.error('[Browse] Error fetching top brands:', error);
-        }
+      try {
+        const topBrands = await getTopBrands(200);
+        const endorsementMap = new Map<string, number>();
+        topBrands.forEach((item) => {
+          // Use the score as endorsement ranking (higher score = more endorsements)
+          endorsementMap.set(item.id, item.score);
+        });
+        setTopBrandsData(endorsementMap);
+      } catch (error) {
+        console.error('[Browse] Error fetching top brands:', error);
       }
     };
     fetchTopBrandsForOrdering();
-  }, [profile.causes]);
+  }, []);
 
   // Auto-fetch location on mount if permission already granted
   useEffect(() => {
@@ -440,60 +434,30 @@ export default function BrowseScreen() {
     ) || false;
   };
 
-  // Compute brand scores for Global section
-  const { allSupport, allAvoid, scoredBrands } = useMemo(() => {
+  // Compute brand rankings for Global section - always order by endorsements
+  const { allSupport } = useMemo(() => {
     const currentBrands = brands || [];
 
     if (!currentBrands || currentBrands.length === 0) {
       return {
         allSupport: [],
-        allAvoid: [],
-        scoredBrands: new Map(),
       };
     }
 
-    // If user has no causes (like business accounts), order by endorsements
-    const userHasNoCauses = !profile.causes || profile.causes.length === 0;
-
-    if (userHasNoCauses && topBrandsData.size > 0) {
-      // Sort by endorsement score (higher = more endorsed)
-      const sortedByEndorsements = [...currentBrands].sort((a, b) => {
-        const scoreA = topBrandsData.get(a.id) || 0;
-        const scoreB = topBrandsData.get(b.id) || 0;
-        return scoreB - scoreA;
-      });
-
-      // All brands are "aligned" since there's no values to compare
-      const topBrands = sortedByEndorsements.slice(0, 50);
-      const scoredMap = new Map<string, number>();
-      // Set a neutral score of 50 for all brands when no values
-      currentBrands.forEach(brand => scoredMap.set(brand.id, 50));
-
-      return {
-        allSupport: topBrands,
-        allAvoid: [], // No "unaligned" when there's no causes
-        scoredBrands: scoredMap,
-      };
-    }
-
-    const brandsWithScores = currentBrands.map(brand => {
-      const score = calculateBrandScore(brand.name, profile.causes || [], valuesMatrix);
-      return { brand, score };
+    // Sort by endorsement score (higher = more endorsed)
+    const sortedByEndorsements = [...currentBrands].sort((a, b) => {
+      const scoreA = topBrandsData.get(a.id) || 0;
+      const scoreB = topBrandsData.get(b.id) || 0;
+      return scoreB - scoreA;
     });
 
-    const normalizedBrands = normalizeBrandScores(brandsWithScores);
-    const scoredMap = new Map(normalizedBrands.map(({ brand, score }) => [brand.id, score]));
-    const sortedByScore = [...normalizedBrands].sort((a, b) => b.score - a.score);
-
-    const alignedBrands = sortedByScore.slice(0, 50).map(({ brand }) => brand);
-    const unalignedBrands = sortedByScore.slice(-50).reverse().map(({ brand }) => brand);
+    // Return top 50 brands by endorsements
+    const topBrands = sortedByEndorsements.slice(0, 50);
 
     return {
-      allSupport: alignedBrands,
-      allAvoid: unalignedBrands,
-      scoredBrands: scoredMap,
+      allSupport: topBrands,
     };
-  }, [brands, profile.causes, valuesMatrix, topBrandsData]);
+  }, [brands, topBrandsData]);
 
   // Transform Firebase values into the format expected by the UI
   const availableValues = useMemo(() => {
@@ -638,7 +602,7 @@ export default function BrowseScreen() {
 
   // Render section blocks
   const renderSectionBlocks = () => {
-    const globalCount = allSupport.length + allAvoid.length;
+    const globalCount = allSupport.length;
     const localCount = userBusinesses.length;
     const valuesCount = (profile.causes || []).length;
 
@@ -690,8 +654,8 @@ export default function BrowseScreen() {
   // Render sticky section header
   const renderSectionHeader = () => {
     const titles: Record<BrowseSection, string> = {
-      global: 'Recommendations',
-      local: 'Recommendations',
+      global: 'Top Brands',
+      local: 'Local',
       values: 'Browse by Values',
     };
 
@@ -711,42 +675,6 @@ export default function BrowseScreen() {
           <Text style={[styles.stickyHeaderTitle, { color: colors.text }]}>{title}</Text>
         </View>
 
-        {/* Global section toggle */}
-        {selectedSection === 'global' && (
-          <View style={styles.globalToggle}>
-            <TouchableOpacity
-              style={[
-                styles.globalToggleButton,
-                globalSubsection === 'aligned' && { backgroundColor: colors.success + '20' },
-              ]}
-              onPress={() => setGlobalSubsection('aligned')}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.globalToggleText,
-                { color: globalSubsection === 'aligned' ? colors.success : colors.textSecondary }
-              ]}>
-                Aligned
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.globalToggleButton,
-                globalSubsection === 'unaligned' && { backgroundColor: colors.danger + '20' },
-              ]}
-              onPress={() => setGlobalSubsection('unaligned')}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.globalToggleText,
-                { color: globalSubsection === 'unaligned' ? colors.danger : colors.textSecondary }
-              ]}>
-                Unaligned
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Local section - Search/Add button */}
         {selectedSection === 'local' && !showLocalSearch && (
           <TouchableOpacity
@@ -757,27 +685,12 @@ export default function BrowseScreen() {
             <Search size={18} color="#FFFFFF" strokeWidth={2.5} />
           </TouchableOpacity>
         )}
-
-        {/* Values section - Update Values button */}
-        {selectedSection === 'values' && (
-          <TouchableOpacity
-            style={[styles.updateValuesButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/onboarding')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.updateValuesButtonText}>Update Values</Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   };
 
   // Render brand card for Global section (matching Local list style)
-  const renderBrandCard = (brand: Product, index: number) => {
-    const score = scoredBrands.get(brand.id) || 0;
-    const scoreColor = score >= 50 ? colors.primary : colors.danger;
-    const userHasNoCauses = !profile.causes || profile.causes.length === 0;
-
+  const renderBrandCard = (brand: Product, index: number, showRank: boolean = false) => {
     return (
       <View key={brand.id} style={{ position: 'relative', marginBottom: 4 }}>
         <TouchableOpacity
@@ -789,6 +702,14 @@ export default function BrowseScreen() {
           activeOpacity={0.7}
         >
           <View style={styles.brandCardInner}>
+            {/* Rank number */}
+            {showRank && (
+              <View style={styles.rankContainer}>
+                <Text style={[styles.rankNumber, { color: colors.textSecondary }]}>
+                  {index + 1}
+                </Text>
+              </View>
+            )}
             <View style={styles.brandLogoContainer}>
               <Image
                 source={{ uri: getLogoUrl(brand.website) }}
@@ -806,14 +727,6 @@ export default function BrowseScreen() {
                 {brand.category || 'Brand'}
               </Text>
             </View>
-            {/* Only show score if user has causes/values */}
-            {!userHasNoCauses && (
-              <View style={styles.brandScoreContainer}>
-                <Text style={[styles.brandScore, { color: scoreColor }]}>
-                  {Math.round(score)}
-                </Text>
-              </View>
-            )}
             {/* Action Menu Button - Opens Modal */}
             <TouchableOpacity
               style={styles.actionMenuButton}
@@ -837,9 +750,8 @@ export default function BrowseScreen() {
 
   // Render Global content
   const renderGlobalContent = () => {
-    const items = globalSubsection === 'aligned' ? allSupport : allAvoid;
-    const loadCount = globalSubsection === 'aligned' ? alignedLoadCount : unalignedLoadCount;
-    const setLoadCount = globalSubsection === 'aligned' ? setAlignedLoadCount : setUnalignedLoadCount;
+    // Use allSupport which contains top brands ordered by endorsements
+    const items = allSupport;
 
     if (items.length === 0) {
       return (
@@ -847,7 +759,7 @@ export default function BrowseScreen() {
           <Target size={48} color={colors.textSecondary} strokeWidth={1.5} />
           <Text style={[styles.emptySectionTitle, { color: colors.text }]}>No brands yet</Text>
           <Text style={[styles.emptySectionText, { color: colors.textSecondary }]}>
-            Set your values to see personalized brand recommendations
+            Check back later for top endorsed brands
           </Text>
         </View>
       );
@@ -855,16 +767,16 @@ export default function BrowseScreen() {
 
     return (
       <View style={styles.brandList}>
-        {items.slice(0, loadCount).map((brand, index) => renderBrandCard(brand, index))}
+        {items.slice(0, globalLoadCount).map((brand, index) => renderBrandCard(brand, index, true))}
 
-        {items.length > loadCount && (
+        {items.length > globalLoadCount && (
           <TouchableOpacity
             style={[styles.loadMoreButton, { borderColor: colors.border }]}
-            onPress={() => setLoadCount(loadCount + 10)}
+            onPress={() => setGlobalLoadCount(globalLoadCount + 10)}
             activeOpacity={0.7}
           >
             <Text style={[styles.loadMoreText, { color: colors.primary }]}>
-              Load More ({items.length - loadCount} remaining)
+              Load More ({items.length - globalLoadCount} remaining)
             </Text>
           </TouchableOpacity>
         )}
@@ -984,103 +896,32 @@ export default function BrowseScreen() {
     );
   };
 
-  // Render Values content
+  // Render Values content - shows all values organized by category for browsing
   const renderValuesContent = () => {
+    // Get all values organized by category
+    const allValuesByCategory: Record<string, any[]> = {};
+    Object.keys(availableValues).forEach(category => {
+      const values = availableValues[category] || [];
+      if (values.length > 0) {
+        allValuesByCategory[category] = values;
+      }
+    });
+
+    const allCategories = Object.keys(allValuesByCategory);
+    const knownCats = CATEGORY_ORDER.filter(cat => allCategories.includes(cat));
+    const unknownCats = allCategories.filter(cat => !CATEGORY_ORDER.includes(cat)).sort();
+    const orderedCategories = [...knownCats, ...unknownCats];
+
     return (
       <View style={styles.valuesContent}>
         <Text style={[styles.valueHintText, { color: colors.textSecondary }]}>
           Tap any value to see related brands
         </Text>
 
-        {supportCauses.length === 0 && avoidCauses.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Values Selected</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              Complete onboarding to add values
-            </Text>
-          </View>
-        ) : (
-          <>
-            {supportCauses.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Support</Text>
-                <View style={styles.valuesGrid}>
-                  {supportCauses.map(cause => {
-                    const currentState = getValueState(cause.id);
-                    return (
-                      <TouchableOpacity
-                        key={cause.id}
-                        style={[
-                          styles.valueChip,
-                          currentState === 'support' && { backgroundColor: colors.success, borderColor: colors.success },
-                          currentState === 'avoid' && { backgroundColor: colors.danger, borderColor: colors.danger },
-                          currentState === 'unselected' && { backgroundColor: 'transparent', borderColor: colors.neutral, borderWidth: 1.5 }
-                        ]}
-                        onPress={() => handleValueTap(cause.id)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.valueChipText,
-                            currentState === 'support' && { color: colors.white },
-                            currentState === 'avoid' && { color: colors.white },
-                            currentState === 'unselected' && { color: colors.neutral, fontWeight: '500' as const }
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {cause.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {avoidCauses.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Against</Text>
-                <View style={styles.valuesGrid}>
-                  {avoidCauses.map(cause => {
-                    const currentState = getValueState(cause.id);
-                    return (
-                      <TouchableOpacity
-                        key={cause.id}
-                        style={[
-                          styles.valueChip,
-                          currentState === 'support' && { backgroundColor: colors.success, borderColor: colors.success },
-                          currentState === 'avoid' && { backgroundColor: colors.danger, borderColor: colors.danger },
-                          currentState === 'unselected' && { backgroundColor: 'transparent', borderColor: colors.neutral, borderWidth: 1.5 }
-                        ]}
-                        onPress={() => handleValueTap(cause.id)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.valueChipText,
-                            currentState === 'support' && { color: colors.white },
-                            currentState === 'avoid' && { color: colors.white },
-                            currentState === 'unselected' && { color: colors.neutral, fontWeight: '500' as const }
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {cause.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* Unselected Values Section */}
+        {/* All Values Section */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Unselected Values</Text>
-
-          {sortedCategories.map((category) => {
-            const values = unselectedValuesByCategory[category];
+          {orderedCategories.map((category) => {
+            const values = allValuesByCategory[category];
             if (!values || values.length === 0) return null;
 
             const Icon = getCategoryIcon(category);
@@ -1111,48 +952,33 @@ export default function BrowseScreen() {
 
                 {isExpanded && (
                   <View style={[styles.valuesGrid, styles.expandedValuesGrid]}>
-                    {values.map(value => {
-                      const currentState = getValueState(value.id);
-                      return (
-                        <TouchableOpacity
-                          key={value.id}
+                    {values.map(value => (
+                      <TouchableOpacity
+                        key={value.id}
+                        style={[
+                          styles.valueChip,
+                          styles.unselectedValueChip,
+                          { borderColor: colors.border, backgroundColor: 'transparent' }
+                        ]}
+                        onPress={() => handleValueTap(value.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
                           style={[
-                            styles.valueChip,
-                            currentState === 'unselected' && styles.unselectedValueChip,
-                            currentState === 'unselected' && { borderColor: colors.neutral, backgroundColor: 'transparent' },
-                            currentState === 'support' && { backgroundColor: colors.success, borderColor: colors.success },
-                            currentState === 'avoid' && { backgroundColor: colors.danger, borderColor: colors.danger }
+                            styles.valueChipText,
+                            { color: colors.text }
                           ]}
-                          onPress={() => handleValueTap(value.id)}
-                          activeOpacity={0.7}
+                          numberOfLines={1}
                         >
-                          <Text
-                            style={[
-                              styles.valueChipText,
-                              currentState === 'unselected' && styles.unselectedValueText,
-                              currentState === 'unselected' && { color: colors.neutral },
-                              currentState === 'support' && { color: colors.white },
-                              currentState === 'avoid' && { color: colors.white }
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {value.name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+                          {value.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 )}
               </View>
             );
           })}
-        </View>
-
-        <View style={[styles.infoSection, { backgroundColor: colors.backgroundSecondary }]}>
-          <Text style={[styles.infoTitle, { color: colors.text }]}>About Your Values</Text>
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            Your values help us recommend products and brands that match your beliefs and priorities.
-          </Text>
         </View>
       </View>
     );
@@ -1377,6 +1203,15 @@ const styles = StyleSheet.create({
     height: '100%',
     overflow: 'visible',
     backgroundColor: 'transparent',
+  },
+  rankContainer: {
+    width: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rankNumber: {
+    fontSize: 16,
+    fontWeight: '700' as const,
   },
   brandLogoContainer: {
     width: 64,

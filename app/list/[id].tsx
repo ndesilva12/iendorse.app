@@ -782,10 +782,10 @@ export default function SharedListScreen() {
             {mapEntries.length > 0 && (
               <TouchableOpacity
                 onPress={() => setShowMapModal(true)}
-                style={[styles.mapButton, { backgroundColor: colors.backgroundSecondary }]}
+                style={[styles.mapButton, { backgroundColor: 'transparent', borderColor: colors.primary }]}
                 activeOpacity={0.7}
               >
-                <MapPin size={20} color={colors.primary} strokeWidth={2} />
+                <Text style={[styles.mapButtonText, { color: colors.primary }]}>Map</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1218,8 +1218,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   mapButton: {
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  mapButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   // Map modal styles
   mapModalOverlay: {

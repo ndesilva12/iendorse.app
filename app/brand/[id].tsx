@@ -25,7 +25,7 @@ import { useLibrary } from '@/contexts/LibraryContext';
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { getLogoUrl } from '@/lib/logo';
 import { getUserLists, addEntryToList } from '@/services/firebase/listService';
-import { calculateBrandScore, getBrandScoreLabel, getBrandScoreColor, normalizeBrandScores } from '@/lib/scoring';
+import { getBrandEndorsementCount } from '@/services/firebase/topRankingsService';
 import { followEntity, unfollowEntity, isFollowing as checkIsFollowing, getFollowersCount, getFollowingCount } from '@/services/firebase/followService';
 import FollowingFollowersList from '@/components/FollowingFollowersList';
 import { Review as FirebaseReview, getEntityReviews, createReview, likeReview, unlikeReview, hasLikedReview, getUserLikedReviewIds } from '@/services/firebase/reviewService';
@@ -141,6 +141,22 @@ export default function BrandDetailScreen() {
   const [followingCount, setFollowingCount] = useState(0);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showFollowingModal, setShowFollowingModal] = useState(false);
+  const [brandEndorsementCount, setBrandEndorsementCount] = useState(0);
+
+  // Load endorsement count for this brand
+  useEffect(() => {
+    const loadEndorsementCount = async () => {
+      if (!brand?.id) return;
+
+      try {
+        const count = await getBrandEndorsementCount(brand.id);
+        setBrandEndorsementCount(count);
+      } catch (error) {
+        console.error('[BrandDetail] Error loading endorsement count:', error);
+      }
+    };
+    loadEndorsementCount();
+  }, [brand?.id]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -543,33 +559,6 @@ export default function BrandDetailScreen() {
     }
   };
 
-  // Calculate alignment score using new scoring system with normalization
-  // Note: valuesMatrix contains brand NAMES not IDs in support/oppose arrays
-  // Match the normalization logic from home tab to ensure scores are consistent
-  const brandScore = useMemo(() => {
-    if (!brand || !brand.name || !allBrands || allBrands.length === 0) return 50;
-
-    // Calculate scores for all brands
-    const brandsWithScores = allBrands.map(b => {
-      const score = calculateBrandScore(b.name, profile.causes || [], valuesMatrix);
-      return { brand: b, score };
-    });
-
-    // Normalize scores to 1-99 range (matching home tab)
-    const normalizedBrands = normalizeBrandScores(brandsWithScores);
-
-    // Find the score for the current brand
-    const currentBrandScore = normalizedBrands.find(b => b.brand.id === brand.id);
-    return currentBrandScore?.score || 50;
-  }, [brand, allBrands, profile.causes, valuesMatrix]);
-
-  const scoreLabel = getBrandScoreLabel(brandScore);
-  const scoreColor = getBrandScoreColor(brandScore, colors);
-
-  const alignmentColor = brandScore >= 60 ? colors.success : brandScore < 40 ? colors.danger : colors.textSecondary;
-  const AlignmentIcon = brandScore >= 60 ? TrendingUp : TrendingDown;
-  const alignmentLabel = brandScore >= 60 ? 'Aligned' : brandScore < 40 ? 'Not Aligned' : 'Neutral';
-
   // Calculate which values match with this brand - split into aligned and unaligned
   const alignedValues: { id: string; userStance: string; brandStance: string }[] = [];
   const unalignedValues: { id: string; userStance: string; brandStance: string }[] = [];
@@ -734,9 +723,15 @@ export default function BrandDetailScreen() {
               )}
             </View>
             <View style={[styles.scoreContainer, { position: 'relative', zIndex: showActionMenu ? 99999 : 1, overflow: 'visible' }]}>
-              <View style={[styles.scoreCircle, { borderColor: scoreColor, backgroundColor: colors.background }]}>
-                <Text style={[styles.scoreNumber, { color: scoreColor }]}>
-                  {Math.round(brandScore)}
+              <View style={styles.endorsementBadgeContainer}>
+                <View style={[styles.endorsementBadge, { backgroundColor: 'transparent', borderColor: colors.primary }]}>
+                  <Users size={16} color={colors.primary} strokeWidth={2} />
+                  <Text style={[styles.endorsementBadgeText, { color: colors.primary }]}>
+                    {brandEndorsementCount}
+                  </Text>
+                </View>
+                <Text style={[styles.endorsementBadgeLabel, { color: colors.textSecondary }]}>
+                  endorsements
                 </Text>
               </View>
               <TouchableOpacity
@@ -1446,6 +1441,28 @@ const styles = StyleSheet.create({
   scoreNumber: {
     fontSize: 16,
     fontWeight: '700' as const,
+  },
+  endorsementBadgeContainer: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  endorsementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    gap: 6,
+  },
+  endorsementBadgeText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+  },
+  endorsementBadgeLabel: {
+    fontSize: 11,
+    fontWeight: '500' as const,
   },
   actionMenuButton: {
     width: 36,

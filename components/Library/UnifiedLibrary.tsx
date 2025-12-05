@@ -1942,6 +1942,12 @@ export default function UnifiedLibrary({
           const fullBusiness = userBusinesses.find(b => b.id === entry.businessId)
             || allBusinesses.find(b => b.id === entry.businessId);
 
+          // Skip rendering if business no longer exists (was deleted)
+          if (!fullBusiness) {
+            console.log('[UnifiedLibrary] Skipping deleted business entry:', entry.businessId);
+            return null;
+          }
+
           // Get business name from multiple possible fields - prefer actual business data
           const businessName = fullBusiness?.businessInfo?.name || (entry as any).businessName || (entry as any).name || 'Unknown Business';
           const businessCategory = fullBusiness?.businessInfo?.category || (entry as any).businessCategory || (entry as any).category;
@@ -1949,9 +1955,10 @@ export default function UnifiedLibrary({
           const businessWebsite = fullBusiness?.businessInfo?.website || (entry as any).website || '';
           const logoUrl = fullBusiness?.businessInfo?.logoUrl || (entry as any).logoUrl || (entry as any).logo || (businessWebsite ? getLogoUrl(businessWebsite) : getLogoUrl(''));
           // Get discount percentage if available - only show if business accepts discounts
+          // Use customerDiscountPercent (lowest tier) for consistent display across the app
           const acceptsDiscounts = fullBusiness?.businessInfo?.acceptsStandDiscounts === true;
           const discountPercent = acceptsDiscounts
-            ? (fullBusiness?.businessInfo?.endorsementDiscountPercent || fullBusiness?.businessInfo?.customerDiscountPercent)
+            ? fullBusiness?.businessInfo?.customerDiscountPercent
             : undefined;
 
           // Endorsement section: render as card with position-based background
@@ -4102,10 +4109,10 @@ export default function UnifiedLibrary({
             {mapEntries.length > 0 && (
               <TouchableOpacity
                 onPress={() => setShowMapModal(true)}
-                style={styles.headerActionButton}
+                style={[styles.mapButton, { backgroundColor: 'transparent', borderColor: colors.primary }]}
                 activeOpacity={0.7}
               >
-                <MapPin size={28} color={colors.primary} strokeWidth={2} />
+                <Text style={[styles.mapButtonText, { color: colors.primary }]}>Map</Text>
               </TouchableOpacity>
             )}
 
@@ -5825,6 +5832,16 @@ const styles = StyleSheet.create({
   },
   headerActionButton: {
     padding: 10,
+  },
+  mapButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  mapButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   endorsedActionDropdown: {
     position: 'absolute',
