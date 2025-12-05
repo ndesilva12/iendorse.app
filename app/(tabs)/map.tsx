@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { MapPin, Filter, X, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { MapPin, Filter, X, Check, ChevronDown, ChevronUp, Heart, UserPlus, UserMinus } from 'lucide-react-native';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
@@ -32,7 +32,8 @@ import { useUser } from '@/contexts/UserContext';
 import { useData } from '@/contexts/DataContext';
 import { useLibrary } from '@/contexts/LibraryContext';
 import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
-import { getEndorsementList } from '@/services/firebase/listService';
+import { getEndorsementList, removeEntryFromList, addEntryToList } from '@/services/firebase/listService';
+import { followEntity, unfollowEntity, isFollowing as checkIsFollowing } from '@/services/firebase/followService';
 import { getLogoUrl } from '@/lib/logo';
 import { ListEntry, BrandListEntry, BusinessListEntry, PlaceListEntry } from '@/types/library';
 
@@ -49,6 +50,8 @@ interface MapMarker {
   address?: string;
   distance?: number;
   isLocal?: boolean;
+  rank?: number; // Position in endorsement list (1-indexed)
+  entryId?: string; // ID of the entry in endorsement list (for removal)
 }
 
 // Muted map style
@@ -98,7 +101,7 @@ export default function MapScreen() {
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'endorsements' | 'local'>('endorsements');
+  const [activeFilter, setActiveFilter] = useState<'endorsements'>('endorsements');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showMarkersList, setShowMarkersList] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -108,7 +111,7 @@ export default function MapScreen() {
   const markersLayerRef = useRef<any>(null);
   const mapInitializedRef = useRef(false);
   const hasUserChangedFilterRef = useRef(false);
-  const previousFilterRef = useRef<'endorsements' | 'local'>('endorsements');
+  const previousFilterRef = useRef<'endorsements'>('endorsements');
   const dataLoadedRef = useRef(false);
 
   // Fetch user location
@@ -202,8 +205,9 @@ export default function MapScreen() {
     console.log('[Map] Processing', endorsementList.length, 'endorsement entries, brands:', brands.length, 'businesses:', allBusinesses.length);
 
     // Process all endorsement list entries
-    endorsementList.forEach((entry) => {
+    endorsementList.forEach((entry, index) => {
       let marker: MapMarker | null = null;
+      const rank = index + 1; // 1-indexed rank
 
       if (entry.type === 'business') {
         businessCount++;
@@ -226,6 +230,8 @@ export default function MapScreen() {
             address: business.businessInfo.location,
             distance,
             isLocal: distance ? distance <= 25 : false,
+            rank: rank <= 50 ? rank : undefined,
+            entryId: entry.id,
           };
         }
       } else if (entry.type === 'brand') {
@@ -249,6 +255,8 @@ export default function MapScreen() {
             address: brand.location,
             distance,
             isLocal: distance ? distance <= 25 : false,
+            rank: rank <= 50 ? rank : undefined,
+            entryId: entry.id,
           };
         }
       } else if (entry.type === 'place') {
@@ -277,6 +285,8 @@ export default function MapScreen() {
             address: placeEntry.placeAddress,
             distance,
             isLocal: distance ? distance <= 25 : false,
+            rank: rank <= 50 ? rank : undefined,
+            entryId: entry.id,
           };
         }
       }
@@ -375,12 +385,6 @@ export default function MapScreen() {
 
     let filteredMarkers = [...allMarkers]; // Create a copy to avoid mutation issues
 
-    // Local filter: only show markers within 25 miles
-    if (activeFilter === 'local') {
-      filteredMarkers = filteredMarkers.filter(m => m.isLocal === true);
-      console.log('[Map] After local filter:', filteredMarkers.length);
-    }
-
     // Apply category filter - only if not 'all' (case insensitive check)
     const isAllCategory = selectedCategory.toLowerCase() === 'all';
     console.log('[Map] isAllCategory:', isAllCategory, 'selectedCategory:', selectedCategory);
@@ -456,6 +460,33 @@ export default function MapScreen() {
     setSelectedMarker(null);
   };
 
+  // Handle unendorsing an item from the map
+  const handleUnendorse = async () => {
+    if (!selectedMarker || !selectedMarker.entryId || !clerkUser?.id) return;
+
+    try {
+      // Find the endorsement list ID
+      const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
+      if (!endorsementListData) {
+        console.error('[Map] No endorsement list found');
+        return;
+      }
+
+      // Remove the entry
+      await removeEntryFromList(endorsementListData.id, selectedMarker.entryId);
+
+      // Reload the library to refresh the data
+      await library.loadUserLists(clerkUser.id, true);
+
+      // Close the marker details
+      setSelectedMarker(null);
+
+      console.log('[Map] Successfully unendorsed:', selectedMarker.name);
+    } catch (error) {
+      console.error('[Map] Error unendorsing:', error);
+    }
+  };
+
   // Render header
   const renderHeader = () => (
     <View style={[styles.mainHeaderContainer, { backgroundColor: colors.background, borderBottomColor: 'rgba(0, 0, 0, 0.05)' }]}>
@@ -495,27 +526,6 @@ export default function MapScreen() {
             Endorsements
           </Text>
           {activeFilter === 'endorsements' && (
-            <View style={[styles.filterCount, { backgroundColor: colors.primary }]}>
-              <Text style={styles.filterCountText}>{mapMarkers.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            activeFilter === 'local' && styles.filterButtonActive,
-            { borderColor: activeFilter === 'local' ? colors.primary : colors.border }
-          ]}
-          onPress={() => setActiveFilter('local')}
-        >
-          <Text style={[
-            styles.filterButtonText,
-            { color: activeFilter === 'local' ? colors.primary : colors.text }
-          ]}>
-            Local (25mi)
-          </Text>
-          {activeFilter === 'local' && (
             <View style={[styles.filterCount, { backgroundColor: colors.primary }]}>
               <Text style={styles.filterCountText}>{mapMarkers.length}</Text>
             </View>
@@ -648,13 +658,35 @@ export default function MapScreen() {
       }
     };
 
+    // Listen for unendorse events from web popups
+    const handleUnendorseFromWeb = async (event: any) => {
+      const { entryId, name } = event.detail;
+      if (!entryId || !clerkUser?.id) return;
+
+      try {
+        const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
+        if (!endorsementListData) {
+          console.error('[Map] No endorsement list found');
+          return;
+        }
+
+        await removeEntryFromList(endorsementListData.id, entryId);
+        await library.loadUserLists(clerkUser.id, true);
+        console.log('[Map] Successfully unendorsed:', name);
+      } catch (error) {
+        console.error('[Map] Error unendorsing:', error);
+      }
+    };
+
     window.addEventListener('navigate-to-endorsement', handleNavigate);
+    window.addEventListener('unendorse-from-map', handleUnendorseFromWeb);
 
     return () => {
       clearTimeout(timer);
       window.removeEventListener('navigate-to-endorsement', handleNavigate);
+      window.removeEventListener('unendorse-from-map', handleUnendorseFromWeb);
     };
-  }, [loading, loadingLocation, userLocation, router]);
+  }, [loading, loadingLocation, userLocation, router, clerkUser?.id, library]);
 
   // Update markers when data changes (separate from map initialization)
   useEffect(() => {
@@ -668,42 +700,40 @@ export default function MapScreen() {
     // Clear existing markers
     markersLayerRef.current.clearLayers();
 
-    // Add local radius circle if local filter is active
-    if (activeFilter === 'local' && userLocation) {
-      L.circle([userLocation.latitude, userLocation.longitude], {
-        radius: 25 * 1609.34, // 25 miles in meters
-        color: 'rgba(59, 130, 246, 0.5)',
-        fillColor: 'rgba(59, 130, 246, 0.1)',
-        fillOpacity: 0.2,
-        weight: 2,
-      }).addTo(markersLayerRef.current);
-    }
-
-    // Add endorsement markers (green)
+    // Add endorsement markers (app blue color)
     mapMarkers.forEach((marker) => {
-      const markerColor = '#22C55E';
+      const markerColor = '#00aaff'; // App blue color
       const distanceText = marker.distance !== undefined
         ? marker.distance < 1
           ? `${(marker.distance * 5280).toFixed(0)} ft away`
           : `${marker.distance.toFixed(1)} mi away`
         : '';
 
+      // Create marker HTML - show rank number inside marker if ranked, otherwise plain marker
+      const markerHtml = marker.rank
+        ? `<div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div style="background-color: ${markerColor}; color: white; font-size: 11px; font-weight: 700; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${marker.rank}</div>
+            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${markerColor}; margin-top: -2px;"></div>
+          </div>`
+        : `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
+            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
+          </svg>`;
+
       L.marker([marker.latitude, marker.longitude], {
         icon: L.divIcon({
           className: 'endorsement-marker',
-          html: `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
-            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
-          </svg>`,
-          iconSize: [20, 28],
-          iconAnchor: [10, 28],
+          html: markerHtml,
+          iconSize: marker.rank ? [24, 32] : [20, 28],
+          iconAnchor: marker.rank ? [12, 32] : [10, 28],
         }),
       })
         .addTo(markersLayerRef.current)
         .bindPopup(`
-          <div style="min-width: 200px; padding: 12px;">
-            <div style="font-size: 16px; font-weight: bold; margin-bottom: 6px; color: #1f2937;">
-              ${marker.name}
+          <div style="min-width: 220px; padding: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              ${marker.rank ? `<span style="background-color: #00aaff; color: white; font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 6px;">#${marker.rank}</span>` : ''}
+              <span style="font-size: 16px; font-weight: bold; color: #1f2937;">${marker.name}</span>
             </div>
             <div style="font-size: 13px; color: #6b7280; margin-bottom: 8px; text-transform: capitalize;">
               ${marker.category}
@@ -718,25 +748,42 @@ export default function MapScreen() {
                 ${distanceText}
               </div>
             ` : ''}
-            <button
-              onclick="window.dispatchEvent(new CustomEvent('navigate-to-endorsement', { detail: { id: '${marker.id}', type: '${marker.type}' } }))"
-              style="
-                width: 100%;
-                background-color: #00aaff;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: background-color 0.2s;
-              "
-              onmouseover="this.style.backgroundColor='#0099ee'"
-              onmouseout="this.style.backgroundColor='#00aaff'"
-            >
-              View Details
-            </button>
+            <div style="display: flex; gap: 8px;">
+              <button
+                onclick="window.dispatchEvent(new CustomEvent('navigate-to-endorsement', { detail: { id: '${marker.id}', type: '${marker.type}' } }))"
+                style="
+                  flex: 1;
+                  background-color: #00aaff;
+                  color: white;
+                  border: none;
+                  padding: 8px 12px;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                View Details
+              </button>
+              <button
+                onclick="window.dispatchEvent(new CustomEvent('unendorse-from-map', { detail: { entryId: '${marker.entryId}', name: '${marker.name.replace(/'/g, "\\'")}' } }))"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 4px;
+                  background-color: #FEE2E2;
+                  color: #EF4444;
+                  border: none;
+                  padding: 8px 12px;
+                  border-radius: 8px;
+                  font-size: 13px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                ❤️ Unendorse
+              </button>
+            </div>
           </div>
         `, {
           maxWidth: 280,
@@ -744,27 +791,7 @@ export default function MapScreen() {
         });
     });
 
-    // Only fit bounds when user switches to local filter (to show local area)
-    // Don't fit bounds on initial load to avoid zooming out to show worldwide markers
-    const filterChanged = previousFilterRef.current !== activeFilter;
-    if (filterChanged) {
-      hasUserChangedFilterRef.current = true;
-      previousFilterRef.current = activeFilter;
-    }
-
-    // Fit map bounds only for local filter OR when user explicitly changed filter
-    if (mapMarkers.length > 0 && activeFilter === 'local' && userLocation) {
-      // For local filter, fit to show the local radius area
-      const bounds = L.latLngBounds(mapMarkers.map(m => [m.latitude, m.longitude]));
-      bounds.extend([userLocation.latitude, userLocation.longitude]);
-      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
-    } else if (hasUserChangedFilterRef.current && activeFilter === 'endorsements' && mapMarkers.length > 0) {
-      // When switching back to endorsements, reset to initial zoom centered on user
-      if (userLocation) {
-        mapInstanceRef.current.setView([userLocation.latitude, userLocation.longitude], 9);
-      }
-    }
-    // On initial load with endorsements filter, keep the initial zoom (level 9) and don't fit all worldwide markers
+    // Keep the initial zoom (level 9) and don't fit all worldwide markers
   }, [mapMarkers, activeFilter, userLocation, mapReady]);
 
   // Cleanup map on unmount
@@ -894,17 +921,6 @@ export default function MapScreen() {
             </Marker>
           )}
 
-          {/* Local radius circle */}
-          {activeFilter === 'local' && userLocation && (
-            <Circle
-              center={userLocation}
-              radius={25 * 1609.34} // 25 miles in meters
-              strokeColor="rgba(59, 130, 246, 0.5)"
-              fillColor="rgba(59, 130, 246, 0.1)"
-              strokeWidth={2}
-            />
-          )}
-
           {/* Business/Brand markers */}
           {mapMarkers.map((marker) => (
             <Marker
@@ -917,7 +933,16 @@ export default function MapScreen() {
               onPress={() => handleMarkerPress(marker)}
             >
               <View style={styles.businessMarker}>
-                <MapPin size={28} color="#22C55E" fill="#22C55E" strokeWidth={1.5} />
+                {marker.rank ? (
+                  <View style={styles.rankedMarker}>
+                    <View style={styles.rankedMarkerCircle}>
+                      <Text style={styles.rankedMarkerText}>{marker.rank}</Text>
+                    </View>
+                    <View style={styles.rankedMarkerPointer} />
+                  </View>
+                ) : (
+                  <MapPin size={28} color="#00aaff" fill="#00aaff" strokeWidth={1.5} />
+                )}
               </View>
             </Marker>
           ))}
@@ -929,7 +954,14 @@ export default function MapScreen() {
             <View style={styles.selectionCard}>
               <View style={styles.selectionHeader}>
                 <View style={styles.selectionHeaderLeft}>
-                  <Text style={styles.businessName}>{selectedMarker.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {selectedMarker.rank && (
+                      <View style={styles.rankBadge}>
+                        <Text style={styles.rankBadgeText}>#{selectedMarker.rank}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.businessName}>{selectedMarker.name}</Text>
+                  </View>
                   <Text style={styles.businessCategory}>{selectedMarker.category}</Text>
                 </View>
                 <TouchableOpacity
@@ -956,12 +988,22 @@ export default function MapScreen() {
                   </Text>
                 )}
 
-                <TouchableOpacity
-                  style={styles.viewDetailsButton}
-                  onPress={handleViewDetails}
-                >
-                  <Text style={styles.viewDetailsButtonText}>View Details</Text>
-                </TouchableOpacity>
+                <View style={styles.actionButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.viewDetailsButton}
+                    onPress={handleViewDetails}
+                  >
+                    <Text style={styles.viewDetailsButtonText}>View Details</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.unendorseButton}
+                    onPress={handleUnendorse}
+                  >
+                    <Heart size={16} color="#EF4444" fill="#EF4444" strokeWidth={2} />
+                    <Text style={styles.unendorseButtonText}>Unendorse</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
@@ -1187,10 +1229,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   businessMarker: {
-    width: 28,
-    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rankedMarker: {
+    alignItems: 'center',
+  },
+  rankedMarkerCircle: {
+    backgroundColor: '#00aaff',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  rankedMarkerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  rankedMarkerPointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#00aaff',
+    marginTop: -2,
   },
   selectionContainer: {
     position: 'absolute',
@@ -1261,18 +1335,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
   },
+  rankBadge: {
+    backgroundColor: '#00aaff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  rankBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
   viewDetailsButton: {
+    flex: 1,
     backgroundColor: '#00aaff',
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderRadius: 10,
     alignItems: 'center',
-    marginTop: 4,
   },
   viewDetailsButtonText: {
     fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  unendorseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEE2E2',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  unendorseButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
   },
   emptyOverlay: {
     position: 'absolute',

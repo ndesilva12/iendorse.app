@@ -21,8 +21,7 @@ import MenuButton from '@/components/MenuButton';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
 import { useData } from '@/contexts/DataContext';
-import { CauseCategory, Cause, Product, UserProfile } from '@/types';
-import { useFocusEffect } from '@react-navigation/native';
+import { Product, UserProfile } from '@/types';
 import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
 import { getLogoUrl } from '@/lib/logo';
 import LocalBusinessView from '@/components/Library/LocalBusinessView';
@@ -113,17 +112,10 @@ const getCategoryLabel = (category: string) => {
   return category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
-interface LocalValueState {
-  id: string;
-  name: string;
-  category: string;
-  type: 'support' | 'avoid';
-  description?: string;
-}
-
 export default function BrowseScreen() {
   const router = useRouter();
-  const { profile, isDarkMode, removeCauses, clerkUser, addCauses } = useUser();
+  // Note: addCauses/removeCauses removed - values no longer associated with users
+  const { profile, isDarkMode, clerkUser } = useUser();
   const { brands, valuesMatrix, values: firebaseValues } = useData();
   const library = useLibrary();
   const colors = isDarkMode ? darkColors : lightColors;
@@ -134,8 +126,6 @@ export default function BrowseScreen() {
 
   // Values tab state
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [localChanges, setLocalChanges] = useState<Map<string, LocalValueState | null>>(new Map());
-  const hasUnsavedChanges = useRef(false);
 
   // Global section state
   const [globalLoadCount, setGlobalLoadCount] = useState(10);
@@ -342,7 +332,8 @@ export default function BrowseScreen() {
       setSearchQuery(text);
 
       if (text.trim().length > 0) {
-        const userCauseIds = profile?.causes ? profile.causes.map(c => c.id) : [];
+        // Note: user values removed - pass empty array for neutral search
+        const userCauseIds: string[] = [];
         const productResults = searchProducts(text, userCauseIds);
 
         // Search Firebase businesses
@@ -469,7 +460,7 @@ export default function BrowseScreen() {
       setSearchResults([]);
       setPlacesResults([]);
     }
-  }, [publicUsers, userBusinesses, brands, profile?.causes]);
+  }, [publicUsers, userBusinesses, brands]);
 
   // Request location permission
   const requestLocation = async () => {
@@ -755,19 +746,12 @@ export default function BrowseScreen() {
     return valuesByCategory;
   }, [firebaseValues]);
 
-  const supportCauses = (profile.causes || [])
-    .filter(c => c.type === 'support')
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const avoidCauses = (profile.causes || [])
-    .filter(c => c.type === 'avoid')
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  const selectedValueIds = new Set((profile.causes || []).map(c => c.id));
-
+  // Note: user values removed - values are just for browsing brands, not associated with user profiles
+  // All values are now "unselected" from user perspective
   const unselectedValuesByCategory: Record<string, any[]> = {};
   Object.keys(availableValues).forEach(category => {
     const values = availableValues[category] || [];
-    unselectedValuesByCategory[category] = values.filter(v => !selectedValueIds.has(v.id));
+    unselectedValuesByCategory[category] = values;
   });
 
   const allCategories = Object.keys(unselectedValuesByCategory);
@@ -787,84 +771,13 @@ export default function BrowseScreen() {
     });
   };
 
+  // Note: user values removed - all values are now just for browsing, not user-associated
   const getValueState = (valueId: string): 'unselected' | 'support' | 'avoid' => {
-    if (localChanges.has(valueId)) {
-      const localState = localChanges.get(valueId);
-      if (localState === null) return 'unselected';
-      return localState.type;
-    }
-    const profileCause = profile.causes.find(c => c.id === valueId);
-    if (!profileCause) return 'unselected';
-    return profileCause.type;
+    // Values are no longer associated with users - always return unselected
+    return 'unselected';
   };
 
-  const savePendingChanges = async () => {
-    if (!hasUnsavedChanges.current || localChanges.size === 0) return;
-
-    try {
-      const isBusiness = profile.accountType === 'business';
-      const minValues = isBusiness ? 3 : 5;
-
-      const finalCauses: Cause[] = [];
-      const removedCauseIds: string[] = [];
-
-      profile.causes.forEach(cause => {
-        if (localChanges.has(cause.id)) {
-          const localState = localChanges.get(cause.id);
-          if (localState !== null) {
-            finalCauses.push({
-              id: cause.id,
-              name: cause.name,
-              category: cause.category,
-              type: localState.type,
-              description: cause.description,
-            });
-          } else {
-            removedCauseIds.push(cause.id);
-          }
-        } else {
-          finalCauses.push(cause);
-        }
-      });
-
-      localChanges.forEach((localState, valueId) => {
-        if (localState !== null && !profile.causes.find(c => c.id === valueId)) {
-          finalCauses.push({
-            id: localState.id,
-            name: localState.name,
-            category: localState.category as CauseCategory,
-            type: localState.type,
-            description: localState.description,
-          });
-        }
-      });
-
-      if (finalCauses.length < minValues) {
-        return;
-      }
-
-      if (removedCauseIds.length > 0) {
-        await removeCauses(removedCauseIds);
-      }
-
-      await addCauses(finalCauses);
-
-      setLocalChanges(new Map());
-      hasUnsavedChanges.current = false;
-    } catch (error) {
-      console.error('[Browse] Error saving changes:', error);
-    }
-  };
-
-  useFocusEffect(
-    React.useCallback(() => {
-      return () => {
-        if (hasUnsavedChanges.current) {
-          savePendingChanges();
-        }
-      };
-    }, [localChanges, profile.causes])
-  );
+  // Note: savePendingChanges and useFocusEffect removed - values no longer associated with users
 
   const handleValueTap = (valueId: string) => {
     router.push(`/value/${valueId}`);
@@ -1196,7 +1109,7 @@ export default function BrowseScreen() {
           <LocalBusinessView
             userBusinesses={userBusinesses}
             userLocation={userLocation}
-            userCauses={profile.causes || []}
+            userCauses={[]}
             isDarkMode={isDarkMode}
             onRequestLocation={requestLocation}
           />
@@ -1492,7 +1405,7 @@ export default function BrowseScreen() {
           <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundSecondary }]}>
             <Search size={22} color={colors.primary} strokeWidth={2} />
             <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
+              style={[styles.searchInput, { color: colors.primary, outlineStyle: 'none' } as any]}
               placeholder="Search"
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}

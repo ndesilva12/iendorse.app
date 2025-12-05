@@ -41,8 +41,8 @@ export default function SearchScreen() {
   const handleSearch = (text: string) => {
     setQuery(text);
     if (text.trim().length > 0) {
-      const userCauseIds = profile.causes.map(c => c.id);
-      const searchResults = searchProducts(text, userCauseIds);
+      // Note: User causes removed - search with empty array for neutral results
+      const searchResults = searchProducts(text, []);
       setResults(searchResults);
     } else {
       setResults([]);

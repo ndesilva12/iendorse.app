@@ -79,9 +79,10 @@ export default function ValueDetailScreen() {
     })
   ).current;
 
-  // First check if the value is in user's selected causes
-  let userCause = profile.causes.find(c => c.id === id);
-  let isSelected = !!userCause;
+  // Note: Values are no longer associated with user profiles
+  // Look up value in Firebase values only
+  let userCause: any = null;
+  let isSelected = false;
 
   // If not found in user's causes, check Firebase values
   if (!userCause) {

@@ -4151,8 +4151,8 @@ export default function UnifiedLibrary({
               </View>
             )}
 
-            {/* Map button - show if there are mappable entries */}
-            {mapEntries.length > 0 && (
+            {/* Map button - show for other users' endorsement lists only */}
+            {mapEntries.length > 0 && mode !== 'edit' && viewingUserId && viewingUserId !== currentUserId && (
               <TouchableOpacity
                 onPress={() => setShowMapModal(true)}
                 style={[styles.mapButton, { backgroundColor: 'transparent', borderColor: colors.primary }]}

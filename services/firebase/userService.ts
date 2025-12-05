@@ -239,7 +239,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
         consentVersion: data.consentVersion,
       };
 
-      console.log('[Firebase getUserProfile] 📤 Returning profile with', profile.causes.length, 'causes');
+      console.log('[Firebase getUserProfile] 📤 Returning profile with', profile.causes?.length || 0, 'causes');
       return profile;
     } else {
       console.log('[Firebase getUserProfile] ⚠️ No document found for user:', userId);

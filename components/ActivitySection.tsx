@@ -155,8 +155,9 @@ export default function ActivitySection({ timeframe: externalTimeframe, onTimefr
     }
   };
 
-  // Get user's values
-  const userValues = profile.causes || [];
+  // Note: Values are no longer associated with user profiles
+  // Using empty array for mock data generation
+  const userValues: { name: string; type: string }[] = [];
 
   // Generate data based on timeframe
   const data = generateMockData(timeframe, userValues);
