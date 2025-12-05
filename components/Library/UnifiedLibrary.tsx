@@ -1942,6 +1942,12 @@ export default function UnifiedLibrary({
           const fullBusiness = userBusinesses.find(b => b.id === entry.businessId)
             || allBusinesses.find(b => b.id === entry.businessId);
 
+          // Skip rendering if business no longer exists (was deleted)
+          if (!fullBusiness) {
+            console.log('[UnifiedLibrary] Skipping deleted business entry:', entry.businessId);
+            return null;
+          }
+
           // Get business name from multiple possible fields - prefer actual business data
           const businessName = fullBusiness?.businessInfo?.name || (entry as any).businessName || (entry as any).name || 'Unknown Business';
           const businessCategory = fullBusiness?.businessInfo?.category || (entry as any).businessCategory || (entry as any).category;
