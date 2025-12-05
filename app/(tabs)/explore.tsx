@@ -377,6 +377,8 @@ export default function SearchScreen() {
   const [loadingMoreUsers, setLoadingMoreUsers] = useState(false);
   const [showAllUsers, setShowAllUsers] = useState(false);
   const [followingItems, setFollowingItems] = useState<FollowingItem[]>([]);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [followingDisplayCount, setFollowingDisplayCount] = useState(10);
   const [topBusinessItems, setTopBusinessItems] = useState<TopBusinessItem[]>([]);
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
   const [loadingMoreBusinesses, setLoadingMoreBusinesses] = useState(false);
@@ -510,6 +512,7 @@ export default function SearchScreen() {
     const fetchFollowingItems = async () => {
       if (!clerkUser?.id || activeTab !== 'following') return;
 
+      setLoadingFollowing(true);
       try {
         const followingEntities = await getFollowing(clerkUser.id);
         const items: FollowingItem[] = [];
@@ -610,6 +613,8 @@ export default function SearchScreen() {
         setFollowingItems(items);
       } catch (error) {
         console.error('Error fetching following items:', error);
+      } finally {
+        setLoadingFollowing(false);
       }
     };
     fetchFollowingItems();
@@ -1723,10 +1728,10 @@ export default function SearchScreen() {
         activeTab === 'following' ? (
           <FlatList
             key="following-list"
-            data={followingItems}
+            data={followingItems.slice(0, followingDisplayCount)}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.userCard, { backgroundColor: colors.backgroundSecondary }]}
+                style={[styles.userCard, { backgroundColor: 'transparent', borderColor: 'transparent' }]}
                 onPress={() => {
                   if (item.type === 'user') {
                     router.push(`/user/${item.id}`);
@@ -1738,28 +1743,35 @@ export default function SearchScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <View style={[styles.userCardAvatar, { backgroundColor: colors.background }]}>
+                <View style={styles.userCardContent}>
                   {item.profileImage ? (
                     <Image
                       source={{ uri: item.profileImage }}
-                      style={styles.userCardAvatarImage}
+                      style={styles.userCardImage}
                       contentFit="cover"
                       transition={200}
                       cachePolicy="memory-disk"
                     />
                   ) : (
-                    <Text style={[styles.userCardAvatarText, { color: colors.primary }]}>
-                      {item.name.charAt(0).toUpperCase()}
-                    </Text>
+                    <View style={[styles.userCardImagePlaceholder, { backgroundColor: colors.primary }]}>
+                      <Text style={[styles.userCardImageText, { color: colors.white }]}>
+                        {item.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
                   )}
-                </View>
-                <View style={styles.userCardInfo}>
-                  <Text style={[styles.userCardName, { color: colors.text }]} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.userCardLocation, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {item.type === 'user' ? (item.location || 'User') : (item.category || item.type)}
-                  </Text>
+                  <View style={styles.userCardInfo}>
+                    <Text style={[styles.userCardName, { color: colors.text }]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={[styles.userCardLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {item.type === 'user' ? (item.location || 'User') : (item.category || item.type)}
+                    </Text>
+                    {item.description && (
+                      <Text style={[styles.userCardBio, { color: colors.textSecondary }]} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    )}
+                  </View>
                 </View>
               </TouchableOpacity>
             )}
@@ -1767,15 +1779,34 @@ export default function SearchScreen() {
             contentContainerStyle={[styles.userListContainer, { paddingBottom: 100 }]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
-                  <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
+              loadingFollowing ? (
+                <View style={styles.loadingState}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
                 </View>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>Not Following Anyone</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  Follow users, businesses, and brands to see them here
-                </Text>
-              </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <View style={[styles.emptyIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+                    <SearchIcon size={48} color={colors.primary} strokeWidth={1.5} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Not Following Anyone</Text>
+                  <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                    Follow users, businesses, and brands to see them here
+                  </Text>
+                </View>
+              )
+            }
+            ListFooterComponent={
+              followingItems.length > followingDisplayCount ? (
+                <TouchableOpacity
+                  style={[styles.showMoreButton, { backgroundColor: colors.backgroundSecondary }]}
+                  onPress={() => setFollowingDisplayCount(followingDisplayCount + 10)}
+                >
+                  <Text style={[styles.showMoreText, { color: colors.primary }]}>
+                    Show More ({followingItems.length - followingDisplayCount} remaining)
+                  </Text>
+                </TouchableOpacity>
+              ) : null
             }
           />
         ) : (

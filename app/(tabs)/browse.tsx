@@ -22,7 +22,6 @@ import { useData } from '@/contexts/DataContext';
 import { CauseCategory, Cause, Product } from '@/types';
 import { useFocusEffect } from '@react-navigation/native';
 import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
-import { calculateBrandScore, normalizeBrandScores } from '@/lib/scoring';
 import { getLogoUrl } from '@/lib/logo';
 import LocalBusinessView from '@/components/Library/LocalBusinessView';
 import { getTopBrands } from '@/services/firebase/topRankingsService';
@@ -158,26 +157,23 @@ export default function BrowseScreen() {
     fetchUserBusinesses();
   }, [fetchUserBusinesses]);
 
-  // Fetch top brands for endorsement-based ordering when user has no causes
+  // Fetch top brands for endorsement-based ordering (always fetch - values feature removed)
   useEffect(() => {
     const fetchTopBrandsForOrdering = async () => {
-      // Only fetch if user has no causes (like business accounts)
-      if (!profile.causes || profile.causes.length === 0) {
-        try {
-          const topBrands = await getTopBrands(200);
-          const endorsementMap = new Map<string, number>();
-          topBrands.forEach((item, index) => {
-            // Use the score as endorsement ranking (higher score = more endorsements)
-            endorsementMap.set(item.id, item.score);
-          });
-          setTopBrandsData(endorsementMap);
-        } catch (error) {
-          console.error('[Browse] Error fetching top brands:', error);
-        }
+      try {
+        const topBrands = await getTopBrands(200);
+        const endorsementMap = new Map<string, number>();
+        topBrands.forEach((item) => {
+          // Use the score as endorsement ranking (higher score = more endorsements)
+          endorsementMap.set(item.id, item.score);
+        });
+        setTopBrandsData(endorsementMap);
+      } catch (error) {
+        console.error('[Browse] Error fetching top brands:', error);
       }
     };
     fetchTopBrandsForOrdering();
-  }, [profile.causes]);
+  }, []);
 
   // Auto-fetch location on mount if permission already granted
   useEffect(() => {
@@ -438,60 +434,30 @@ export default function BrowseScreen() {
     ) || false;
   };
 
-  // Compute brand scores for Global section
-  const { allSupport, allAvoid, scoredBrands } = useMemo(() => {
+  // Compute brand rankings for Global section - always order by endorsements
+  const { allSupport } = useMemo(() => {
     const currentBrands = brands || [];
 
     if (!currentBrands || currentBrands.length === 0) {
       return {
         allSupport: [],
-        allAvoid: [],
-        scoredBrands: new Map(),
       };
     }
 
-    // If user has no causes (like business accounts), order by endorsements
-    const userHasNoCauses = !profile.causes || profile.causes.length === 0;
-
-    if (userHasNoCauses && topBrandsData.size > 0) {
-      // Sort by endorsement score (higher = more endorsed)
-      const sortedByEndorsements = [...currentBrands].sort((a, b) => {
-        const scoreA = topBrandsData.get(a.id) || 0;
-        const scoreB = topBrandsData.get(b.id) || 0;
-        return scoreB - scoreA;
-      });
-
-      // All brands are "aligned" since there's no values to compare
-      const topBrands = sortedByEndorsements.slice(0, 50);
-      const scoredMap = new Map<string, number>();
-      // Set a neutral score of 50 for all brands when no values
-      currentBrands.forEach(brand => scoredMap.set(brand.id, 50));
-
-      return {
-        allSupport: topBrands,
-        allAvoid: [], // No "unaligned" when there's no causes
-        scoredBrands: scoredMap,
-      };
-    }
-
-    const brandsWithScores = currentBrands.map(brand => {
-      const score = calculateBrandScore(brand.name, profile.causes || [], valuesMatrix);
-      return { brand, score };
+    // Sort by endorsement score (higher = more endorsed)
+    const sortedByEndorsements = [...currentBrands].sort((a, b) => {
+      const scoreA = topBrandsData.get(a.id) || 0;
+      const scoreB = topBrandsData.get(b.id) || 0;
+      return scoreB - scoreA;
     });
 
-    const normalizedBrands = normalizeBrandScores(brandsWithScores);
-    const scoredMap = new Map(normalizedBrands.map(({ brand, score }) => [brand.id, score]));
-    const sortedByScore = [...normalizedBrands].sort((a, b) => b.score - a.score);
-
-    const alignedBrands = sortedByScore.slice(0, 50).map(({ brand }) => brand);
-    const unalignedBrands = sortedByScore.slice(-50).reverse().map(({ brand }) => brand);
+    // Return top 50 brands by endorsements
+    const topBrands = sortedByEndorsements.slice(0, 50);
 
     return {
-      allSupport: alignedBrands,
-      allAvoid: unalignedBrands,
-      scoredBrands: scoredMap,
+      allSupport: topBrands,
     };
-  }, [brands, profile.causes, valuesMatrix, topBrandsData]);
+  }, [brands, topBrandsData]);
 
   // Transform Firebase values into the format expected by the UI
   const availableValues = useMemo(() => {
@@ -636,7 +602,7 @@ export default function BrowseScreen() {
 
   // Render section blocks
   const renderSectionBlocks = () => {
-    const globalCount = allSupport.length + allAvoid.length;
+    const globalCount = allSupport.length;
     const localCount = userBusinesses.length;
     const valuesCount = (profile.causes || []).length;
 
