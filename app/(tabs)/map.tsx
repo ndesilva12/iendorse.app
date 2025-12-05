@@ -308,12 +308,12 @@ export default function MapScreen() {
 
   // Render header
   const renderHeader = () => (
-    <View style={[styles.mainHeaderContainer, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+    <View style={[styles.mainHeaderContainer, { backgroundColor: colors.background, borderBottomColor: 'rgba(0, 0, 0, 0.05)' }]}>
+      <View style={[styles.header, { backgroundColor: colors.background }]}>
         <Image
           source={require('@/assets/images/endorsing.png')}
           style={styles.headerLogo}
-          contentFit="contain"
+          resizeMode="contain"
         />
         <MenuButton />
       </View>
