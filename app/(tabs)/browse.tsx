@@ -10,31 +10,47 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  Share as RNShare,
+  FlatList,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { ChevronDown, ChevronUp, Heart, Building2, Users, Globe, Shield, User as UserIcon, Tag, Trophy, Target, MapPin, Plus, UserPlus, UserMinus, Share2, Search, X } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Heart, Building2, Users, Globe, Shield, User as UserIcon, Tag, Trophy, Target, MapPin, Plus, UserPlus, UserMinus, Share2, Search, X, MoreVertical, ChevronRight } from 'lucide-react-native';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import * as Location from 'expo-location';
 import MenuButton from '@/components/MenuButton';
 import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
 import { useData } from '@/contexts/DataContext';
-import { CauseCategory, Cause, Product } from '@/types';
+import { CauseCategory, Cause, Product, UserProfile } from '@/types';
 import { useFocusEffect } from '@react-navigation/native';
 import { getAllUserBusinesses, BusinessUser } from '@/services/firebase/businessService';
 import { getLogoUrl } from '@/lib/logo';
 import LocalBusinessView from '@/components/Library/LocalBusinessView';
 import { getTopBrands } from '@/services/firebase/topRankingsService';
 import { useLibrary } from '@/contexts/LibraryContext';
-import { followEntity, unfollowEntity, isFollowing as checkIsFollowing } from '@/services/firebase/followService';
-import { addEntryToList, removeEntryFromList } from '@/services/firebase/listService';
+import { followEntity, unfollowEntity, isFollowing as checkIsFollowing, getFollowing } from '@/services/firebase/followService';
+import { addEntryToList, removeEntryFromList, copyListToLibrary, getEndorsementList } from '@/services/firebase/listService';
 import ItemOptionsModal from '@/components/ItemOptionsModal';
 import { useReferralCode } from '@/hooks/useReferralCode';
 import { appendReferralTracking } from '@/services/firebase/referralService';
 import { searchPlaces, PlaceSearchResult, formatCategory } from '@/services/firebase/placesService';
+import { getAllPublicUsers } from '@/services/firebase/userService';
+import { searchProducts } from '@/mocks/products';
 
 // ===== Types =====
-type BrowseSection = 'global' | 'local' | 'values';
+type BrowseSection = 'global' | 'local' | 'values' | 'users' | 'following' | 'search';
+
+// Following item interface to handle all entity types
+interface FollowingItem {
+  id: string;
+  type: 'user' | 'business' | 'brand';
+  name: string;
+  description?: string;
+  profileImage?: string;
+  location?: string;
+  category?: string;
+  website?: string;
+}
 
 const CATEGORY_ICONS: Record<string, any> = {
   social_issue: Heart,
@@ -144,6 +160,25 @@ export default function BrowseScreen() {
   const [topBrandsData, setTopBrandsData] = useState<Map<string, number>>(new Map());
   const [loadingTopBrands, setLoadingTopBrands] = useState(true);
 
+  // Users section state
+  const [publicUsers, setPublicUsers] = useState<{ id: string; profile: UserProfile }[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [usersDisplayCount, setUsersDisplayCount] = useState(10);
+
+  // Following section state
+  const [followingItems, setFollowingItems] = useState<FollowingItem[]>([]);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [followingDisplayCount, setFollowingDisplayCount] = useState(10);
+
+  // Search section state (matching explore tab functionality)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [placesResults, setPlacesResults] = useState<PlaceSearchResult[]>([]);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [loadingPlaces, setLoadingPlaces] = useState(false);
+  const searchDebounce = useRef<NodeJS.Timeout | null>(null);
+  const placesSearchDebounce = useRef<NodeJS.Timeout | null>(null);
+
   // Fetch user businesses
   const fetchUserBusinesses = useCallback(async () => {
     try {
@@ -197,6 +232,244 @@ export default function BrowseScreen() {
     };
     checkAndGetLocation();
   }, []);
+
+  // Fetch public users for Users section
+  useEffect(() => {
+    const fetchPublicUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const users = await getAllPublicUsers(50);
+        setPublicUsers(users);
+      } catch (error) {
+        console.error('[Browse] Error fetching public users:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    fetchPublicUsers();
+  }, []);
+
+  // Fetch following items when Following section is selected
+  useEffect(() => {
+    const fetchFollowingItems = async () => {
+      if (!clerkUser?.id || selectedSection !== 'following') return;
+
+      setLoadingFollowing(true);
+      try {
+        const following = await getFollowing(clerkUser.id);
+        const items: FollowingItem[] = [];
+        const staleFollows: Array<{ id: string; type: 'user' | 'brand' | 'business' }> = [];
+
+        for (const item of following) {
+          // Use followedType and followedId (not entityType/entityId)
+          if (item.followedType === 'user') {
+            // Find user in publicUsers
+            const user = publicUsers.find(u => u.id === item.followedId);
+            if (user) {
+              items.push({
+                id: item.followedId,
+                type: 'user',
+                name: user.profile.userDetails?.name || 'User',
+                description: user.profile.userDetails?.description,
+                profileImage: user.profile.userDetails?.profileImage,
+                location: user.profile.userDetails?.location,
+              });
+            } else {
+              // User not found - mark for cleanup
+              staleFollows.push({ id: item.followedId, type: 'user' });
+            }
+          } else if (item.followedType === 'business') {
+            const business = userBusinesses.find(b => b.id === item.followedId);
+            if (business) {
+              items.push({
+                id: item.followedId,
+                type: 'business',
+                name: business.businessInfo.name,
+                description: business.businessInfo.description,
+                profileImage: business.businessInfo.logoUrl,
+                location: business.businessInfo.location,
+                category: business.businessInfo.category,
+              });
+            } else {
+              // Business not found - mark for cleanup
+              staleFollows.push({ id: item.followedId, type: 'business' });
+            }
+          } else if (item.followedType === 'brand') {
+            const brand = brands?.find(b => b.id === item.followedId);
+            if (brand) {
+              items.push({
+                id: item.followedId,
+                type: 'brand',
+                name: brand.name,
+                description: brand.description,
+                profileImage: brand.exampleImageUrl,
+                category: brand.category,
+                website: brand.website,
+              });
+            } else {
+              // Brand not found - mark for cleanup
+              staleFollows.push({ id: item.followedId, type: 'brand' });
+            }
+          }
+        }
+
+        setFollowingItems(items);
+
+        // Clean up stale follow records in background (entities that no longer exist)
+        if (staleFollows.length > 0) {
+          console.log('[Browse] Cleaning up', staleFollows.length, 'stale follow records');
+          for (const stale of staleFollows) {
+            try {
+              await unfollowEntity(clerkUser.id, stale.id, stale.type);
+            } catch (err) {
+              console.error('[Browse] Error cleaning up stale follow:', err);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Browse] Error fetching following:', error);
+      } finally {
+        setLoadingFollowing(false);
+      }
+    };
+
+    fetchFollowingItems();
+  }, [clerkUser?.id, selectedSection, publicUsers, userBusinesses, brands]);
+
+  // Handle search - matching explore tab functionality exactly
+  const handleSearch = useCallback((text: string) => {
+    try {
+      setSearchQuery(text);
+
+      if (text.trim().length > 0) {
+        const userCauseIds = profile?.causes ? profile.causes.map(c => c.id) : [];
+        const productResults = searchProducts(text, userCauseIds);
+
+        // Search Firebase businesses
+        const businessResults = userBusinesses
+          .filter(business => {
+            const searchLower = text.toLowerCase();
+            return (
+              business.businessInfo.name.toLowerCase().includes(searchLower) ||
+              business.businessInfo.category.toLowerCase().includes(searchLower) ||
+              business.businessInfo.location?.toLowerCase().includes(searchLower) ||
+              business.businessInfo.description?.toLowerCase().includes(searchLower)
+            );
+          })
+          .map(business => ({
+            id: `firebase-business-${business.id}`,
+            firebaseId: business.id,
+            name: business.businessInfo.name,
+            brand: business.businessInfo.name,
+            category: business.businessInfo.category,
+            description: business.businessInfo.description || '',
+            exampleImageUrl: business.businessInfo.logoUrl || (business.businessInfo.website ? getLogoUrl(business.businessInfo.website) : ''),
+            website: business.businessInfo.website,
+            location: business.businessInfo.location,
+            valueAlignments: [],
+            keyReasons: [
+              business.businessInfo.acceptsStandDiscounts
+                ? `Accepts Endorse Discounts at ${business.businessInfo.name}`
+                : `Local business: ${business.businessInfo.name}`
+            ],
+            moneyFlow: { company: business.businessInfo.name, shareholders: [], overallAlignment: 0 },
+            relatedValues: [],
+            isFirebaseBusiness: true,
+          } as Product & { firebaseId: string; isFirebaseBusiness: boolean }));
+
+        // Search users
+        const userResults = publicUsers
+          .filter(user => {
+            const searchLower = text.toLowerCase();
+            const userName = user.profile.userDetails?.name || '';
+            const userLocation = user.profile.userDetails?.location || '';
+            const userBio = user.profile.userDetails?.description || '';
+
+            return (
+              userName.toLowerCase().includes(searchLower) ||
+              userLocation.toLowerCase().includes(searchLower) ||
+              userBio.toLowerCase().includes(searchLower)
+            );
+          })
+          .map(user => ({
+            id: `user-${user.id}`,
+            userId: user.id,
+            name: user.profile.userDetails?.name || 'User',
+            brand: user.profile.userDetails?.name || 'User',
+            category: 'User',
+            description: user.profile.userDetails?.description || '',
+            exampleImageUrl: user.profile.userDetails?.profileImage || '',
+            website: user.profile.userDetails?.website || '',
+            location: user.profile.userDetails?.location || '',
+            valueAlignments: [],
+            keyReasons: ['User profile'],
+            moneyFlow: { company: '', shareholders: [], overallAlignment: 0 },
+            relatedValues: [],
+            isUser: true,
+          } as Product & { userId: string; isUser: boolean }));
+
+        // Search Firebase brands (from DataContext)
+        const brandResults = (brands || [])
+          .filter(brand => {
+            const searchLower = text.toLowerCase();
+            return (
+              brand.name?.toLowerCase().includes(searchLower) ||
+              brand.category?.toLowerCase().includes(searchLower) ||
+              brand.description?.toLowerCase().includes(searchLower)
+            );
+          })
+          .map(brand => ({
+            id: `firebase-brand-${brand.id}`,
+            brandId: brand.id,
+            name: brand.name,
+            brand: brand.name,
+            category: brand.category || 'Brand',
+            description: brand.description || '',
+            exampleImageUrl: brand.exampleImageUrl || (brand.website ? getLogoUrl(brand.website) : ''),
+            website: brand.website || '',
+            location: brand.location || '',
+            valueAlignments: [],
+            keyReasons: [brand.category ? `Category: ${brand.category}` : 'Brand'],
+            moneyFlow: { company: brand.name, shareholders: [], overallAlignment: 0 },
+            relatedValues: [],
+            isFirebaseBrand: true,
+          } as Product & { brandId: string; isFirebaseBrand: boolean }));
+
+        // Combine product, business, brand, and user results
+        const combinedResults = [...(productResults || []), ...businessResults, ...brandResults, ...userResults];
+        setSearchResults(combinedResults);
+
+        // Also search Google Places with debouncing
+        if (placesSearchDebounce.current) {
+          clearTimeout(placesSearchDebounce.current);
+        }
+        placesSearchDebounce.current = setTimeout(async () => {
+          if (text.trim().length >= 2) {
+            setLoadingPlaces(true);
+            try {
+              const places = await searchPlaces(text.trim());
+              setPlacesResults(places);
+            } catch (error) {
+              console.error('Error searching places:', error);
+              setPlacesResults([]);
+            } finally {
+              setLoadingPlaces(false);
+            }
+          }
+        }, 500);
+      } else {
+        setSearchResults([]);
+        setPlacesResults([]);
+        if (placesSearchDebounce.current) {
+          clearTimeout(placesSearchDebounce.current);
+        }
+      }
+    } catch (error) {
+      console.error('Error during search:', error);
+      setSearchResults([]);
+      setPlacesResults([]);
+    }
+  }, [publicUsers, userBusinesses, brands, profile?.causes]);
 
   // Request location permission
   const requestLocation = async () => {
@@ -598,27 +871,25 @@ export default function BrowseScreen() {
   };
 
   // Section colors
-  const sectionColors = {
+  const sectionColors: Record<BrowseSection, { bg: string; border: string }> = {
     global: { bg: colors.primary + '15', border: colors.primary },
     local: { bg: colors.success + '15', border: colors.success },
     values: { bg: colors.danger + '15', border: colors.danger },
+    users: { bg: '#ADFF2F' + '15', border: '#ADFF2F' }, // neon lime green
+    following: { bg: '#ADFF2F' + '15', border: '#ADFF2F' }, // neon lime green
+    search: { bg: '#FFFFFF' + '15', border: '#FFFFFF' }, // white
   };
 
   // Render section blocks
   const renderSectionBlocks = () => {
-    const globalCount = allSupport.length;
-    const localCount = userBusinesses.length;
-    // Count total available values for browsing (not user's selected values)
-    const valuesCount = Object.values(availableValues).reduce((total, values) => total + (values?.length || 0), 0);
-
-    const SectionBox = ({ section, label, count, Icon }: { section: BrowseSection; label: string; count: number; Icon: any }) => {
+    const SectionBox = ({ section, label, Icon }: { section: BrowseSection; label: string; Icon: any }) => {
       const isSelected = selectedSection === section;
       const sectionColor = sectionColors[section];
 
       return (
         <TouchableOpacity
           style={[
-            styles.sectionBox,
+            styles.sectionBoxCompact,
             {
               backgroundColor: colors.backgroundSecondary,
               borderColor: isSelected ? sectionColor.border : colors.border,
@@ -628,12 +899,9 @@ export default function BrowseScreen() {
           onPress={() => setSelectedSection(section)}
           activeOpacity={0.7}
         >
-          <Icon size={20} color={isSelected ? sectionColor.border : colors.textSecondary} strokeWidth={2} />
-          <Text style={[styles.sectionLabel, { color: isSelected ? sectionColor.border : colors.text }]}>
+          <Icon size={22} color={isSelected ? sectionColor.border : colors.textSecondary} strokeWidth={2} />
+          <Text style={[styles.sectionLabelCompact, { color: isSelected ? sectionColor.border : colors.text }]} numberOfLines={1}>
             {label}
-          </Text>
-          <Text style={[styles.sectionCount, { color: colors.textSecondary }]}>
-            {count}
           </Text>
         </TouchableOpacity>
       );
@@ -641,15 +909,28 @@ export default function BrowseScreen() {
 
     return (
       <View style={styles.sectionSelector}>
+        {/* First row: Global, Local, Values */}
         <View style={styles.sectionRow}>
           <View style={styles.sectionThird}>
-            <SectionBox section="global" label="Global" count={globalCount} Icon={Target} />
+            <SectionBox section="global" label="Global" Icon={Target} />
           </View>
           <View style={styles.sectionThird}>
-            <SectionBox section="local" label="Local" count={localCount} Icon={MapPin} />
+            <SectionBox section="local" label="Local" Icon={MapPin} />
           </View>
           <View style={styles.sectionThird}>
-            <SectionBox section="values" label="Values" count={valuesCount} Icon={Heart} />
+            <SectionBox section="values" label="Values" Icon={Heart} />
+          </View>
+        </View>
+        {/* Second row: Users, Following, Search */}
+        <View style={[styles.sectionRow, { marginTop: 8 }]}>
+          <View style={styles.sectionThird}>
+            <SectionBox section="users" label="Users" Icon={Users} />
+          </View>
+          <View style={styles.sectionThird}>
+            <SectionBox section="following" label="Following" Icon={UserPlus} />
+          </View>
+          <View style={styles.sectionThird}>
+            <SectionBox section="search" label="Search" Icon={Search} />
           </View>
         </View>
       </View>
@@ -662,16 +943,27 @@ export default function BrowseScreen() {
       global: 'Top Brands',
       local: 'Local',
       values: 'Browse by Values',
+      users: 'Top Users',
+      following: 'Following',
+      search: 'Search',
     };
 
     const icons: Record<BrowseSection, any> = {
       global: Target,
       local: MapPin,
       values: Heart,
+      users: Users,
+      following: UserPlus,
+      search: Search,
     };
 
     const SectionIcon = icons[selectedSection];
     const title = titles[selectedSection];
+
+    // Don't show header for search section (search bar is integrated in content)
+    if (selectedSection === 'search') {
+      return null;
+    }
 
     return (
       <View style={[styles.stickyHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -1001,6 +1293,349 @@ export default function BrowseScreen() {
     );
   };
 
+  // Handle search result item press - matching explore tab
+  const handleSearchItemPress = (item: any) => {
+    if (item.isUser && item.userId) {
+      router.push(`/user/${item.userId}`);
+    } else if (item.isFirebaseBusiness && item.firebaseId) {
+      router.push(`/business/${item.firebaseId}`);
+    } else if (item.isFirebaseBrand && item.brandId) {
+      router.push(`/brand/${item.brandId}`);
+    } else if (item.id) {
+      // Regular product/brand
+      router.push(`/brand/${item.id}`);
+    }
+  };
+
+  // Render Users content (Top Users) - matching explore tab
+  const renderUsersContent = () => {
+    if (loadingUsers) {
+      return (
+        <View style={styles.loadingSection}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary, marginTop: 12 }]}>
+            Loading users...
+          </Text>
+        </View>
+      );
+    }
+
+    if (publicUsers.length === 0) {
+      return (
+        <View style={styles.emptySection}>
+          <Users size={48} color={colors.textSecondary} strokeWidth={1.5} />
+          <Text style={[styles.emptySectionTitle, { color: colors.text }]}>No Users Yet</Text>
+          <Text style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+            Be one of the first to make your profile public!
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.usersList}>
+        {publicUsers.slice(0, usersDisplayCount).map((user) => (
+          <TouchableOpacity
+            key={user.id}
+            style={styles.userCard}
+            onPress={() => router.push(`/user/${user.id}`)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.userCardContent}>
+              {user.profile.userDetails?.profileImage ? (
+                <Image
+                  source={{ uri: user.profile.userDetails.profileImage }}
+                  style={styles.userCardImage}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                />
+              ) : (
+                <View style={[styles.userCardImagePlaceholder, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.userCardImageText, { color: colors.white }]}>
+                    {(user.profile.userDetails?.name || 'U').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.userCardInfo}>
+                <Text style={[styles.userCardName, { color: colors.text }]} numberOfLines={1}>
+                  {user.profile.userDetails?.name || 'User'}
+                </Text>
+                <Text style={[styles.userCardLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {user.profile.userDetails?.location || 'User'}
+                </Text>
+                {user.profile.userDetails?.description && (
+                  <Text style={[styles.userCardBio, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {user.profile.userDetails.description}
+                  </Text>
+                )}
+              </View>
+              <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+            </View>
+          </TouchableOpacity>
+        ))}
+
+        {publicUsers.length > usersDisplayCount && (
+          <TouchableOpacity
+            style={[styles.loadMoreButton, { borderColor: colors.border }]}
+            onPress={() => setUsersDisplayCount(usersDisplayCount + 10)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+              Show More ({publicUsers.length - usersDisplayCount} remaining)
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  // Render Following content - matching explore tab
+  const renderFollowingContent = () => {
+    if (loadingFollowing) {
+      return (
+        <View style={styles.loadingSection}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary, marginTop: 12 }]}>
+            Loading...
+          </Text>
+        </View>
+      );
+    }
+
+    if (followingItems.length === 0) {
+      return (
+        <View style={styles.emptySection}>
+          <UserPlus size={48} color={colors.textSecondary} strokeWidth={1.5} />
+          <Text style={[styles.emptySectionTitle, { color: colors.text }]}>Not Following Anyone</Text>
+          <Text style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+            Follow users, businesses, and brands to see them here
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.usersList}>
+        {followingItems.slice(0, followingDisplayCount).map((item) => (
+          <TouchableOpacity
+            key={`${item.type}-${item.id}`}
+            style={styles.userCard}
+            onPress={() => {
+              if (item.type === 'user') {
+                router.push(`/user/${item.id}`);
+              } else if (item.type === 'business') {
+                router.push(`/business/${item.id}`);
+              } else if (item.type === 'brand') {
+                router.push(`/brand/${item.id}`);
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.userCardContent}>
+              {item.profileImage ? (
+                <View style={[styles.userCardImage, item.type !== 'user' && { backgroundColor: '#FFFFFF' }]}>
+                  <Image
+                    source={{ uri: item.profileImage }}
+                    style={styles.userCardImage}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
+                  />
+                </View>
+              ) : (
+                <View style={[styles.userCardImagePlaceholder, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.userCardImageText, { color: colors.white }]}>
+                    {item.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.userCardInfo}>
+                <Text style={[styles.userCardName, { color: colors.text }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={[styles.userCardLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {item.type === 'user' ? (item.location || 'User') : (item.category || item.type)}
+                </Text>
+                {item.description && (
+                  <Text style={[styles.userCardBio, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                )}
+              </View>
+              <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+            </View>
+          </TouchableOpacity>
+        ))}
+
+        {followingItems.length > followingDisplayCount && (
+          <TouchableOpacity
+            style={[styles.loadMoreButton, { borderColor: colors.border }]}
+            onPress={() => setFollowingDisplayCount(followingDisplayCount + 10)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+              Show More ({followingItems.length - followingDisplayCount} remaining)
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  // Render Search content - matching explore tab exactly
+  const renderSearchContent = () => {
+    return (
+      <View style={styles.searchSection}>
+        {/* Search Bar */}
+        <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundSecondary }]}>
+            <Search size={22} color={colors.primary} strokeWidth={2} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search"
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={handleSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                  setPlacesResults([]);
+                }}
+                style={{ padding: 8 }}
+                activeOpacity={0.7}
+              >
+                <X size={22} color={colors.textSecondary} strokeWidth={2} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Search Results */}
+        {searchQuery.trim().length === 0 ? (
+          <View style={styles.emptySection}>
+            <Search size={48} color={colors.textSecondary} strokeWidth={1.5} />
+            <Text style={[styles.emptySectionTitle, { color: colors.text }]}>Search</Text>
+            <Text style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+              Search for users, businesses, and brands
+            </Text>
+          </View>
+        ) : searchResults.length === 0 && placesResults.length === 0 && !loadingPlaces ? (
+          <View style={styles.emptySection}>
+            <Text style={[styles.emptySectionTitle, { color: colors.text }]}>No results found</Text>
+            <Text style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+              Try searching for a different product or brand
+            </Text>
+          </View>
+        ) : (
+          <ScrollView style={styles.searchResultsScroll} showsVerticalScrollIndicator={false}>
+            {/* Database Results */}
+            {searchResults.length > 0 && (
+              <View style={styles.searchResultsSection}>
+                <Text style={[styles.searchResultsSectionTitle, { color: colors.textSecondary }]}>
+                  Results ({searchResults.length})
+                </Text>
+                {searchResults.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.searchResultItem}
+                    onPress={() => handleSearchItemPress(item)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.searchResultInner}>
+                      <View style={[styles.searchResultLogo, { backgroundColor: '#FFFFFF' }]}>
+                        {item.exampleImageUrl ? (
+                          <Image
+                            source={{ uri: item.exampleImageUrl }}
+                            style={styles.searchResultLogoImage}
+                            contentFit="cover"
+                            transition={200}
+                            cachePolicy="memory-disk"
+                          />
+                        ) : (
+                          <View style={[styles.searchResultLogoPlaceholder, { backgroundColor: colors.primary }]}>
+                            <Text style={styles.searchResultLogoText}>
+                              {item.name?.charAt(0).toUpperCase() || '?'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.searchResultText}>
+                        <Text style={[styles.searchResultName, { color: colors.text }]} numberOfLines={2}>
+                          {item.name}
+                        </Text>
+                        <Text style={[styles.searchResultCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {item.brand || item.category || 'Brand'}
+                        </Text>
+                      </View>
+                      <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Google Places Results */}
+            {loadingPlaces && (
+              <View style={styles.searchResultsSection}>
+                <Text style={[styles.searchResultsSectionTitle, { color: colors.textSecondary }]}>
+                  Searching all businesses...
+                </Text>
+              </View>
+            )}
+
+            {!loadingPlaces && placesResults.length > 0 && (
+              <View style={styles.searchResultsSection}>
+                <Text style={[styles.searchResultsSectionTitle, { color: colors.textSecondary }]}>
+                  All Businesses ({placesResults.length})
+                </Text>
+                {placesResults.map((place) => (
+                  <TouchableOpacity
+                    key={place.placeId}
+                    style={styles.searchResultItem}
+                    onPress={() => router.push(`/place/${place.placeId}`)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.searchResultInner}>
+                      <View style={[styles.searchResultLogo, { backgroundColor: colors.backgroundSecondary }]}>
+                        <Image
+                          source={require('@/assets/images/endorsing1.png')}
+                          style={styles.searchResultLogoImage}
+                          contentFit="cover"
+                          transition={200}
+                          cachePolicy="memory-disk"
+                        />
+                      </View>
+                      <View style={styles.searchResultText}>
+                        <Text style={[styles.searchResultName, { color: colors.text }]} numberOfLines={2}>
+                          {place.name}
+                        </Text>
+                        <Text style={[styles.searchResultCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {formatCategory(place.category)}{place.rating ? ` · ${place.rating}★` : ''}
+                        </Text>
+                        {place.address && (
+                          <Text style={[styles.searchResultAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {place.address}
+                          </Text>
+                        )}
+                      </View>
+                      <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )}
+      </View>
+    );
+  };
+
   // Render section content based on selection
   const renderSectionContent = () => {
     switch (selectedSection) {
@@ -1010,6 +1645,12 @@ export default function BrowseScreen() {
         return renderLocalContent();
       case 'values':
         return renderValuesContent();
+      case 'users':
+        return renderUsersContent();
+      case 'following':
+        return renderFollowingContent();
+      case 'search':
+        return renderSearchContent();
       default:
         return null;
     }
@@ -1150,6 +1791,28 @@ const styles = StyleSheet.create({
   },
   sectionCount: {
     fontSize: 12,
+    fontWeight: '500' as const,
+  },
+  // Compact section box styles (2/3 size)
+  sectionBoxCompact: {
+    padding: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    minHeight: 60,
+  },
+  sectionBoxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sectionLabelCompact: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  sectionCountCompact: {
+    fontSize: 10,
     fontWeight: '500' as const,
   },
 
@@ -1517,5 +2180,142 @@ const styles = StyleSheet.create({
   localSearchEmptyText: {
     fontSize: 14,
     textAlign: 'center' as const,
+  },
+
+  // Users list styles
+  usersList: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  userCard: {
+    marginBottom: 8,
+  },
+  userCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  userCardImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  userCardImagePlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userCardImageText: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+  },
+  userCardInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  userCardName: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    marginBottom: 2,
+  },
+  userCardLocation: {
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  userCardBio: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+
+  // Search section styles
+  searchSection: {
+    flex: 1,
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 0,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600' as const,
+    padding: 0,
+    margin: 0,
+  },
+  searchResultsScroll: {
+    flex: 1,
+    paddingBottom: 100,
+  },
+  searchResultsSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  searchResultsSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    marginBottom: 12,
+    textTransform: 'uppercase' as const,
+  },
+  searchResultItem: {
+    marginBottom: 4,
+  },
+  searchResultInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 12,
+  },
+  searchResultLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchResultLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  searchResultLogoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  searchResultLogoText: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  searchResultText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  searchResultName: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    marginBottom: 2,
+  },
+  searchResultCategory: {
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  searchResultAddress: {
+    fontSize: 12,
   },
 });

@@ -309,17 +309,15 @@ export default function SignInScreen() {
                   activeOpacity={0.7}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>Forgot password?</Text>
+                  <Text style={[styles.forgotPasswordText, { color: colors.textSecondary }]}>Forgot password?</Text>
                 </TouchableOpacity>
                 <Text style={[styles.linkText, { color: colors.textSecondary }]}>  |  </Text>
                 <TouchableOpacity onPress={() => setShowContactModal(true)}>
-                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>Contact</Text>
+                  <Text style={[styles.forgotPasswordText, { color: colors.textSecondary }]}>Contact</Text>
                 </TouchableOpacity>
-              </View>
-              <View style={styles.linkContainer}>
-                <Text style={[styles.linkText, { color: colors.textSecondary }]}>Don't have an account?  </Text>
+                <Text style={[styles.linkText, { color: colors.textSecondary }]}>  |  </Text>
                 <TouchableOpacity onPress={() => router.push('/(auth)/sign-up')}>
-                  <Text style={[styles.link, { color: colors.primary }]}>Sign up</Text>
+                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>SIGN UP</Text>
                 </TouchableOpacity>
               </View>
 

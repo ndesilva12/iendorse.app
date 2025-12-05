@@ -48,7 +48,7 @@ export default function Index() {
   // This ensures users with causes don't get stuck in onboarding loops
   if (hasCompletedOnboarding || profile.causes.length > 0) {
     console.log('[Index] ✅ User has completed onboarding or has causes, redirecting to home');
-    return <Redirect href="/(tabs)/list" />;
+    return <Redirect href="/(tabs)/home" />;
   }
 
   console.log('[Index] 🔍 Checking onboarding flow... isNewUser =', isNewUser);
@@ -71,7 +71,7 @@ export default function Index() {
   }
 
   console.log('[Index] 👤 EXISTING USER - No onboarding needed, redirecting to home');
-  return <Redirect href="/(tabs)/list" />;
+  return <Redirect href="/(tabs)/home" />;
 }
 
 const styles = StyleSheet.create({
