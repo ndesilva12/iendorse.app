@@ -36,15 +36,18 @@ export default function EndorsementMapView({ entries, userLocation, onEntryPress
         </Text>
       </View>
       <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
-        {entries.map((entry, index) => (
+        {entries.map((entry, index) => {
+          const rank = index + 1;
+          const isRanked = rank <= 50;
+          return (
           <TouchableOpacity
             key={`${entry.type}-${entry.id}`}
             style={styles.entryCard}
             onPress={() => onEntryPress?.(entry)}
             activeOpacity={0.7}
           >
-            <View style={styles.entryNumber}>
-              <Text style={styles.entryNumberText}>{index + 1}</Text>
+            <View style={[styles.entryNumber, isRanked && styles.entryNumberRanked]}>
+              <Text style={styles.entryNumberText}>{rank}</Text>
             </View>
             <View style={styles.entryInfo}>
               <Text style={styles.entryName} numberOfLines={1}>{entry.name}</Text>
@@ -62,7 +65,8 @@ export default function EndorsementMapView({ entries, userLocation, onEntryPress
             </View>
             <ExternalLink size={16} color="#00aaff" strokeWidth={2} />
           </TouchableOpacity>
-        ))}
+        );
+        })}
       </ScrollView>
     </View>
   );
@@ -113,6 +117,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#00aaff',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  entryNumberRanked: {
+    backgroundColor: '#1e3a5f',
   },
   entryNumberText: {
     color: '#ffffff',
