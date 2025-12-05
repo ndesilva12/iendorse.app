@@ -717,7 +717,7 @@ export default function BrowseScreen() {
             )}
             <View style={styles.brandLogoContainer}>
               <Image
-                source={{ uri: getLogoUrl(brand.website) }}
+                source={{ uri: brand.exampleImageUrl || getLogoUrl(brand.website) }}
                 style={styles.brandLogo}
                 contentFit="cover"
                 transition={200}
