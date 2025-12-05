@@ -709,12 +709,12 @@ export default function MapScreen() {
           : `${marker.distance.toFixed(1)} mi away`
         : '';
 
-      // Create marker HTML - use same map pin shape for all, with number inside for ranked
+      // Create marker HTML - use same map pin shape and size for all, with number inside for ranked
       const markerHtml = marker.rank
-        ? `<svg width="28" height="40" viewBox="0 0 28 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14z" fill="${markerColor}"/>
-            <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14z" stroke="white" stroke-width="2"/>
-            <text x="14" y="18" text-anchor="middle" fill="white" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">${marker.rank}</text>
+        ? `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
+            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
+            <text x="10" y="13" text-anchor="middle" fill="white" font-size="9" font-weight="700" font-family="system-ui, -apple-system, sans-serif">${marker.rank}</text>
           </svg>`
         : `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
@@ -725,8 +725,8 @@ export default function MapScreen() {
         icon: L.divIcon({
           className: 'endorsement-marker',
           html: markerHtml,
-          iconSize: marker.rank ? [28, 40] : [20, 28],
-          iconAnchor: marker.rank ? [14, 40] : [10, 28],
+          iconSize: [20, 28],
+          iconAnchor: [10, 28],
         }),
       })
         .addTo(markersLayerRef.current)
@@ -1238,34 +1238,34 @@ const styles = StyleSheet.create({
   },
   rankedMarkerPinHead: {
     backgroundColor: '#1e3a5f',
-    borderRadius: 14,
-    width: 28,
-    height: 28,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
   },
   rankedMarkerPinText: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   rankedMarkerPinTail: {
     width: 0,
     height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 12,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 8,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderTopColor: '#1e3a5f',
-    marginTop: -3,
+    marginTop: -2,
   },
   selectionContainer: {
     position: 'absolute',
