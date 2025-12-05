@@ -261,15 +261,20 @@ export default function MapScreen() {
             ? calculateDistance(userLocation.latitude, userLocation.longitude, placeEntry.location.lat, placeEntry.location.lng)
             : undefined;
 
+          // Debug: log place category values
+          if (placeCount <= 5) {
+            console.log('[Map] Place category debug:', placeEntry.placeName, 'placeCategory:', placeEntry.placeCategory, 'raw entry:', JSON.stringify(entry).substring(0, 200));
+          }
+
           marker = {
             id: placeEntry.placeId,
             type: 'place',
             name: placeEntry.placeName,
-            category: placeEntry.category || 'other',
+            category: placeEntry.placeCategory || 'other',
             latitude: placeEntry.location.lat,
             longitude: placeEntry.location.lng,
-            logoUrl: placeEntry.imageUrl,
-            address: placeEntry.address,
+            logoUrl: placeEntry.logoUrl,
+            address: placeEntry.placeAddress,
             distance,
             isLocal: distance ? distance <= 25 : false,
           };
@@ -366,7 +371,7 @@ export default function MapScreen() {
 
   // Apply filters to get displayed markers
   const mapMarkers = useMemo(() => {
-    console.log('[Map] Computing mapMarkers - allMarkers:', allMarkers.length, 'activeFilter:', activeFilter, 'selectedCategory:', selectedCategory);
+    console.log('[Map] Computing mapMarkers - allMarkers:', allMarkers.length, 'activeFilter:', activeFilter, 'selectedCategory:', JSON.stringify(selectedCategory));
 
     let filteredMarkers = [...allMarkers]; // Create a copy to avoid mutation issues
 
@@ -376,8 +381,11 @@ export default function MapScreen() {
       console.log('[Map] After local filter:', filteredMarkers.length);
     }
 
-    // Apply category filter
-    if (selectedCategory !== 'all') {
+    // Apply category filter - only if not 'all' (case insensitive check)
+    const isAllCategory = selectedCategory.toLowerCase() === 'all';
+    console.log('[Map] isAllCategory:', isAllCategory, 'selectedCategory:', selectedCategory);
+
+    if (!isAllCategory) {
       const beforeCount = filteredMarkers.length;
       filteredMarkers = filteredMarkers.filter(m => {
         const markerCat = (m.category || '').toLowerCase();
@@ -387,6 +395,8 @@ export default function MapScreen() {
           selectedCat.includes(markerCat);
       });
       console.log('[Map] Category filter "' + selectedCategory + '":', beforeCount, '->', filteredMarkers.length);
+    } else {
+      console.log('[Map] Showing ALL markers (no category filter):', filteredMarkers.length);
     }
 
     console.log('[Map] Final mapMarkers count:', filteredMarkers.length);
