@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { MapPin, Filter, X, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -119,6 +119,11 @@ export default function MapScreen() {
   const [activeFilter, setActiveFilter] = useState<'endorsements' | 'local'>('endorsements');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showMarkersList, setShowMarkersList] = useState(false);
+
+  // Refs for map state management
+  const mapInstanceRef = useRef<any>(null);
+  const markersLayerRef = useRef<any>(null);
+  const mapInitializedRef = useRef(false);
 
   // Fetch user location
   useEffect(() => {
@@ -516,9 +521,9 @@ export default function MapScreen() {
     </View>
   );
 
-  // Initialize Leaflet map for web
+  // Initialize Leaflet map for web (only once)
   useEffect(() => {
-    if (Platform.OS !== 'web' || loading || loadingLocation) return;
+    if (Platform.OS !== 'web' || loading || loadingLocation || mapInitializedRef.current) return;
 
     // Load Leaflet CSS
     if (!document.querySelector('link[data-leaflet-map-css]')) {
@@ -549,20 +554,22 @@ export default function MapScreen() {
       const mapElement = document.getElementById('endorsement-map');
       if (!mapElement) return;
 
-      // Remove existing map if any
-      if ((mapElement as any)._leaflet_id) {
-        (mapElement as any)._leaflet_map?.remove();
-      }
+      // Skip if already initialized
+      if (mapInstanceRef.current) return;
 
-      // Calculate zoom level based on markers
-      let zoom = 12;
-      if (mapMarkers.length === 0) zoom = 10;
-      else if (mapMarkers.length === 1) zoom = 14;
-      else if (mapMarkers.length < 10) zoom = 11;
-      else zoom = 10;
+      console.log('[Map] Initializing Leaflet map');
+      mapInitializedRef.current = true;
+
+      // Default center (user location or San Francisco)
+      const centerLat = userLocation?.latitude || 37.7749;
+      const centerLng = userLocation?.longitude || -122.4194;
 
       // Initialize map
-      const map = L.map('endorsement-map').setView([mapRegion.latitude, mapRegion.longitude], zoom);
+      const map = L.map('endorsement-map', {
+        center: [centerLat, centerLng],
+        zoom: 10,
+      });
+      mapInstanceRef.current = map;
 
       // Add tile layer (CartoDB Voyager for better labels)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -570,6 +577,9 @@ export default function MapScreen() {
         maxZoom: 19,
         subdomains: 'abcd',
       }).addTo(map);
+
+      // Create a layer group for markers
+      markersLayerRef.current = L.layerGroup().addTo(map);
 
       // Add user location marker (blue)
       if (userLocation) {
@@ -586,96 +596,6 @@ export default function MapScreen() {
           }),
         }).addTo(map).bindPopup('You are here');
       }
-
-      // Add local radius circle if local filter is active
-      if (activeFilter === 'local' && userLocation) {
-        L.circle([userLocation.latitude, userLocation.longitude], {
-          radius: 50 * 1609.34, // 50 miles in meters
-          color: 'rgba(59, 130, 246, 0.5)',
-          fillColor: 'rgba(59, 130, 246, 0.1)',
-          fillOpacity: 0.2,
-          weight: 2,
-        }).addTo(map);
-      }
-
-      // Add endorsement markers (green)
-      mapMarkers.forEach((marker) => {
-        const markerColor = '#22C55E';
-        const distanceText = marker.distance !== undefined
-          ? marker.distance < 1
-            ? `${(marker.distance * 5280).toFixed(0)} ft away`
-            : `${marker.distance.toFixed(1)} mi away`
-          : '';
-
-        L.marker([marker.latitude, marker.longitude], {
-          icon: L.divIcon({
-            className: 'endorsement-marker',
-            html: `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
-              <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
-            </svg>`,
-            iconSize: [20, 28],
-            iconAnchor: [10, 28],
-          }),
-        })
-          .addTo(map)
-          .bindPopup(`
-            <div style="min-width: 200px; padding: 12px;">
-              <div style="font-size: 16px; font-weight: bold; margin-bottom: 6px; color: #1f2937;">
-                ${marker.name}
-              </div>
-              <div style="font-size: 13px; color: #6b7280; margin-bottom: 8px; text-transform: capitalize;">
-                ${marker.category}
-              </div>
-              ${marker.address ? `
-                <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px; line-height: 1.4;">
-                  📍 ${marker.address}
-                </div>
-              ` : ''}
-              ${distanceText ? `
-                <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">
-                  ${distanceText}
-                </div>
-              ` : ''}
-              <button
-                onclick="window.dispatchEvent(new CustomEvent('navigate-to-endorsement', { detail: { id: '${marker.id}', type: '${marker.type}' } }))"
-                style="
-                  width: 100%;
-                  background-color: #00aaff;
-                  color: white;
-                  border: none;
-                  padding: 8px 16px;
-                  border-radius: 8px;
-                  font-size: 14px;
-                  font-weight: 600;
-                  cursor: pointer;
-                  transition: background-color 0.2s;
-                "
-                onmouseover="this.style.backgroundColor='#0099ee'"
-                onmouseout="this.style.backgroundColor='#00aaff'"
-              >
-                View Details
-              </button>
-            </div>
-          `, {
-            maxWidth: 280,
-            className: 'endorsement-popup'
-          });
-      });
-
-      // Fit map bounds to show all markers
-      if (mapMarkers.length > 1) {
-        const bounds = L.latLngBounds(mapMarkers.map(m => [m.latitude, m.longitude]));
-        if (userLocation) {
-          bounds.extend([userLocation.latitude, userLocation.longitude]);
-        }
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
-      } else if (mapMarkers.length === 1) {
-        map.setView([mapMarkers[0].latitude, mapMarkers[0].longitude], 14);
-      }
-
-      // Store map reference
-      (mapElement as any)._leaflet_map = map;
     };
 
     // Initialize after a short delay to ensure DOM is ready
@@ -697,13 +617,119 @@ export default function MapScreen() {
 
     return () => {
       clearTimeout(timer);
-      const mapElement = document.getElementById('endorsement-map');
-      if (mapElement && (mapElement as any)._leaflet_map) {
-        (mapElement as any)._leaflet_map.remove();
-      }
       window.removeEventListener('navigate-to-endorsement', handleNavigate);
     };
-  }, [mapMarkers, userLocation, mapRegion, activeFilter, loading, loadingLocation, router]);
+  }, [loading, loadingLocation, userLocation, router]);
+
+  // Update markers when data changes (separate from map initialization)
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !mapInstanceRef.current || !markersLayerRef.current) return;
+
+    const L = (window as any).L;
+    if (!L) return;
+
+    console.log('[Map] Updating markers:', mapMarkers.length);
+
+    // Clear existing markers
+    markersLayerRef.current.clearLayers();
+
+    // Add local radius circle if local filter is active
+    if (activeFilter === 'local' && userLocation) {
+      L.circle([userLocation.latitude, userLocation.longitude], {
+        radius: 50 * 1609.34, // 50 miles in meters
+        color: 'rgba(59, 130, 246, 0.5)',
+        fillColor: 'rgba(59, 130, 246, 0.1)',
+        fillOpacity: 0.2,
+        weight: 2,
+      }).addTo(markersLayerRef.current);
+    }
+
+    // Add endorsement markers (green)
+    mapMarkers.forEach((marker) => {
+      const markerColor = '#22C55E';
+      const distanceText = marker.distance !== undefined
+        ? marker.distance < 1
+          ? `${(marker.distance * 5280).toFixed(0)} ft away`
+          : `${marker.distance.toFixed(1)} mi away`
+        : '';
+
+      L.marker([marker.latitude, marker.longitude], {
+        icon: L.divIcon({
+          className: 'endorsement-marker',
+          html: `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
+            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
+          </svg>`,
+          iconSize: [20, 28],
+          iconAnchor: [10, 28],
+        }),
+      })
+        .addTo(markersLayerRef.current)
+        .bindPopup(`
+          <div style="min-width: 200px; padding: 12px;">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 6px; color: #1f2937;">
+              ${marker.name}
+            </div>
+            <div style="font-size: 13px; color: #6b7280; margin-bottom: 8px; text-transform: capitalize;">
+              ${marker.category}
+            </div>
+            ${marker.address ? `
+              <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px; line-height: 1.4;">
+                📍 ${marker.address}
+              </div>
+            ` : ''}
+            ${distanceText ? `
+              <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">
+                ${distanceText}
+              </div>
+            ` : ''}
+            <button
+              onclick="window.dispatchEvent(new CustomEvent('navigate-to-endorsement', { detail: { id: '${marker.id}', type: '${marker.type}' } }))"
+              style="
+                width: 100%;
+                background-color: #00aaff;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background-color 0.2s;
+              "
+              onmouseover="this.style.backgroundColor='#0099ee'"
+              onmouseout="this.style.backgroundColor='#00aaff'"
+            >
+              View Details
+            </button>
+          </div>
+        `, {
+          maxWidth: 280,
+          className: 'endorsement-popup'
+        });
+    });
+
+    // Fit map bounds to show all markers (only if we have markers)
+    if (mapMarkers.length > 0) {
+      const bounds = L.latLngBounds(mapMarkers.map(m => [m.latitude, m.longitude]));
+      if (userLocation) {
+        bounds.extend([userLocation.latitude, userLocation.longitude]);
+      }
+      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+    }
+  }, [mapMarkers, activeFilter, userLocation]);
+
+  // Cleanup map on unmount
+  useEffect(() => {
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markersLayerRef.current = null;
+        mapInitializedRef.current = false;
+      }
+    };
+  }, []);
 
   // Render map
   const renderMap = () => {
