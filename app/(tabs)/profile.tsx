@@ -261,13 +261,14 @@ export default function ProfileScreen() {
   }, [clerkUser?.id]);
 
   // Calculate aligned and unaligned brands based on user's values
+  // Note: User values removed - using empty array for neutral scoring
   const { allSupportFull, allAvoidFull, scoredBrands } = useMemo(() => {
     const csvBrands = brands || [];
     const localBizList = userBusinesses || [];
 
     const currentBrands = [...csvBrands, ...localBizList];
 
-    if (!currentBrands || currentBrands.length === 0 || !profile.causes || profile.causes.length === 0) {
+    if (!currentBrands || currentBrands.length === 0) {
       return {
         allSupportFull: [],
         allAvoidFull: [],
@@ -279,17 +280,17 @@ export default function ProfileScreen() {
     const { calculateBrandScore, calculateSimilarityScore, normalizeBrandScores } = require('@/lib/scoring');
 
     // Calculate scores for all entities (brands AND businesses)
-    // Use the appropriate scoring function based on entity type
+    // Note: User values removed - using empty array for neutral scoring
     const brandsWithScores = currentBrands.map(entity => {
       let score;
 
       // Check if this is a business (has businessInfo field)
       if ('businessInfo' in entity) {
         // For businesses, use similarity scoring based on shared causes
-        score = calculateSimilarityScore(profile.causes || [], entity.causes || []);
+        score = calculateSimilarityScore([], entity.causes || []);
       } else {
         // For brands, use brand scoring based on values matrix
-        score = calculateBrandScore(entity.name, profile.causes || [], valuesMatrix);
+        score = calculateBrandScore(entity.name, [], valuesMatrix);
       }
 
       return { brand: entity, score };
@@ -320,7 +321,7 @@ export default function ProfileScreen() {
       allAvoidFull: unalignedBrands,
       scoredBrands: scoredMap,
     };
-  }, [brands, userBusinesses, profile.causes, valuesMatrix]);
+  }, [brands, userBusinesses, valuesMatrix]);
 
   // If this is a business account, show the business profile editor instead
   if (profile.accountType === 'business') {
