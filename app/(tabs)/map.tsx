@@ -127,6 +127,7 @@ export default function MapScreen() {
   const mapInitializedRef = useRef(false);
   const hasUserChangedFilterRef = useRef(false);
   const previousFilterRef = useRef<'endorsements' | 'local'>('endorsements');
+  const dataLoadedRef = useRef(false);
 
   // Fetch user location
   useEffect(() => {
@@ -150,31 +151,34 @@ export default function MapScreen() {
   }, []);
 
   // Get endorsement list from library context (same as home tab)
+  // Only load once when clerkUser is available to prevent data reset on context updates
   useEffect(() => {
     const loadData = async () => {
-      if (!clerkUser?.id) return;
+      if (!clerkUser?.id || dataLoadedRef.current) return;
 
       setLoading(true);
       try {
-        // Get endorsement list from library context
-        const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
-        if (endorsementListData?.entries) {
-          console.log('[Map] Found endorsement list with', endorsementListData.entries.length, 'entries');
-          setEndorsementList(endorsementListData.entries);
-        } else {
-          console.log('[Map] No endorsement list found, trying direct fetch');
-          // Fallback to direct fetch
-          const list = await getEndorsementList(clerkUser.id);
-          if (list) {
-            console.log('[Map] Direct fetch found', list.entries?.length || 0, 'entries');
-            setEndorsementList(list.entries || []);
-          }
-        }
-
-        // Fetch all businesses for location data
+        // Fetch all businesses for location data first
         const businesses = await getAllUserBusinesses();
         console.log('[Map] Found', businesses.length, 'businesses');
         setAllBusinesses(businesses);
+
+        // Get endorsement list from library context
+        const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
+        if (endorsementListData?.entries && endorsementListData.entries.length > 0) {
+          console.log('[Map] Found endorsement list with', endorsementListData.entries.length, 'entries');
+          setEndorsementList(endorsementListData.entries);
+          dataLoadedRef.current = true;
+        } else {
+          console.log('[Map] No endorsement list found in context, trying direct fetch');
+          // Fallback to direct fetch
+          const list = await getEndorsementList(clerkUser.id);
+          if (list && list.entries && list.entries.length > 0) {
+            console.log('[Map] Direct fetch found', list.entries.length, 'entries');
+            setEndorsementList(list.entries);
+            dataLoadedRef.current = true;
+          }
+        }
       } catch (error) {
         console.error('[Map] Error fetching data:', error);
       } finally {
@@ -183,17 +187,37 @@ export default function MapScreen() {
     };
 
     loadData();
-  }, [clerkUser?.id, library.state.userLists]);
+  }, [clerkUser?.id]);
+
+  // Update endorsement list when library context has new data (but don't clear existing data)
+  useEffect(() => {
+    if (!dataLoadedRef.current) return; // Don't update until initial load is done
+
+    const endorsementListData = library.state.userLists?.find(list => list.isEndorsed);
+    if (endorsementListData?.entries && endorsementListData.entries.length > 0) {
+      console.log('[Map] Updating endorsement list from context:', endorsementListData.entries.length, 'entries');
+      setEndorsementList(endorsementListData.entries);
+    }
+  }, [library.state.userLists]);
+
+  // Store previous valid markers to prevent flashing empty state
+  const prevMarkersRef = useRef<MapMarker[]>([]);
 
   // Convert endorsement list entries to map markers (without category filter)
   const allMarkers = useMemo(() => {
+    // Don't process if we don't have the required data yet
+    if (endorsementList.length === 0) {
+      console.log('[Map] Skipping marker creation - no endorsement entries, returning previous:', prevMarkersRef.current.length);
+      return prevMarkersRef.current;
+    }
+
     const markers: MapMarker[] = [];
     let placeCount = 0;
     let businessCount = 0;
     let brandCount = 0;
     let noLocationCount = 0;
 
-    console.log('[Map] Processing', endorsementList.length, 'endorsement entries');
+    console.log('[Map] Processing', endorsementList.length, 'endorsement entries, brands:', brands.length, 'businesses:', allBusinesses.length);
 
     // Process all endorsement list entries
     endorsementList.forEach((entry) => {
@@ -280,38 +304,55 @@ export default function MapScreen() {
     console.log('[Map] Entry breakdown: places:', placeCount, 'businesses:', businessCount, 'brands:', brandCount);
     console.log('[Map] Markers created:', markers.length, 'No location:', noLocationCount);
 
+    // Store valid markers for future reference
+    if (markers.length > 0) {
+      prevMarkersRef.current = markers;
+    }
+
     return markers;
   }, [endorsementList, allBusinesses, brands, userLocation]);
 
   // Get unique categories from ALL markers (before filtering)
   const availableCategories = useMemo(() => {
     const cats = new Set<string>();
+    const catCounts: Record<string, number> = {};
     allMarkers.forEach(m => {
       if (m.category) {
-        cats.add(m.category.toLowerCase());
+        const cat = m.category.toLowerCase();
+        cats.add(cat);
+        catCounts[cat] = (catCounts[cat] || 0) + 1;
       }
     });
+    console.log('[Map] Available categories with counts:', catCounts);
     return ['all', ...Array.from(cats)];
   }, [allMarkers]);
 
   // Apply filters to get displayed markers
   const mapMarkers = useMemo(() => {
-    let filteredMarkers = allMarkers;
+    console.log('[Map] Computing mapMarkers - allMarkers:', allMarkers.length, 'activeFilter:', activeFilter, 'selectedCategory:', selectedCategory);
+
+    let filteredMarkers = [...allMarkers]; // Create a copy to avoid mutation issues
 
     // Local filter: only show markers within 25 miles
     if (activeFilter === 'local') {
       filteredMarkers = filteredMarkers.filter(m => m.isLocal === true);
+      console.log('[Map] After local filter:', filteredMarkers.length);
     }
 
     // Apply category filter
     if (selectedCategory !== 'all') {
-      filteredMarkers = filteredMarkers.filter(m =>
-        m.category.toLowerCase() === selectedCategory.toLowerCase() ||
-        m.category.toLowerCase().includes(selectedCategory.toLowerCase()) ||
-        selectedCategory.toLowerCase().includes(m.category.toLowerCase())
-      );
+      const beforeCount = filteredMarkers.length;
+      filteredMarkers = filteredMarkers.filter(m => {
+        const markerCat = (m.category || '').toLowerCase();
+        const selectedCat = selectedCategory.toLowerCase();
+        return markerCat === selectedCat ||
+          markerCat.includes(selectedCat) ||
+          selectedCat.includes(markerCat);
+      });
+      console.log('[Map] Category filter "' + selectedCategory + '":', beforeCount, '->', filteredMarkers.length);
     }
 
+    console.log('[Map] Final mapMarkers count:', filteredMarkers.length);
     return filteredMarkers;
   }, [allMarkers, activeFilter, selectedCategory]);
 
