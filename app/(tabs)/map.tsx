@@ -700,32 +700,32 @@ export default function MapScreen() {
     // Clear existing markers
     markersLayerRef.current.clearLayers();
 
-    // Add endorsement markers (green)
+    // Add endorsement markers (app blue color)
     mapMarkers.forEach((marker) => {
-      const markerColor = '#22C55E';
+      const markerColor = '#00aaff'; // App blue color
       const distanceText = marker.distance !== undefined
         ? marker.distance < 1
           ? `${(marker.distance * 5280).toFixed(0)} ft away`
           : `${marker.distance.toFixed(1)} mi away`
         : '';
 
-      // Create marker HTML with optional rank badge
-      const rankBadgeHtml = marker.rank
-        ? `<div style="position: absolute; top: -8px; right: -8px; background-color: #00aaff; color: white; font-size: 10px; font-weight: 700; border-radius: 10px; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: 2px solid white; z-index: 1;">${marker.rank}</div>`
-        : '';
+      // Create marker HTML - show rank number inside marker if ranked, otherwise plain marker
+      const markerHtml = marker.rank
+        ? `<div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div style="background-color: ${markerColor}; color: white; font-size: 11px; font-weight: 700; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${marker.rank}</div>
+            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${markerColor}; margin-top: -2px;"></div>
+          </div>`
+        : `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
+            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
+          </svg>`;
 
       L.marker([marker.latitude, marker.longitude], {
         icon: L.divIcon({
           className: 'endorsement-marker',
-          html: `<div style="position: relative;">
-            ${rankBadgeHtml}
-            <svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${markerColor}"/>
-              <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
-            </svg>
-          </div>`,
-          iconSize: [20, 28],
-          iconAnchor: [10, 28],
+          html: markerHtml,
+          iconSize: marker.rank ? [24, 32] : [20, 28],
+          iconAnchor: marker.rank ? [12, 32] : [10, 28],
         }),
       })
         .addTo(markersLayerRef.current)
@@ -933,12 +933,16 @@ export default function MapScreen() {
               onPress={() => handleMarkerPress(marker)}
             >
               <View style={styles.businessMarker}>
-                {marker.rank && (
-                  <View style={styles.markerRankBadge}>
-                    <Text style={styles.markerRankText}>{marker.rank}</Text>
+                {marker.rank ? (
+                  <View style={styles.rankedMarker}>
+                    <View style={styles.rankedMarkerCircle}>
+                      <Text style={styles.rankedMarkerText}>{marker.rank}</Text>
+                    </View>
+                    <View style={styles.rankedMarkerPointer} />
                   </View>
+                ) : (
+                  <MapPin size={28} color="#00aaff" fill="#00aaff" strokeWidth={1.5} />
                 )}
-                <MapPin size={28} color="#22C55E" fill="#22C55E" strokeWidth={1.5} />
               </View>
             </Marker>
           ))}
@@ -1228,25 +1232,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  markerRankBadge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
+  rankedMarker: {
+    alignItems: 'center',
+  },
+  rankedMarkerCircle: {
     backgroundColor: '#00aaff',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    zIndex: 1,
     borderWidth: 2,
     borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
-  markerRankText: {
-    fontSize: 10,
+  rankedMarkerText: {
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  rankedMarkerPointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#00aaff',
+    marginTop: -2,
   },
   selectionContainer: {
     position: 'absolute',
