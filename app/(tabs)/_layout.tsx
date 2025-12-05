@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from "expo-router";
-import { BookOpen, DollarSign, Compass, User, Home } from "lucide-react-native";
+import { BookOpen, DollarSign, MapPin, User, Home } from "lucide-react-native";
 import React from "react";
 import { Platform, useWindowDimensions, StyleSheet, StatusBar, View, Text, ActivityIndicator } from "react-native";
 import { lightColors, darkColors } from "@/constants/colors";
@@ -116,10 +116,17 @@ export default function TabLayout() {
             }}
           >
             <Tabs.Screen
-              name="list"
+              name="home"
               options={{
-                title: "List",
-                tabBarIcon: renderTabIconWithLabel(Home, "List", colors.primary),
+                title: "Home",
+                tabBarIcon: renderTabIconWithLabel(Home, "Home", colors.primary),
+              }}
+            />
+            <Tabs.Screen
+              name="map"
+              options={{
+                title: "Map",
+                tabBarIcon: renderTabIconWithLabel(MapPin, "Map", colors.primary),
               }}
             />
             <Tabs.Screen
@@ -127,13 +134,6 @@ export default function TabLayout() {
               options={{
                 title: "Browse",
                 tabBarIcon: renderTabIconWithLabel(BookOpen, "Browse", colors.primary),
-              }}
-            />
-            <Tabs.Screen
-              name="explore"
-              options={{
-                title: "Explore",
-                tabBarIcon: renderTabIconWithLabel(Compass, "Explore", colors.primary),
               }}
             />
             <Tabs.Screen
