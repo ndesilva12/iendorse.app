@@ -36,24 +36,6 @@ import { getEndorsementList } from '@/services/firebase/listService';
 import { getLogoUrl } from '@/lib/logo';
 import { ListEntry, BrandListEntry, BusinessListEntry, PlaceListEntry } from '@/types/library';
 
-// Categories for filtering
-const CATEGORIES = [
-  { id: 'all', label: 'All', color: '#3B82F6' },
-  { id: 'technology', label: 'Technology', color: '#3B82F6' },
-  { id: 'retail', label: 'Retail', color: '#10B981' },
-  { id: 'food_beverage', label: 'Food & Beverage', color: '#F59E0B' },
-  { id: 'food', label: 'Food', color: '#F59E0B' },
-  { id: 'restaurant', label: 'Restaurant', color: '#F59E0B' },
-  { id: 'finance', label: 'Finance', color: '#6366F1' },
-  { id: 'automotive', label: 'Automotive', color: '#EF4444' },
-  { id: 'entertainment', label: 'Entertainment', color: '#EC4899' },
-  { id: 'health_wellness', label: 'Health & Wellness', color: '#14B8A6' },
-  { id: 'health', label: 'Health', color: '#14B8A6' },
-  { id: 'fashion', label: 'Fashion', color: '#8B5CF6' },
-  { id: 'travel', label: 'Travel', color: '#06B6D4' },
-  { id: 'services', label: 'Services', color: '#6B7280' },
-  { id: 'other', label: 'Other', color: '#6B7280' },
-];
 
 // Map marker data interface
 interface MapMarker {
@@ -312,20 +294,75 @@ export default function MapScreen() {
     return markers;
   }, [endorsementList, allBusinesses, brands, userLocation]);
 
-  // Get unique categories from ALL markers (before filtering)
+  // Helper function to get a color for a category
+  const getCategoryColor = useCallback((category: string): string => {
+    const colorMap: Record<string, string> = {
+      restaurant: '#F59E0B',
+      food: '#F59E0B',
+      cafe: '#F59E0B',
+      bar: '#F59E0B',
+      bakery: '#F59E0B',
+      meal_delivery: '#F59E0B',
+      meal_takeaway: '#F59E0B',
+      retail: '#10B981',
+      store: '#10B981',
+      shopping_mall: '#10B981',
+      grocery_or_supermarket: '#10B981',
+      supermarket: '#10B981',
+      technology: '#3B82F6',
+      electronics_store: '#3B82F6',
+      finance: '#6366F1',
+      bank: '#6366F1',
+      atm: '#6366F1',
+      automotive: '#EF4444',
+      car_dealer: '#EF4444',
+      car_repair: '#EF4444',
+      gas_station: '#EF4444',
+      entertainment: '#EC4899',
+      movie_theater: '#EC4899',
+      amusement_park: '#EC4899',
+      health: '#14B8A6',
+      hospital: '#14B8A6',
+      pharmacy: '#14B8A6',
+      doctor: '#14B8A6',
+      gym: '#14B8A6',
+      spa: '#14B8A6',
+      fashion: '#8B5CF6',
+      clothing_store: '#8B5CF6',
+      shoe_store: '#8B5CF6',
+      travel: '#06B6D4',
+      lodging: '#06B6D4',
+      hotel: '#06B6D4',
+      airport: '#06B6D4',
+      services: '#6B7280',
+      other: '#6B7280',
+    };
+    return colorMap[category.toLowerCase()] || '#6B7280';
+  }, []);
+
+  // Get unique categories from ALL markers (before filtering) and create display-friendly labels
   const availableCategories = useMemo(() => {
-    const cats = new Set<string>();
     const catCounts: Record<string, number> = {};
     allMarkers.forEach(m => {
       if (m.category) {
         const cat = m.category.toLowerCase();
-        cats.add(cat);
         catCounts[cat] = (catCounts[cat] || 0) + 1;
       }
     });
-    console.log('[Map] Available categories with counts:', catCounts);
-    return ['all', ...Array.from(cats)];
-  }, [allMarkers]);
+    console.log('[Map] Available categories with counts:', JSON.stringify(catCounts));
+
+    // Sort by count (most common first) and create category objects
+    const sortedCats = Object.entries(catCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, count]) => ({
+        id,
+        label: id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), // Convert to Title Case
+        count,
+        color: getCategoryColor(id),
+      }));
+
+    return [{ id: 'all', label: 'All', count: allMarkers.length, color: '#3B82F6' }, ...sortedCats];
+  }, [allMarkers, getCategoryColor]);
 
   // Apply filters to get displayed markers
   const mapMarkers = useMemo(() => {
@@ -478,8 +515,8 @@ export default function MapScreen() {
         {/* Separator */}
         <View style={[styles.filterSeparator, { backgroundColor: colors.border }]} />
 
-        {/* Category filter chips in same row - always show all categories */}
-        {CATEGORIES.map((cat) => (
+        {/* Category filter chips in same row - dynamically generated from actual data */}
+        {availableCategories.map((cat) => (
           <TouchableOpacity
             key={cat.id}
             style={[
