@@ -30,17 +30,18 @@ type Props = {
 };
 
 // Create marker icon HTML - ranked markers (top 50) are navy blue, others are app blue
+// All markers are the same size for consistency
 function createMarkerIconHtml(index: number): string {
   const rank = index + 1;
   const isRanked = rank <= 50;
   const color = isRanked ? '#1e3a5f' : '#00aaff'; // Navy blue for ranked, app blue for others
 
   if (isRanked) {
-    // Larger marker with number inside for ranked items
-    return `<svg width="28" height="40" viewBox="0 0 28 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14z" fill="${color}"/>
-      <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14z" stroke="white" stroke-width="2"/>
-      <text x="14" y="18" text-anchor="middle" fill="white" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">${rank}</text>
+    // Same size marker with number inside for ranked items
+    return `<svg width="20" height="28" viewBox="0 0 20 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" fill="${color}"/>
+      <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 18 10 18s10-10.5 10-18c0-5.52-4.48-10-10-10z" stroke="white" stroke-width="1.5"/>
+      <text x="10" y="13" text-anchor="middle" fill="white" font-size="9" font-weight="700" font-family="system-ui, -apple-system, sans-serif">${rank}</text>
     </svg>`;
   } else {
     // Standard marker for unranked items
@@ -263,8 +264,6 @@ export default function EndorsementMapView({
       // Add new markers
       currentEntries.forEach((entry, index) => {
         const markerId = `${entry.id}__${entry.type}`;
-        const rank = index + 1;
-        const isRanked = rank <= 50;
 
         if (!markersRef.current.has(markerId)) {
           try {
@@ -275,8 +274,8 @@ export default function EndorsementMapView({
               icon: L.divIcon({
                 className: 'endorsement-marker',
                 html: createMarkerIconHtml(index),
-                iconSize: isRanked ? [28, 40] : [20, 28],
-                iconAnchor: isRanked ? [14, 40] : [10, 28],
+                iconSize: [20, 28],
+                iconAnchor: [10, 28],
               }),
             })
               .addTo(mapRef.current)
