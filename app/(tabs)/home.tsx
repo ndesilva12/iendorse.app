@@ -250,8 +250,8 @@ export default function HomeScreen() {
     if (isProfileLoading) return;
 
     // Set up the library view for first-time users
-    if (clerkUser && profile.causes && profile.causes.length > 0 && profile.hasSeenIntro === false) {
-      console.log('[HomeScreen] First time user, setting up aligned list view');
+    if (clerkUser && profile.hasSeenIntro === false) {
+      console.log('[HomeScreen] First time user, setting up library view');
       setMainView('myLibrary');
       setExpandedListId('aligned');
       setSelectedListId('aligned');
@@ -263,7 +263,7 @@ export default function HomeScreen() {
       markIntroAsSeen();
       setMainView('myLibrary');
     }
-  }, [clerkUser, profile.causes, profile.hasSeenIntro, markIntroAsSeen, isProfileLoading]);
+  }, [clerkUser, profile.hasSeenIntro, markIntroAsSeen, isProfileLoading]);
 
   // Fetch brands and values from Firebase via DataContext
   const { brands, values, valuesMatrix, isLoading, error } = useData();
@@ -721,8 +721,9 @@ export default function HomeScreen() {
     }
 
     // Calculate scores for brands using values matrix
+    // Note: User values removed - using empty array for neutral scoring
     const brandsWithScores = currentBrands.map(brand => {
-      const score = calculateBrandScore(brand.name, profile.causes || [], valuesMatrix);
+      const score = calculateBrandScore(brand.name, [], valuesMatrix);
       return { brand, score };
     });
 
@@ -764,7 +765,7 @@ export default function HomeScreen() {
       brandDistances: new Map(),
       rawBrandScores,
     };
-  }, [brands, profile.causes, valuesMatrix]);
+  }, [brands, valuesMatrix]);
 
   // Compute local businesses when "local" view is active
   const localBusinessData = useMemo(() => {
@@ -792,7 +793,8 @@ export default function HomeScreen() {
       }
 
       // Calculate similarity score with the business
-      const similarityScore = calculateSimilarityScore(profile.causes || [], business.causes || []);
+      // Note: User values removed - using empty array for neutral scoring
+      const similarityScore = calculateSimilarityScore([], business.causes || []);
 
       return {
         business,
@@ -835,18 +837,19 @@ export default function HomeScreen() {
       alignedBusinesses,
       unalignedBusinesses,
     };
-  }, [mainView, userLocation, userBusinesses, localDistance, profile.causes, localSortDirection, rawBrandScores]);
+  }, [mainView, userLocation, userBusinesses, localDistance, localSortDirection, rawBrandScores]);
 
   // Normalize all business scores for library display using brand scores as reference
   const businessScoresMap = useMemo(() => {
-    if (!profile.causes || userBusinesses.length === 0) {
+    if (userBusinesses.length === 0) {
       return new Map<string, number>();
     }
 
     // Calculate scores for all businesses
+    // Note: User values removed - using empty array for neutral scoring
     const businessesWithScores = userBusinesses.map(b => ({
       ...b,
-      alignmentScore: calculateSimilarityScore(profile.causes || [], b.causes || [])
+      alignmentScore: calculateSimilarityScore([], b.causes || [])
     }));
 
     // Normalize similarity scores using brand scores as reference distribution
@@ -862,7 +865,7 @@ export default function HomeScreen() {
     });
 
     return scoresMap;
-  }, [userBusinesses, profile.causes, rawBrandScores]);
+  }, [userBusinesses, rawBrandScores]);
 
   const categorizedBrands = useMemo(() => {
     const categorized = new Map<string, Product[]>();
