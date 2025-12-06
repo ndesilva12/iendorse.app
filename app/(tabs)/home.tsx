@@ -385,6 +385,27 @@ export default function HomeScreen() {
     }
   };
 
+  // Auto-fetch location on mount if permission is already granted
+  useEffect(() => {
+    const checkAndFetchLocation = async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted' && !userLocation) {
+          console.log('[Home] Location permission already granted, fetching location...');
+          const location = await Location.getCurrentPositionAsync({});
+          setUserLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          console.log('[Home] ✅ Auto-fetched location');
+        }
+      } catch (error) {
+        console.error('[Home] Error auto-fetching location:', error);
+      }
+    };
+    checkAndFetchLocation();
+  }, []);
+
   // Load user's personal list on mount and set default view
   useEffect(() => {
     const loadPersonalList = async () => {
