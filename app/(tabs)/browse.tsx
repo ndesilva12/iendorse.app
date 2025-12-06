@@ -843,19 +843,16 @@ export default function BrowseScreen() {
 
     return (
       <View style={styles.sectionSelector}>
-        {/* First row: Global, Local, Values */}
+        {/* First row: Global, Local (stretched to fill width evenly) */}
         <View style={styles.sectionRow}>
-          <View style={styles.sectionThird}>
+          <View style={styles.sectionHalf}>
             <SectionBox section="global" label="Global" Icon={Target} />
           </View>
-          <View style={styles.sectionThird}>
+          <View style={styles.sectionHalf}>
             <SectionBox section="local" label="Local" Icon={MapPin} />
           </View>
-          <View style={styles.sectionThird}>
-            <SectionBox section="values" label="Values" Icon={Heart} />
-          </View>
         </View>
-        {/* Second row: Users, Following, Search */}
+        {/* Second row: Users, Following, Values */}
         <View style={[styles.sectionRow, { marginTop: 8 }]}>
           <View style={styles.sectionThird}>
             <SectionBox section="users" label="Users" Icon={Users} />
@@ -864,7 +861,7 @@ export default function BrowseScreen() {
             <SectionBox section="following" label="Following" Icon={UserPlus} />
           </View>
           <View style={styles.sectionThird}>
-            <SectionBox section="search" label="Search" Icon={Search} />
+            <SectionBox section="values" label="Values" Icon={Heart} />
           </View>
         </View>
       </View>
@@ -1605,7 +1602,16 @@ export default function BrowseScreen() {
             style={styles.headerLogo}
             resizeMode="contain"
           />
-          <MenuButton />
+          <View style={styles.headerRightContainer}>
+            <TouchableOpacity
+              style={[styles.headerSearchButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={() => setSelectedSection('search')}
+              activeOpacity={0.7}
+            >
+              <Search size={22} color={selectedSection === 'search' ? colors.primary : colors.textSecondary} strokeWidth={2} />
+            </TouchableOpacity>
+            <MenuButton />
+          </View>
         </View>
       </View>
 
@@ -1699,6 +1705,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
     alignSelf: 'flex-start',
   },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerSearchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // Section selector styles
   sectionSelector: {
@@ -1710,6 +1728,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionThird: {
+    flex: 1,
+  },
+  sectionHalf: {
     flex: 1,
   },
   sectionBox: {
