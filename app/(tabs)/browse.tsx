@@ -491,6 +491,27 @@ export default function BrowseScreen() {
     }
   };
 
+  // Auto-fetch location on mount if permission is already granted
+  useEffect(() => {
+    const checkAndFetchLocation = async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted' && !userLocation) {
+          console.log('[Browse] Location permission already granted, fetching location...');
+          const location = await Location.getCurrentPositionAsync({});
+          setUserLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          console.log('[Browse] ✅ Auto-fetched location');
+        }
+      } catch (error) {
+        console.error('[Browse] Error auto-fetching location:', error);
+      }
+    };
+    checkAndFetchLocation();
+  }, []);
+
   // Brand action handlers
   const handleEndorseBrand = async (brandId: string, brandName: string) => {
     console.log('[Browse] handleEndorseBrand called:', brandId, brandName);

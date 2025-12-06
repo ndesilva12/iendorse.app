@@ -103,6 +103,7 @@ export default function OnboardingScreen() {
   const params = useLocalSearchParams<{ accountType?: string }>();
   const { signOut } = useAuth();
   const { profile, isDarkMode, clerkUser, isLoading, setAccountType, clearAllStoredData } = useUser();
+  const { firebaseValues = [] } = useData();
   // Note: values removed from user profiles - values are only used for brand associations in browse tab
   const colors = isDarkMode ? darkColors : lightColors;
   const insets = useSafeAreaInsets();
