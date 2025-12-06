@@ -31,7 +31,7 @@ import { useLibrary } from '@/contexts/LibraryContext';
 import { unfollowEntity, followEntity, isFollowing as checkIsFollowing } from '@/services/firebase/followService';
 import { addEntryToList, removeEntryFromList } from '@/services/firebase/listService';
 import ItemOptionsModal from '@/components/ItemOptionsModal';
-import { getBusinessesEndorsementCounts } from '@/services/firebase/topRankingsService';
+import { getBusinessesEndorsementCounts, getBusinessesReferralCounts } from '@/services/firebase/topRankingsService';
 
 // Helper function to extract Town, State from full address
 const shortenAddress = (fullAddress: string | undefined): string => {
@@ -91,6 +91,7 @@ interface BusinessWithScore {
   business: BusinessUser;
   alignmentScore: number;
   endorsementCount: number;
+  referralCount: number;
   distance?: number;
   closestLocation?: string;
   isWithinRange: boolean;
@@ -161,8 +162,9 @@ export default function LocalBusinessView({
   const [endorsedBusinessIds, setEndorsedBusinessIds] = useState<Set<string>>(new Set());
   const [followedBusinessIds, setFollowedBusinessIds] = useState<Set<string>>(new Set());
 
-  // Track endorsement counts for ordering
+  // Track endorsement and referral counts for ordering
   const [endorsementCounts, setEndorsementCounts] = useState<Map<string, number>>(new Map());
+  const [referralCounts, setReferralCounts] = useState<Map<string, number>>(new Map());
 
   // Check endorsement status from library
   useEffect(() => {
@@ -183,17 +185,24 @@ export default function LocalBusinessView({
     }
   }, [library.state?.userLists]);
 
-  // Fetch endorsement counts for all businesses (for ordering)
+  // Fetch endorsement and referral counts for all businesses (for ordering)
   useEffect(() => {
-    const fetchEndorsementCounts = async () => {
+    const fetchCounts = async () => {
       if (userBusinesses.length === 0) return;
 
       const businessIds = userBusinesses.map(b => b.id);
-      const counts = await getBusinessesEndorsementCounts(businessIds);
-      setEndorsementCounts(counts);
+
+      // Fetch both counts in parallel
+      const [endorsements, referrals] = await Promise.all([
+        getBusinessesEndorsementCounts(businessIds),
+        getBusinessesReferralCounts(businessIds),
+      ]);
+
+      setEndorsementCounts(endorsements);
+      setReferralCounts(referrals);
     };
 
-    fetchEndorsementCounts();
+    fetchCounts();
   }, [userBusinesses]);
 
   // Check follow status for displayed businesses
@@ -389,6 +398,7 @@ export default function LocalBusinessView({
         business,
         alignmentScore: similarityScore,
         endorsementCount: endorsementCounts.get(business.id) || 0,
+        referralCount: referralCounts.get(business.id) || 0,
         distance: rangeResult.closestDistance,
         closestLocation: rangeResult.closestLocation,
         isWithinRange: rangeResult.isWithinRange,
@@ -418,11 +428,21 @@ export default function LocalBusinessView({
       );
     }
 
-    // Sort by endorsement count (total number of endorsements)
+    // Sort by referral count first, then by endorsement count
     const allBusinessesSorted = [...filteredBusinesses].sort((a, b) => {
       if (localSortDirection === 'highToLow') {
+        // First compare by referral count
+        if (b.referralCount !== a.referralCount) {
+          return b.referralCount - a.referralCount;
+        }
+        // If referral counts are equal, compare by endorsement count
         return b.endorsementCount - a.endorsementCount;
       } else {
+        // First compare by referral count
+        if (a.referralCount !== b.referralCount) {
+          return a.referralCount - b.referralCount;
+        }
+        // If referral counts are equal, compare by endorsement count
         return a.endorsementCount - b.endorsementCount;
       }
     });
@@ -432,7 +452,7 @@ export default function LocalBusinessView({
       alignedBusinesses: filteredBusinesses.filter((b) => b.alignmentScore >= 60),
       unalignedBusinesses: filteredBusinesses.filter((b) => b.alignmentScore < 40),
     };
-  }, [userLocation, userBusinesses, localDistance, userCauses, localSortDirection, searchQuery, brands, valuesMatrix, endorsementCounts]);
+  }, [userLocation, userBusinesses, localDistance, userCauses, localSortDirection, searchQuery, brands, valuesMatrix, endorsementCounts, referralCounts]);
 
   const renderLocalBusinessCard = (
     businessData: BusinessWithScore,
