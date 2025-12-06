@@ -384,6 +384,36 @@ export async function getBusinessesEndorsementCounts(businessIds: string[]): Pro
 }
 
 /**
+ * Get referral counts for multiple businesses
+ * Referral count is stored on the user document as referralCount
+ * @param businessIds - Array of business IDs to check
+ * @returns Map of businessId -> referralCount
+ */
+export async function getBusinessesReferralCounts(businessIds: string[]): Promise<Map<string, number>> {
+  try {
+    // Fetch all business user documents to get their referral counts
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+
+    const referralCounts = new Map<string, number>();
+    // Initialize all counts to 0
+    businessIds.forEach(id => referralCounts.set(id, 0));
+
+    usersSnapshot.forEach((doc) => {
+      if (businessIds.includes(doc.id)) {
+        const userData = doc.data();
+        referralCounts.set(doc.id, userData.referralCount || 0);
+      }
+    });
+
+    return referralCounts;
+  } catch (error) {
+    console.error('[TopRankings] Error getting businesses referral counts:', error);
+    return new Map();
+  }
+}
+
+/**
  * Get the endorsement count for a specific brand
  * @param brandId - The brand ID to check
  * @returns The endorsement count for this brand
