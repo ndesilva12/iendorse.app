@@ -57,7 +57,7 @@ export default function SignInScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
         <View style={styles.alreadySignedInContainer}>
           <Image
-            source={require('@/assets/images/endorsing.png')}
+            source={require('@/assets/images/yendorse.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -74,7 +74,7 @@ export default function SignInScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
         <View style={styles.alreadySignedInContainer}>
           <Image
-            source={require('@/assets/images/endorsing.png')}
+            source={require('@/assets/images/yendorse.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -248,7 +248,7 @@ export default function SignInScreen() {
           {/* Hero Section */}
           <View style={styles.heroSection}>
             <Image
-              source={require('@/assets/images/endorsing.png')}
+              source={require('@/assets/images/yendorse.png')}
               style={styles.logo}
               resizeMode="contain"
             />

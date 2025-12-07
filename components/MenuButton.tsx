@@ -136,7 +136,7 @@ export default function MenuButton() {
           >
             <View style={styles.logoContainer}>
               <Image
-                source={require('@/assets/images/endorsing.png')}
+                source={require('@/assets/images/yendorse.png')}
                 style={styles.menuLogo}
                 resizeMode="contain"
               />

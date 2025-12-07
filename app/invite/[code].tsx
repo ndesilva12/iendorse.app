@@ -95,7 +95,7 @@ export default function InviteLandingPage() {
       <View style={styles.content}>
         {/* Logo */}
         <Image
-          source={require('@/assets/images/endorsing.png')}
+          source={require('@/assets/images/yendorse.png')}
           style={styles.logo}
           resizeMode="contain"
         />

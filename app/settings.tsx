@@ -182,7 +182,7 @@ export default function SettingsScreen() {
           <ChevronLeft size={28} color={colors.text} strokeWidth={2} />
         </TouchableOpacity>
         <Image
-          source={require('@/assets/images/endorsing.png')}
+          source={require('@/assets/images/yendorse.png')}
           style={styles.headerLogo}
           resizeMode="contain"
         />
