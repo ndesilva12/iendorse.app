@@ -1087,7 +1087,7 @@ export default function BrowseScreen() {
                   >
                     <View style={[styles.localSearchResultLogo, { backgroundColor: colors.backgroundSecondary }]}>
                       <Image
-                        source={require('@/assets/images/endorsing1.png')}
+                        source={require('@/assets/images/yendorseicon.png')}
                         style={styles.localSearchResultLogoImage}
                         contentFit="cover"
                         transition={200}
@@ -1535,7 +1535,7 @@ export default function BrowseScreen() {
                     <View style={styles.searchResultInner}>
                       <View style={[styles.searchResultLogo, { backgroundColor: colors.backgroundSecondary }]}>
                         <Image
-                          source={require('@/assets/images/endorsing1.png')}
+                          source={require('@/assets/images/yendorseicon.png')}
                           style={styles.searchResultLogoImage}
                           contentFit="cover"
                           transition={200}
@@ -1598,7 +1598,7 @@ export default function BrowseScreen() {
       <View style={[styles.mainHeaderContainer, { backgroundColor: colors.background, borderBottomColor: 'rgba(0, 0, 0, 0.05)' }]}>
         <View style={[styles.header, { backgroundColor: colors.background }]}>
           <Image
-            source={require('@/assets/images/endorsing.png')}
+            source={require('@/assets/images/yendorse.png')}
             style={styles.headerLogo}
             resizeMode="contain"
           />
