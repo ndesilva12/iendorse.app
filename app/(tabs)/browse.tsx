@@ -248,7 +248,6 @@ export default function BrowseScreen() {
       try {
         const following = await getFollowing(clerkUser.id);
         const items: FollowingItem[] = [];
-        const staleFollows: Array<{ id: string; type: 'user' | 'brand' | 'business' }> = [];
 
         for (const item of following) {
           // Use followedType and followedId (not entityType/entityId)
@@ -264,10 +263,9 @@ export default function BrowseScreen() {
                 profileImage: user.profile.userDetails?.profileImage,
                 location: user.profile.userDetails?.location,
               });
-            } else {
-              // User not found - mark for cleanup
-              staleFollows.push({ id: item.followedId, type: 'user' });
             }
+            // Note: Don't auto-cleanup follows for users not in publicUsers
+            // They might exist but just have missing isPublicProfile/accountType fields
           } else if (item.followedType === 'business') {
             const business = userBusinesses.find(b => b.id === item.followedId);
             if (business) {
@@ -280,10 +278,9 @@ export default function BrowseScreen() {
                 location: business.businessInfo.location,
                 category: business.businessInfo.category,
               });
-            } else {
-              // Business not found - mark for cleanup
-              staleFollows.push({ id: item.followedId, type: 'business' });
             }
+            // Note: Don't auto-cleanup follows for businesses not found
+            // They might exist but just not be loaded yet
           } else if (item.followedType === 'brand') {
             const brand = brands?.find(b => b.id === item.followedId);
             if (brand) {
@@ -296,26 +293,12 @@ export default function BrowseScreen() {
                 category: brand.category,
                 website: brand.website,
               });
-            } else {
-              // Brand not found - mark for cleanup
-              staleFollows.push({ id: item.followedId, type: 'brand' });
             }
+            // Note: Don't auto-cleanup follows for brands not found
           }
         }
 
         setFollowingItems(items);
-
-        // Clean up stale follow records in background (entities that no longer exist)
-        if (staleFollows.length > 0) {
-          console.log('[Browse] Cleaning up', staleFollows.length, 'stale follow records');
-          for (const stale of staleFollows) {
-            try {
-              await unfollowEntity(clerkUser.id, stale.id, stale.type);
-            } catch (err) {
-              console.error('[Browse] Error cleaning up stale follow:', err);
-            }
-          }
-        }
       } catch (error) {
         console.error('[Browse] Error fetching following:', error);
       } finally {
