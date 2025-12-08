@@ -815,7 +815,6 @@ export default function BusinessesManagement() {
       const newBusinessData = {
         email: createEmail.trim(),
         accountType: 'business',
-        isPublicProfile: true,
         businessInfo: businessInfo,
         causes: [],
         searchHistory: [],

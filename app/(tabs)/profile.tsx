@@ -77,7 +77,6 @@ export default function ProfileScreen() {
   const [linkedin, setLinkedin] = useState(userDetails.socialMedia?.linkedin || '');
   const [profileImage, setProfileImage] = useState(userDetails.profileImage || '');
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [isPublicProfile, setIsPublicProfile] = useState(profile.isPublicProfile !== false);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followModalVisible, setFollowModalVisible] = useState(false);
@@ -153,16 +152,6 @@ export default function ProfileScreen() {
 
     await setUserDetails(updateInfo);
 
-    // Update profile privacy setting
-    try {
-      const userRef = doc(db, 'users', clerkUser.id);
-      await updateDoc(userRef, {
-        isPublicProfile,
-      });
-    } catch (error) {
-      console.error('[ProfileScreen] Error updating profile privacy:', error);
-    }
-
     setEditing(false);
     Alert.alert('Success', 'Profile updated successfully');
   };
@@ -179,7 +168,6 @@ export default function ProfileScreen() {
     setTwitter(userDetails.socialMedia?.twitter || '');
     setLinkedin(userDetails.socialMedia?.linkedin || '');
     setProfileImage(userDetails.profileImage || '');
-    setIsPublicProfile(profile.isPublicProfile !== false);
     setEditing(false);
   };
 
