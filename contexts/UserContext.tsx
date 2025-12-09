@@ -79,10 +79,50 @@ export const [UserProvider, useUser] = createContextHook(() => {
           // Firebase has the profile - use it
           console.log('[UserContext] 📥 Using Firebase profile');
 
+          let needsSave = false;
+
           // Ensure promo code exists
           if (!firebaseProfile.promoCode) {
             firebaseProfile.promoCode = generatePromoCode();
             console.log('[UserContext] Generated new promo code:', firebaseProfile.promoCode);
+            needsSave = true;
+          }
+
+          // Ensure accountType is set for individual users (backfill for existing users)
+          if (!firebaseProfile.accountType && firebaseProfile.accountType !== 'business') {
+            firebaseProfile.accountType = 'individual';
+            console.log('[UserContext] 🔧 Setting accountType: individual for existing user');
+            needsSave = true;
+          }
+
+          // Backfill userDetails from Clerk data if missing
+          const clerkFullName = clerkUser.fullName ||
+            (clerkUser.firstName && clerkUser.lastName
+              ? `${clerkUser.firstName} ${clerkUser.lastName}`
+              : clerkUser.firstName || '');
+
+          if (!firebaseProfile.userDetails?.name && clerkFullName) {
+            firebaseProfile.userDetails = {
+              ...firebaseProfile.userDetails,
+              name: clerkFullName,
+              profileImage: firebaseProfile.userDetails?.profileImage || clerkUser.imageUrl || undefined,
+            };
+            console.log('[UserContext] 🔧 Backfilling userDetails from Clerk:', clerkFullName);
+            needsSave = true;
+
+            // Also sync to root-level metadata
+            try {
+              await updateUserMetadata(clerkUser.id, {
+                email: clerkUser.primaryEmailAddress?.emailAddress,
+                firstName: clerkUser.firstName || undefined,
+                lastName: clerkUser.lastName || undefined,
+                fullName: clerkFullName || undefined,
+                imageUrl: clerkUser.imageUrl || undefined,
+              });
+              console.log('[UserContext] ✅ Clerk metadata synced to Firebase (backfill)');
+            } catch (error) {
+              console.error('[UserContext] ❌ Failed to sync Clerk metadata:', error);
+            }
           }
 
           // Auto-verify organic users: if they don't have isVerified set and are not a celebrity account
@@ -91,11 +131,16 @@ export const [UserProvider, useUser] = createContextHook(() => {
           if (needsVerification) {
             console.log('[UserContext] 🔧 Organic user without verification. Setting isVerified: true...');
             firebaseProfile.isVerified = true;
+            needsSave = true;
+          }
+
+          // Save if any changes were made
+          if (needsSave) {
             try {
               await saveUserProfile(clerkUser.id, firebaseProfile);
-              console.log('[UserContext] ✅ User verified in Firebase');
+              console.log('[UserContext] ✅ Profile updated in Firebase');
             } catch (error) {
-              console.error('[UserContext] ❌ Failed to verify user:', error);
+              console.error('[UserContext] ❌ Failed to update profile:', error);
             }
           }
 
@@ -137,10 +182,23 @@ export const [UserProvider, useUser] = createContextHook(() => {
           } else if (mounted) {
             console.log('[UserContext] ⚠️ CREATING NEW PROFILE (no Firebase, no AsyncStorage)');
             console.log('[UserContext]   - This is a brand new user');
+
+            // Build name from Clerk data
+            const clerkFullName = clerkUser.fullName ||
+              (clerkUser.firstName && clerkUser.lastName
+                ? `${clerkUser.firstName} ${clerkUser.lastName}`
+                : clerkUser.firstName || '');
+
             const newProfile: UserProfile = {
               id: clerkUser.id,
               searchHistory: [],
               promoCode: generatePromoCode(),
+              accountType: 'individual', // Set account type so user appears in browse
+              // Initialize userDetails from Clerk data so user is searchable
+              userDetails: clerkFullName ? {
+                name: clerkFullName,
+                profileImage: clerkUser.imageUrl || undefined,
+              } : undefined,
             };
             setProfile(newProfile);
             setHasCompletedOnboarding(true);
@@ -149,6 +207,18 @@ export const [UserProvider, useUser] = createContextHook(() => {
             try {
               await saveUserProfile(clerkUser.id, newProfile);
               console.log('[UserContext] ✅ New profile saved to Firebase');
+
+              // Also sync Clerk metadata to root-level Firebase fields
+              if (clerkFullName || clerkUser.imageUrl || clerkUser.primaryEmailAddress?.emailAddress) {
+                await updateUserMetadata(clerkUser.id, {
+                  email: clerkUser.primaryEmailAddress?.emailAddress,
+                  firstName: clerkUser.firstName || undefined,
+                  lastName: clerkUser.lastName || undefined,
+                  fullName: clerkFullName || undefined,
+                  imageUrl: clerkUser.imageUrl || undefined,
+                });
+                console.log('[UserContext] ✅ Clerk metadata synced to Firebase');
+              }
             } catch (error) {
               console.error('[UserContext] Failed to save new profile:', error);
             }
