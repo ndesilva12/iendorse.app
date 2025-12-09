@@ -593,7 +593,7 @@ export default function BusinessesManagement() {
 
   const handleDeleteBusiness = async (business: BusinessData) => {
     // Confirm deletion
-    const confirmMessage = `Are you sure you want to delete business "${business.businessName}"?\n\nThis will:\n- Delete the business account from Firebase\n- Delete all business data, transactions, etc.\n\nThis action CANNOT be undone!`;
+    const confirmMessage = `Are you sure you want to delete business "${business.businessName}"?\n\nThis will:\n- Delete the business account from Firebase\n- Delete all business data, transactions, etc.\n- Delete any business claims (allowing the place to be claimed again)\n\nThis action CANNOT be undone!`;
 
     let confirmed = false;
 
@@ -691,6 +691,21 @@ export default function BusinessesManagement() {
         console.log('[Admin Businesses] ✅ Deleted', transactionsSnapshot.docs.length, 'transactions');
       } catch (txError) {
         console.error('[Admin Businesses] Error deleting transactions:', txError);
+      }
+
+      // Delete business claims for this user (so the place can be claimed again)
+      try {
+        const claimsRef = collection(db, 'businessClaims');
+        const claimsQuery = query(claimsRef, where('userId', '==', business.userId));
+        const claimsSnapshot = await getDocs(claimsQuery);
+
+        const deleteClaimPromises = claimsSnapshot.docs.map(claimDoc =>
+          deleteDoc(doc(db, 'businessClaims', claimDoc.id))
+        );
+        await Promise.all(deleteClaimPromises);
+        console.log('[Admin Businesses] ✅ Deleted', claimsSnapshot.docs.length, 'business claims');
+      } catch (claimError) {
+        console.error('[Admin Businesses] Error deleting business claims:', claimError);
       }
 
       // Reload businesses list
@@ -800,7 +815,6 @@ export default function BusinessesManagement() {
       const newBusinessData = {
         email: createEmail.trim(),
         accountType: 'business',
-        isPublicProfile: true,
         businessInfo: businessInfo,
         causes: [],
         searchHistory: [],

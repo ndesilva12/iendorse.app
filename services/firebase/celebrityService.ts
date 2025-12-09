@@ -142,9 +142,6 @@ export async function createCelebrityAccount(data: CelebrityAccountData): Promis
       accountType: 'individual',
       causes: [],
       searchHistory: [],
-      isPublicProfile: true,
-      alignedListPublic: true,
-      unalignedListPublic: true,
       hasSeenIntro: true,
       isCelebrityAccount: true, // Mark as celebrity account (grey badge)
       userDetails: userDetails as any,
@@ -807,8 +804,7 @@ export async function getClaimInfo(claimToken: string): Promise<{
 }
 
 /**
- * Normalize all celebrity accounts to ensure they have the same fields as regular accounts
- * This fixes any celebrity accounts that might be missing isPublicProfile or accountType
+ * Normalize all celebrity accounts to ensure they have accountType set
  * After running this, celebrity accounts will be found by the same queries as regular accounts
  */
 export async function normalizeCelebrityAccounts(): Promise<{
@@ -841,12 +837,8 @@ export async function normalizeCelebrityAccounts(): Promise<{
       const userId = userDoc.id;
       const userData = userDoc.data();
 
-      // Check if account needs normalization
-      const needsUpdate =
-        userData.isPublicProfile !== true ||
-        userData.accountType !== 'individual' ||
-        userData.alignedListPublic !== true ||
-        userData.unalignedListPublic !== true;
+      // Check if account needs normalization (ensure accountType is set)
+      const needsUpdate = userData.accountType !== 'individual';
 
       if (!needsUpdate) {
         results.alreadyNormalized++;
@@ -862,10 +854,7 @@ export async function normalizeCelebrityAccounts(): Promise<{
       try {
         const userRef = doc(db, 'users', userId);
         await setDoc(userRef, {
-          isPublicProfile: true,
           accountType: 'individual',
-          alignedListPublic: true,
-          unalignedListPublic: true,
         }, { merge: true });
 
         results.updated++;

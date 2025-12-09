@@ -27,7 +27,6 @@ import { getUserLists, deleteList, removeEntryFromList, addEntryToList, updateEn
 import { UserList, ListEntry } from '@/types/library';
 import { getFollowing, getFollowers, followEntity, unfollowEntity, Follow, FollowableType } from '@/services/firebase/followService';
 import { getCumulativeDays, updateEndorsementMetrics, handleBackdateEntry, migrateEndorsementHistory } from '@/services/firebase/endorsementHistoryService';
-import { makeAllProfilesPublic } from '@/services/firebase/userService';
 import { Picker } from '@react-native-picker/picker';
 import { pickAndUploadImage } from '@/lib/imageUpload';
 import { trpc } from '@/lib/trpc';
@@ -1373,7 +1372,6 @@ export default function UsersManagement() {
       const newUserData: Record<string, any> = {
         email: createEmail.trim(),
         accountType: 'individual',
-        isPublicProfile: true,
         causes: parsedCauses,
         searchHistory: [],
         createdAt: new Date().toISOString(),
@@ -1489,45 +1487,6 @@ export default function UsersManagement() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.bulkButton} onPress={() => setShowBulkModal(true)}>
           <Text style={styles.bulkButtonText}>Bulk Create</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.bulkButton, { backgroundColor: '#28a745' }]}
-          onPress={async () => {
-            // Use window.confirm on web, Alert on native
-            const confirmed = Platform.OS === 'web'
-              ? window.confirm('This will update all user profiles to be public so they appear in the Top Users section. Continue?')
-              : await new Promise<boolean>((resolve) => {
-                  Alert.alert(
-                    'Make All Profiles Public',
-                    'This will update all user profiles to be public so they appear in the Top Users section. Continue?',
-                    [
-                      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                      { text: 'Continue', onPress: () => resolve(true) },
-                    ]
-                  );
-                });
-
-            if (!confirmed) return;
-
-            try {
-              const result = await makeAllProfilesPublic();
-              const message = `Total users: ${result.totalUsers}\nUpdated to public: ${result.updatedUsers}\nAlready public: ${result.alreadyPublic}`;
-              if (Platform.OS === 'web') {
-                window.alert('Migration Complete!\n\n' + message);
-              } else {
-                Alert.alert('Migration Complete', message);
-              }
-            } catch (error) {
-              const errorMsg = 'Failed to make profiles public: ' + (error as Error).message;
-              if (Platform.OS === 'web') {
-                window.alert('Error: ' + errorMsg);
-              } else {
-                Alert.alert('Error', errorMsg);
-              }
-            }
-          }}
-        >
-          <Text style={styles.bulkButtonText}>Make All Public</Text>
         </TouchableOpacity>
       </View>
 

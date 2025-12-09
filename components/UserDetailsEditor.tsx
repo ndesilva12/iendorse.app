@@ -57,7 +57,6 @@ export default function UserDetailsEditor() {
   const [coverImage, setCoverImage] = useState(userDetails.coverImage || '');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingCoverImage, setUploadingCoverImage] = useState(false);
-  const [isPublicProfile, setIsPublicProfile] = useState(profile.isPublicProfile || false);
 
   const handleLocationSelect = (locationName: string, lat: number, lon: number) => {
     setLocation(locationName);
@@ -156,16 +155,6 @@ export default function UserDetailsEditor() {
 
     await setUserDetails(updateInfo);
 
-    // Update profile privacy setting
-    try {
-      const userRef = doc(db, 'users', clerkUser.id);
-      await updateDoc(userRef, {
-        isPublicProfile,
-      });
-    } catch (error) {
-      console.error('[UserDetailsEditor] Error updating profile privacy:', error);
-    }
-
     setEditing(false);
     Alert.alert('Success', 'User details updated');
   };
@@ -184,7 +173,6 @@ export default function UserDetailsEditor() {
     setLinkedin(userDetails.socialMedia?.linkedin || '');
     setProfileImage(userDetails.profileImage || '');
     setCoverImage(userDetails.coverImage || '');
-    setIsPublicProfile(profile.isPublicProfile || false);
     setEditing(false);
   };
 
@@ -508,35 +496,6 @@ export default function UserDetailsEditor() {
                   <Text style={[styles.value, { color: colors.textSecondary }]}>Not set</Text>
                 )}
               </View>
-            </View>
-          </View>
-
-          {/* Profile Privacy Toggle */}
-          <View style={styles.privacySection}>
-            <View style={styles.privacyHeader}>
-              <View style={styles.privacyIconRow}>
-                {isPublicProfile ? (
-                  <Eye size={16} color={colors.primary} strokeWidth={2} />
-                ) : (
-                  <EyeOff size={16} color={colors.textSecondary} strokeWidth={2} />
-                )}
-                <View style={styles.privacyTextContainer}>
-                  <Text style={[styles.privacyTitle, { color: colors.text }]}>Public Profile</Text>
-                  <Text style={[styles.privacyDescription, { color: colors.textSecondary }]}>
-                    {isPublicProfile
-                      ? 'Your profile and public lists are visible to others'
-                      : 'Your profile is private and only visible to you'}
-                  </Text>
-                </View>
-              </View>
-              {editing && (
-                <Switch
-                  value={isPublicProfile}
-                  onValueChange={setIsPublicProfile}
-                  trackColor={{ false: colors.border, true: colors.primaryLight }}
-                  thumbColor={isPublicProfile ? colors.primary : colors.textSecondary}
-                />
-              )}
             </View>
           </View>
         </View>

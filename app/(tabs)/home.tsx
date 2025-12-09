@@ -184,8 +184,6 @@ export default function HomeScreen() {
   const [renameListName, setRenameListName] = useState('');
   const [renameListDescription, setRenameListDescription] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
-  const [alignedListPublic, setAlignedListPublic] = useState(false);
-  const [unalignedListPublic, setUnalignedListPublic] = useState(false);
   const [activeListOptionsId, setActiveListOptionsId] = useState<string | null>(null); // Track which list's options menu is open
   const [isLibraryEditMode, setIsLibraryEditMode] = useState(false);
   const [activeOptionsMenu, setActiveOptionsMenu] = useState<string | null>(null);
@@ -605,14 +603,6 @@ export default function HomeScreen() {
       }
     }
   }, [params.fromMap]);
-
-  // Load system list privacy settings from profile
-  useEffect(() => {
-    if (profile) {
-      setAlignedListPublic(profile.alignedListPublic || false);
-      setUnalignedListPublic(profile.unalignedListPublic || false);
-    }
-  }, [profile]);
 
   const loadUserLists = useCallback(async () => {
     if (!clerkUser?.id) return;
@@ -1136,29 +1126,11 @@ export default function HomeScreen() {
   const localDistanceOptions: LocalDistanceOption[] = [100, 50, 10, 5, 1];
 
   // Helper function to toggle list expansion
-  // Toggle privacy for a list (system or custom)
+  // Toggle privacy for a custom list
+  // Note: All profiles and lists are public by default
   const toggleListPrivacy = async (listId: string) => {
     try {
       if (!clerkUser?.id) return;
-
-      // Handle system lists (Aligned, Unaligned)
-      if (listId === 'aligned') {
-        const newValue = !alignedListPublic;
-        setAlignedListPublic(newValue);
-        // Save to Firestore user profile
-        const userRef = doc(db, 'users', clerkUser.id);
-        await updateDoc(userRef, { alignedListPublic: newValue });
-        return;
-      }
-
-      if (listId === 'unaligned') {
-        const newValue = !unalignedListPublic;
-        setUnalignedListPublic(newValue);
-        // Save to Firestore user profile
-        const userRef = doc(db, 'users', clerkUser.id);
-        await updateDoc(userRef, { unalignedListPublic: newValue });
-        return;
-      }
 
       // Handle custom lists (including endorsement)
       const list = userLists.find(l => l.id === listId);

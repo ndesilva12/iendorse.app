@@ -534,7 +534,6 @@ export const convertClaimToBusinessAccount = async (
         },
         email: claim.userEmail,
         fullName: claim.userName,
-        isPublicProfile: true,
         createdAt: Timestamp.now(),
       };
       console.log('[BusinessClaimService] New user document:', JSON.stringify(newUserDoc, null, 2));

@@ -45,9 +45,6 @@ function cleanUserProfile(profile: UserProfile): Partial<UserProfile> {
     ...(profile.codeSharing !== undefined && { codeSharing: profile.codeSharing }),
     ...(profile.consentGivenAt !== undefined && { consentGivenAt: profile.consentGivenAt }),
     ...(profile.consentVersion !== undefined && { consentVersion: profile.consentVersion }),
-    ...(profile.isPublicProfile !== undefined && { isPublicProfile: profile.isPublicProfile }),
-    ...(profile.alignedListPublic !== undefined && { alignedListPublic: profile.alignedListPublic }),
-    ...(profile.unalignedListPublic !== undefined && { unalignedListPublic: profile.unalignedListPublic }),
     ...(profile.isVerified !== undefined && { isVerified: profile.isVerified }),
     ...(profile.isCelebrityAccount !== undefined && { isCelebrityAccount: profile.isCelebrityAccount }),
   });
@@ -284,9 +281,7 @@ export async function createUser(
       searchHistory: [],
       donationAmount: 0,
       selectedCharities: [],
-      isPublicProfile: true, // Default to public profile
-      alignedListPublic: true, // Default aligned list to public
-      unalignedListPublic: true, // Default unaligned list to public
+      accountType: 'individual', // Default account type
     };
 
     const profile = { ...defaultProfile, ...initialProfile };
@@ -414,27 +409,24 @@ export async function aggregateBusinessTransactions(businessId: string): Promise
 }
 
 /**
- * Get all public user profiles, sorted by follower count (highest first)
- * Celebrity/prominent accounts are just regular individual accounts with isCelebrityAccount=true flag
- * They should have the same fields (isPublicProfile, accountType) as regular accounts
- * @returns Array of public user profiles with their IDs, sorted by follower count
+ * Get all individual user profiles, sorted by follower count (highest first)
+ * All profiles are public by default.
+ * @returns Array of user profiles with their IDs, sorted by follower count
  */
-export async function getAllPublicUsers(limitCount?: number): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number; followerCount?: number }>> {
+export async function getAllUsers(limitCount?: number): Promise<Array<{ id: string; profile: UserProfile; endorsementCount?: number; followerCount?: number }>> {
   try {
-    console.log('[Firebase] Fetching all public individual users');
+    console.log('[Firebase] Fetching all individual users');
 
     const usersRef = collection(db, 'users');
 
-    // Single query for all public individual accounts (includes celebrities)
-    // Celebrity accounts are just individual accounts with isCelebrityAccount=true flag
-    const publicUsersQuery = query(
+    // Query for all individual accounts (includes celebrities)
+    const usersQuery = query(
       usersRef,
-      where('isPublicProfile', '==', true),
       where('accountType', '==', 'individual')
     );
 
-    const querySnapshot = await getDocs(publicUsersQuery);
-    console.log(`[Firebase] Found ${querySnapshot.size} public users`);
+    const querySnapshot = await getDocs(usersQuery);
+    console.log(`[Firebase] Found ${querySnapshot.size} users`);
 
     const queryDocs = querySnapshot.docs;
 
@@ -501,9 +493,6 @@ export async function getAllPublicUsers(limitCount?: number): Promise<Array<{ id
         codeSharing: data.codeSharing ?? true,
         consentGivenAt: data.consentGivenAt,
         consentVersion: data.consentVersion,
-        isPublicProfile: data.isPublicProfile,
-        alignedListPublic: data.alignedListPublic,
-        unalignedListPublic: data.unalignedListPublic,
         isVerified: data.isVerified,
         isCelebrityAccount: data.isCelebrityAccount,
       };
@@ -519,76 +508,15 @@ export async function getAllPublicUsers(limitCount?: number): Promise<Array<{ id
       return b.endorsementCount - a.endorsementCount;
     });
 
-    console.log('[Firebase] ✅ Fetched and sorted', usersWithCounts.length, 'public users by follower count');
+    console.log('[Firebase] ✅ Fetched and sorted', usersWithCounts.length, 'users by follower count');
     return usersWithCounts;
   } catch (error) {
-    console.error('[Firebase] ❌ Error fetching public users:', error);
+    console.error('[Firebase] ❌ Error fetching users:', error);
     throw error;
   }
 }
 
 /**
- * Make all user profiles public
- * This is an admin function to migrate existing users who don't have isPublicProfile set
- * Also ensures accountType is set to 'individual' for users without a business account
- * @returns Object with counts of updated and already public users
+ * @deprecated All profiles are now public by default. This function is kept for backwards compatibility.
  */
-export async function makeAllProfilesPublic(): Promise<{
-  totalUsers: number;
-  updatedUsers: number;
-  alreadyPublic: number;
-}> {
-  try {
-    console.log('[Firebase] Starting profile visibility migration...');
-
-    const usersRef = collection(db, 'users');
-    const usersSnapshot = await getDocs(usersRef);
-
-    let totalUsers = 0;
-    let updatedUsers = 0;
-    let alreadyPublic = 0;
-
-    for (const userDoc of usersSnapshot.docs) {
-      totalUsers++;
-      const userId = userDoc.id;
-      const userData = userDoc.data();
-
-      // Check current visibility status
-      const currentlyPublic = userData.isPublicProfile === true;
-      const hasAccountType = userData.accountType === 'individual' || userData.accountType === 'business';
-
-      if (currentlyPublic && hasAccountType) {
-        alreadyPublic++;
-        continue;
-      }
-
-      // Update user to be public and ensure accountType is set
-      const userRef = doc(db, 'users', userId);
-      const updates: Record<string, any> = {};
-
-      if (!currentlyPublic) {
-        updates.isPublicProfile = true;
-      }
-
-      // Set accountType to 'individual' if not already set (and not a business)
-      if (!hasAccountType) {
-        updates.accountType = 'individual';
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await updateDoc(userRef, updates);
-        updatedUsers++;
-        const userName = userData.userDetails?.name || userData.fullName || userData.email || 'Unknown';
-        console.log(`[Firebase] Updated user ${userId} (${userName}):`, updates);
-      }
-    }
-
-    console.log('[Firebase] ✅ Migration complete!');
-    console.log(`[Firebase] Total: ${totalUsers}, Updated: ${updatedUsers}, Already public: ${alreadyPublic}`);
-
-    return { totalUsers, updatedUsers, alreadyPublic };
-  } catch (error) {
-    console.error('[Firebase] ❌ Error making profiles public:', error);
-    throw error;
-  }
-}
+export const getAllPublicUsers = getAllUsers;

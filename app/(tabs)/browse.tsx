@@ -33,7 +33,7 @@ import ItemOptionsModal from '@/components/ItemOptionsModal';
 import { useReferralCode } from '@/hooks/useReferralCode';
 import { appendReferralTracking } from '@/services/firebase/referralService';
 import { searchPlaces, PlaceSearchResult, formatCategory } from '@/services/firebase/placesService';
-import { getAllPublicUsers } from '@/services/firebase/userService';
+import { getAllUsers } from '@/services/firebase/userService';
 import { searchProducts } from '@/mocks/products';
 
 // ===== Types =====
@@ -151,7 +151,7 @@ export default function BrowseScreen() {
   const [loadingTopBrands, setLoadingTopBrands] = useState(true);
 
   // Users section state
-  const [publicUsers, setPublicUsers] = useState<{ id: string; profile: UserProfile }[]>([]);
+  const [allUsers, setAllUsers] = useState<{ id: string; profile: UserProfile }[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [usersDisplayCount, setUsersDisplayCount] = useState(10);
 
@@ -228,8 +228,8 @@ export default function BrowseScreen() {
     const fetchPublicUsers = async () => {
       setLoadingUsers(true);
       try {
-        const users = await getAllPublicUsers(50);
-        setPublicUsers(users);
+        const users = await getAllUsers(50);
+        setAllUsers(users);
       } catch (error) {
         console.error('[Browse] Error fetching public users:', error);
       } finally {
@@ -248,13 +248,12 @@ export default function BrowseScreen() {
       try {
         const following = await getFollowing(clerkUser.id);
         const items: FollowingItem[] = [];
-        const staleFollows: Array<{ id: string; type: 'user' | 'brand' | 'business' }> = [];
 
         for (const item of following) {
           // Use followedType and followedId (not entityType/entityId)
           if (item.followedType === 'user') {
-            // Find user in publicUsers
-            const user = publicUsers.find(u => u.id === item.followedId);
+            // Find user in allUsers
+            const user = allUsers.find(u => u.id === item.followedId);
             if (user) {
               items.push({
                 id: item.followedId,
@@ -264,10 +263,9 @@ export default function BrowseScreen() {
                 profileImage: user.profile.userDetails?.profileImage,
                 location: user.profile.userDetails?.location,
               });
-            } else {
-              // User not found - mark for cleanup
-              staleFollows.push({ id: item.followedId, type: 'user' });
             }
+            // Note: Don't auto-cleanup follows for users not in allUsers
+            // They might exist but just have missing accountType field
           } else if (item.followedType === 'business') {
             const business = userBusinesses.find(b => b.id === item.followedId);
             if (business) {
@@ -280,10 +278,9 @@ export default function BrowseScreen() {
                 location: business.businessInfo.location,
                 category: business.businessInfo.category,
               });
-            } else {
-              // Business not found - mark for cleanup
-              staleFollows.push({ id: item.followedId, type: 'business' });
             }
+            // Note: Don't auto-cleanup follows for businesses not found
+            // They might exist but just not be loaded yet
           } else if (item.followedType === 'brand') {
             const brand = brands?.find(b => b.id === item.followedId);
             if (brand) {
@@ -296,26 +293,12 @@ export default function BrowseScreen() {
                 category: brand.category,
                 website: brand.website,
               });
-            } else {
-              // Brand not found - mark for cleanup
-              staleFollows.push({ id: item.followedId, type: 'brand' });
             }
+            // Note: Don't auto-cleanup follows for brands not found
           }
         }
 
         setFollowingItems(items);
-
-        // Clean up stale follow records in background (entities that no longer exist)
-        if (staleFollows.length > 0) {
-          console.log('[Browse] Cleaning up', staleFollows.length, 'stale follow records');
-          for (const stale of staleFollows) {
-            try {
-              await unfollowEntity(clerkUser.id, stale.id, stale.type);
-            } catch (err) {
-              console.error('[Browse] Error cleaning up stale follow:', err);
-            }
-          }
-        }
       } catch (error) {
         console.error('[Browse] Error fetching following:', error);
       } finally {
@@ -324,7 +307,7 @@ export default function BrowseScreen() {
     };
 
     fetchFollowingItems();
-  }, [clerkUser?.id, selectedSection, publicUsers, userBusinesses, brands]);
+  }, [clerkUser?.id, selectedSection, allUsers, userBusinesses, brands]);
 
   // Handle search - matching explore tab functionality exactly
   const handleSearch = useCallback((text: string) => {
@@ -369,7 +352,7 @@ export default function BrowseScreen() {
           } as Product & { firebaseId: string; isFirebaseBusiness: boolean }));
 
         // Search users
-        const userResults = publicUsers
+        const userResults = allUsers
           .filter(user => {
             const searchLower = text.toLowerCase();
             const userName = user.profile.userDetails?.name || '';
@@ -460,7 +443,7 @@ export default function BrowseScreen() {
       setSearchResults([]);
       setPlacesResults([]);
     }
-  }, [publicUsers, userBusinesses, brands]);
+  }, [allUsers, userBusinesses, brands]);
 
   // Request location permission
   const requestLocation = async () => {
@@ -1251,7 +1234,7 @@ export default function BrowseScreen() {
       );
     }
 
-    if (publicUsers.length === 0) {
+    if (allUsers.length === 0) {
       return (
         <View style={styles.emptySection}>
           <Users size={48} color={colors.textSecondary} strokeWidth={1.5} />
@@ -1265,7 +1248,7 @@ export default function BrowseScreen() {
 
     return (
       <View style={styles.usersList}>
-        {publicUsers.slice(0, usersDisplayCount).map((user) => (
+        {allUsers.slice(0, usersDisplayCount).map((user) => (
           <TouchableOpacity
             key={user.id}
             style={styles.userCard}
@@ -1306,14 +1289,14 @@ export default function BrowseScreen() {
           </TouchableOpacity>
         ))}
 
-        {publicUsers.length > usersDisplayCount && (
+        {allUsers.length > usersDisplayCount && (
           <TouchableOpacity
             style={[styles.loadMoreButton, { borderColor: colors.border }]}
             onPress={() => setUsersDisplayCount(usersDisplayCount + 10)}
             activeOpacity={0.7}
           >
             <Text style={[styles.loadMoreText, { color: colors.primary }]}>
-              Show More ({publicUsers.length - usersDisplayCount} remaining)
+              Show More ({allUsers.length - usersDisplayCount} remaining)
             </Text>
           </TouchableOpacity>
         )}

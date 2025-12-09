@@ -89,14 +89,6 @@ export default function UserProfileScreen() {
       }
 
       const profileData = userDoc.data() as UserProfile;
-
-      // Check if profile is public
-      if (!profileData.isPublicProfile && userId !== clerkUser?.id) {
-        setError('This profile is private');
-        setIsLoading(false);
-        return;
-      }
-
       setUserProfile(profileData);
 
       // Get user's public lists (or all lists if viewing own profile)
