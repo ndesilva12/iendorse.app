@@ -422,9 +422,29 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
     // Fetch all users - we filter client-side to include users without accountType field
     // (they should be treated as individuals) and exclude business accounts
     const querySnapshot = await getDocs(usersRef);
-    console.log(`[Firebase] Found ${querySnapshot.size} users`);
+    console.log(`[Firebase] Found ${querySnapshot.size} total documents in users collection`);
 
     const queryDocs = querySnapshot.docs;
+
+    // Also get all userLists to find users who might have endorsement lists
+    // but missing user documents (or incomplete user data)
+    const userListsRef = collection(db, 'userLists');
+    const userListsQuery = query(userListsRef, where('isEndorsed', '==', true));
+    const userListsSnapshot = await getDocs(userListsQuery);
+
+    // Build a map of userId -> endorsement data from userLists
+    const userListsMap = new Map<string, { endorsementCount: number; listData: any }>();
+    userListsSnapshot.forEach((doc) => {
+      const listData = doc.data();
+      const userId = listData.userId;
+      if (userId) {
+        userListsMap.set(userId, {
+          endorsementCount: listData.entries?.length || 0,
+          listData: listData,
+        });
+      }
+    });
+    console.log(`[Firebase] Found ${userListsMap.size} users with endorsement lists`);
 
     // First, get all follow records in one query for efficiency
     const followsRef = collection(db, 'follows');
@@ -438,7 +458,10 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
       followerCountMap.set(followedId, (followerCountMap.get(followedId) || 0) + 1);
     });
 
-    // First pass: build users with follower counts (no endorsement query yet)
+    // Build map of users from users collection
+    const usersDataMap = new Map<string, any>();
+
+    // First pass: build users with follower counts from users collection
     // Filter client-side: include users without accountType or with accountType === 'individual'
     // Exclude business accounts (accountType === 'business')
     const usersWithFollowers: Array<{ id: string; data: any; followerCount: number }> = [];
@@ -447,8 +470,12 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
       const data = userDoc.data();
       const userId = userDoc.id;
 
+      // Store in map for later lookup
+      usersDataMap.set(userId, data);
+
       // Skip business accounts - include all others (individual or undefined accountType)
       if (data.accountType === 'business') {
+        console.log(`[Firebase] Skipping business account: ${userId}`);
         continue;
       }
 
@@ -456,7 +483,60 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
       usersWithFollowers.push({ id: userId, data, followerCount });
     }
 
-    console.log(`[Firebase] After filtering: ${usersWithFollowers.length} individual users`);
+    console.log(`[Firebase] After filtering business accounts: ${usersWithFollowers.length} individual users from users collection`);
+
+    // Add users who have endorsement lists but might be missing from users collection
+    // or were filtered out for some reason
+    const existingUserIds = new Set(usersWithFollowers.map(u => u.id));
+    let addedFromUserLists = 0;
+
+    for (const [userId, listInfo] of userListsMap) {
+      if (!existingUserIds.has(userId)) {
+        // Check if this user exists in users collection but was filtered out
+        let existingData = usersDataMap.get(userId);
+
+        if (existingData && existingData.accountType === 'business') {
+          // It's a business account, skip it
+          continue;
+        }
+
+        // If no data found in batch query, try fetching individual document
+        if (!existingData) {
+          try {
+            const userDocRef = doc(db, 'users', userId);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+              existingData = userDocSnap.data();
+              console.log(`[Firebase] Found user document for ${userId} via individual fetch`);
+
+              // Check again if it's a business account
+              if (existingData.accountType === 'business') {
+                continue;
+              }
+            }
+          } catch (e) {
+            console.warn(`[Firebase] Could not fetch individual user doc for ${userId}:`, e);
+          }
+        }
+
+        // User has endorsement list but no user document (or wasn't included)
+        // Create a basic entry for them
+        const followerCount = followerCountMap.get(userId) || 0;
+        usersWithFollowers.push({
+          id: userId,
+          data: existingData || {}, // Use existing data if available, else empty
+          followerCount,
+        });
+        addedFromUserLists++;
+        console.log(`[Firebase] Added user ${userId} from userLists (has ${listInfo.endorsementCount} endorsements)`);
+      }
+    }
+
+    if (addedFromUserLists > 0) {
+      console.log(`[Firebase] Added ${addedFromUserLists} users from userLists who were missing from initial query`);
+    }
+
+    console.log(`[Firebase] Total users to process: ${usersWithFollowers.length}`);
 
     // Sort by follower count first
     usersWithFollowers.sort((a, b) => b.followerCount - a.followerCount);
@@ -468,22 +548,26 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
 
     // Fetch endorsement counts only for users we'll return
     for (const { id: userId, data, followerCount } of usersToProcess) {
-      // Get endorsement list count for this user (all lists now in userLists)
+      // Get endorsement count from our pre-fetched map, or query if not found
       let endorsementCount = 0;
-      try {
-        const userListsRef = collection(db, 'userLists');
-        const userListQuery = query(
-          userListsRef,
-          where('userId', '==', userId),
-          where('isEndorsed', '==', true)
-        );
-        const userListSnapshot = await getDocs(userListQuery);
-        if (!userListSnapshot.empty) {
-          const listData = userListSnapshot.docs[0].data();
-          endorsementCount = listData.entries?.length || 0;
+      const cachedListInfo = userListsMap.get(userId);
+      if (cachedListInfo) {
+        endorsementCount = cachedListInfo.endorsementCount;
+      } else {
+        try {
+          const userListQuery = query(
+            userListsRef,
+            where('userId', '==', userId),
+            where('isEndorsed', '==', true)
+          );
+          const userListSnapshot = await getDocs(userListQuery);
+          if (!userListSnapshot.empty) {
+            const listData = userListSnapshot.docs[0].data();
+            endorsementCount = listData.entries?.length || 0;
+          }
+        } catch (e) {
+          console.warn('[Firebase] Could not fetch endorsement count for user', userId);
         }
-      } catch (e) {
-        console.warn('[Firebase] Could not fetch endorsement count for user', userId);
       }
 
       // Build userDetails from existing userDetails or from root-level Clerk fields
