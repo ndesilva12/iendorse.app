@@ -419,13 +419,9 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
 
     const usersRef = collection(db, 'users');
 
-    // Query for all individual accounts (includes celebrities)
-    const usersQuery = query(
-      usersRef,
-      where('accountType', '==', 'individual')
-    );
-
-    const querySnapshot = await getDocs(usersQuery);
+    // Fetch all users - we filter client-side to include users without accountType field
+    // (they should be treated as individuals) and exclude business accounts
+    const querySnapshot = await getDocs(usersRef);
     console.log(`[Firebase] Found ${querySnapshot.size} users`);
 
     const queryDocs = querySnapshot.docs;
@@ -443,14 +439,24 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
     });
 
     // First pass: build users with follower counts (no endorsement query yet)
+    // Filter client-side: include users without accountType or with accountType === 'individual'
+    // Exclude business accounts (accountType === 'business')
     const usersWithFollowers: Array<{ id: string; data: any; followerCount: number }> = [];
 
     for (const userDoc of queryDocs) {
       const data = userDoc.data();
       const userId = userDoc.id;
+
+      // Skip business accounts - include all others (individual or undefined accountType)
+      if (data.accountType === 'business') {
+        continue;
+      }
+
       const followerCount = followerCountMap.get(userId) || 0;
       usersWithFollowers.push({ id: userId, data, followerCount });
     }
+
+    console.log(`[Firebase] After filtering: ${usersWithFollowers.length} individual users`);
 
     // Sort by follower count first
     usersWithFollowers.sort((a, b) => b.followerCount - a.followerCount);
