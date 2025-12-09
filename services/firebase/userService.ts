@@ -486,6 +486,27 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
         console.warn('[Firebase] Could not fetch endorsement count for user', userId);
       }
 
+      // Build userDetails from existing userDetails or from root-level Clerk fields
+      // Regular users have name stored at root level (fullName, name, firstName, lastName)
+      // Celebrity users have it in userDetails
+      let userDetails = data.userDetails;
+      if (!userDetails || !userDetails.name) {
+        // Build userDetails from root-level Clerk metadata fields
+        const rootName = data.fullName || data.name ||
+          (data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : data.firstName || '');
+
+        if (rootName || data.imageUrl || data.location) {
+          userDetails = {
+            ...userDetails, // Preserve any existing partial userDetails
+            name: userDetails?.name || rootName || undefined,
+            profileImage: userDetails?.profileImage || data.imageUrl || undefined,
+            location: userDetails?.location || (data.location?.city && data.location?.state
+              ? `${data.location.city}, ${data.location.state}`
+              : data.location?.city || undefined),
+          };
+        }
+      }
+
       const profile: UserProfile = {
         causes: data.causes || [],
         searchHistory: data.searchHistory || [],
@@ -495,7 +516,7 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
         selectedCharities: data.selectedCharities || [],
         accountType: data.accountType,
         businessInfo: data.businessInfo,
-        userDetails: data.userDetails,
+        userDetails: userDetails,
         codeSharing: data.codeSharing ?? true,
         consentGivenAt: data.consentGivenAt,
         consentVersion: data.consentVersion,
