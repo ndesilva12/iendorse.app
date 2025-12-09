@@ -229,6 +229,19 @@ export default function BrowseScreen() {
       setLoadingUsers(true);
       try {
         const users = await getAllUsers(50);
+        console.log('[Browse] Received', users.length, 'users from getAllUsers');
+
+        // Log users with and without names for debugging
+        const usersWithNames = users.filter(u => u.profile.userDetails?.name);
+        const usersWithoutNames = users.filter(u => !u.profile.userDetails?.name);
+        console.log('[Browse] Users with names:', usersWithNames.length);
+        console.log('[Browse] Users without names:', usersWithoutNames.length);
+
+        // Log first few users for debugging
+        users.slice(0, 5).forEach((u, i) => {
+          console.log(`[Browse] User ${i}: id=${u.id}, name=${u.profile.userDetails?.name || 'NONE'}`);
+        });
+
         setAllUsers(users);
       } catch (error) {
         console.error('[Browse] Error fetching public users:', error);
@@ -1234,7 +1247,10 @@ export default function BrowseScreen() {
       );
     }
 
-    if (allUsers.length === 0) {
+    // Filter to only show users with names (useful display info)
+    const usersWithNames = allUsers.filter(u => u.profile.userDetails?.name);
+
+    if (usersWithNames.length === 0) {
       return (
         <View style={styles.emptySection}>
           <Users size={48} color={colors.textSecondary} strokeWidth={1.5} />
@@ -1248,7 +1264,7 @@ export default function BrowseScreen() {
 
     return (
       <View style={styles.usersList}>
-        {allUsers.slice(0, usersDisplayCount).map((user) => (
+        {usersWithNames.slice(0, usersDisplayCount).map((user) => (
           <TouchableOpacity
             key={user.id}
             style={styles.userCard}
@@ -1289,14 +1305,14 @@ export default function BrowseScreen() {
           </TouchableOpacity>
         ))}
 
-        {allUsers.length > usersDisplayCount && (
+        {usersWithNames.length > usersDisplayCount && (
           <TouchableOpacity
             style={[styles.loadMoreButton, { borderColor: colors.border }]}
             onPress={() => setUsersDisplayCount(usersDisplayCount + 10)}
             activeOpacity={0.7}
           >
             <Text style={[styles.loadMoreText, { color: colors.primary }]}>
-              Show More ({allUsers.length - usersDisplayCount} remaining)
+              Show More ({usersWithNames.length - usersDisplayCount} remaining)
             </Text>
           </TouchableOpacity>
         )}
