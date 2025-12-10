@@ -365,7 +365,9 @@ export default function BrowseScreen() {
             isFirebaseBusiness: true,
           } as Product & { firebaseId: string; isFirebaseBusiness: boolean }));
 
-        // Search users
+        // Search users - log for debugging
+        console.log(`[Search] Searching ${allUsers.length} users for "${text}"`);
+
         const userResults = allUsers
           .filter(user => {
             const searchLower = text.toLowerCase();
@@ -373,11 +375,18 @@ export default function BrowseScreen() {
             const userLocation = user.profile.userDetails?.location || '';
             const userBio = user.profile.userDetails?.description || '';
 
-            return (
+            const matches = (
               userName.toLowerCase().includes(searchLower) ||
               userLocation.toLowerCase().includes(searchLower) ||
               userBio.toLowerCase().includes(searchLower)
             );
+
+            // Log matches for debugging
+            if (matches) {
+              console.log(`[Search] Found user match: ${userName || user.id}`);
+            }
+
+            return matches;
           })
           .map(user => ({
             id: `user-${user.id}`,
@@ -424,6 +433,7 @@ export default function BrowseScreen() {
           } as Product & { brandId: string; isFirebaseBrand: boolean }));
 
         // Combine product, business, brand, and user results
+        console.log(`[Search] Results: ${productResults?.length || 0} products, ${businessResults.length} businesses, ${brandResults.length} brands, ${userResults.length} users`);
         const combinedResults = [...(productResults || []), ...businessResults, ...brandResults, ...userResults];
         setSearchResults(combinedResults);
 
