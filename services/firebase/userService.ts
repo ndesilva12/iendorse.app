@@ -611,15 +611,26 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
       usersWithCounts.push({ id: userId, profile, endorsementCount, followerCount });
     }
 
-    // Sort by follower count (highest first), then by endorsement count as tiebreaker
+    // Sort by: 1) endorsement count (active users first), 2) follower count, 3) has a name
+    // This ensures active users with endorsements appear before inactive celebrity placeholders
     usersWithCounts.sort((a, b) => {
+      // First: users with endorsements come before those without
+      const aHasEndorsements = a.endorsementCount > 0 ? 1 : 0;
+      const bHasEndorsements = b.endorsementCount > 0 ? 1 : 0;
+      if (bHasEndorsements !== aHasEndorsements) {
+        return bHasEndorsements - aHasEndorsements;
+      }
+
+      // Second: sort by follower count
       if (b.followerCount !== a.followerCount) {
         return b.followerCount - a.followerCount;
       }
+
+      // Third: sort by endorsement count
       return b.endorsementCount - a.endorsementCount;
     });
 
-    console.log('[Firebase] ✅ Fetched and sorted', usersWithCounts.length, 'users by follower count');
+    console.log('[Firebase] ✅ Fetched and sorted', usersWithCounts.length, 'users (prioritizing active users)');
     return usersWithCounts;
   } catch (error) {
     console.error('[Firebase] ❌ Error fetching users:', error);

@@ -228,7 +228,8 @@ export default function BrowseScreen() {
     const fetchPublicUsers = async () => {
       setLoadingUsers(true);
       try {
-        const users = await getAllUsers(50);
+        // Fetch up to 200 users to include more regular users beyond just celebrities
+        const users = await getAllUsers(200);
         console.log('[Browse] Received', users.length, 'users from getAllUsers');
 
         // Log users with and without names for debugging
