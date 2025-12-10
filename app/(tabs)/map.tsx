@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { MapPin, Filter, X, Check, ChevronDown, ChevronUp, Heart, UserPlus, UserMinus } from 'lucide-react-native';
+import { MapPin, Filter, X, Check, ChevronDown, ChevronUp, Heart, UserPlus, UserMinus, Search } from 'lucide-react-native';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
@@ -36,6 +36,8 @@ import { getEndorsementList, removeEntryFromList, addEntryToList } from '@/servi
 import { followEntity, unfollowEntity, isFollowing as checkIsFollowing } from '@/services/firebase/followService';
 import { getLogoUrl } from '@/lib/logo';
 import { ListEntry, BrandListEntry, BusinessListEntry, PlaceListEntry } from '@/types/library';
+import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 
 
 // Map marker data interface
@@ -86,6 +88,7 @@ export default function MapScreen() {
   const { profile, isDarkMode, clerkUser } = useUser();
   const { brands } = useData();
   const library = useLibrary();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const { width, height } = useWindowDimensions();
 
@@ -496,7 +499,16 @@ export default function MapScreen() {
           style={styles.headerLogo}
           resizeMode="contain"
         />
-        <MenuButton />
+        <View style={styles.headerRightContainer}>
+          <TouchableOpacity
+            style={[styles.headerSearchButton, { backgroundColor: colors.backgroundSecondary }]}
+            onPress={toggleSearch}
+            activeOpacity={0.7}
+          >
+            <Search size={22} color={colors.textSecondary} strokeWidth={2} />
+          </TouchableOpacity>
+          <MenuButton />
+        </View>
       </View>
     </View>
   );
@@ -1043,15 +1055,23 @@ export default function MapScreen() {
       />
 
       {renderHeader()}
-      {renderFilters()}
 
-      <View style={[
-        styles.mapWrapper,
-        isTabletOrLarger && styles.mapWrapperDesktop
-      ]}>
-        {renderMap()}
-        {renderEmptyState()}
-      </View>
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <>
+          {renderFilters()}
+
+          <View style={[
+            styles.mapWrapper,
+            isTabletOrLarger && styles.mapWrapperDesktop
+          ]}>
+            {renderMap()}
+            {renderEmptyState()}
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -1076,6 +1096,18 @@ const styles = StyleSheet.create({
     height: 47,
     marginTop: 8,
     alignSelf: 'flex-start',
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerSearchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   filtersContainer: {
     borderBottomWidth: 1,

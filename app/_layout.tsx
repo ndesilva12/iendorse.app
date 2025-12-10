@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { LibraryProvider } from "@/contexts/LibraryContext";
+import { GlobalSearchProvider } from "@/contexts/GlobalSearchContext";
 import { trpc, trpcClient } from "@/lib/trpc";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
@@ -195,9 +196,11 @@ export default function RootLayout() {
               <QueryClientProvider client={queryClient}>
                 <UserProvider>
                   <DataProvider>
-                    <GestureHandlerRootView>
-                      <RootLayoutNav />
-                    </GestureHandlerRootView>
+                    <GlobalSearchProvider>
+                      <GestureHandlerRootView>
+                        <RootLayoutNav />
+                      </GestureHandlerRootView>
+                    </GlobalSearchProvider>
                   </DataProvider>
                 </UserProvider>
               </QueryClientProvider>

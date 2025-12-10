@@ -26,7 +26,9 @@ import { useUser } from '@/contexts/UserContext';
 import { useData } from '@/contexts/DataContext';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { User, Globe, MapPin, Facebook, Instagram, Twitter, Linkedin, ExternalLink, Camera, Eye, EyeOff, ChevronDown, ChevronRight, MoreVertical, Plus, Edit, Trash2, Lock, X } from 'lucide-react-native';
+import { User, Globe, MapPin, Facebook, Instagram, Twitter, Linkedin, ExternalLink, Camera, Eye, EyeOff, ChevronDown, ChevronRight, MoreVertical, Plus, Edit, Trash2, Lock, X, Search } from 'lucide-react-native';
+import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 import { pickAndUploadImage } from '@/lib/imageUpload';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -44,6 +46,7 @@ import { Gift, Copy, Share2 as ShareIcon } from 'lucide-react-native';
 export default function ProfileScreen() {
   const { profile, isDarkMode, clerkUser, setUserDetails } = useUser();
   const { brands, valuesMatrix } = useData();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const router = useRouter();
 
@@ -326,17 +329,31 @@ export default function ProfileScreen() {
               style={styles.headerLogo}
               resizeMode="contain"
             />
-            <MenuButton />
+            <View style={styles.headerRightContainer}>
+              <TouchableOpacity
+                style={[styles.headerSearchButton, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={toggleSearch}
+                activeOpacity={0.7}
+              >
+                <Search size={22} color={colors.textSecondary} strokeWidth={2} />
+              </TouchableOpacity>
+              <MenuButton />
+            </View>
           </View>
         </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={Platform.OS === 'web' ? [styles.content, styles.webContent] : styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          <BusinessProfileEditor />
-        </ScrollView>
+        {/* Show search content when search is active, otherwise show normal content */}
+        {isSearchActive ? (
+          <GlobalSearchOverlay />
+        ) : (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={Platform.OS === 'web' ? [styles.content, styles.webContent] : styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            <BusinessProfileEditor />
+          </ScrollView>
+        )}
       </View>
     );
   }
@@ -355,16 +372,29 @@ export default function ProfileScreen() {
             style={styles.headerLogo}
             resizeMode="contain"
           />
-          <MenuButton />
+          <View style={styles.headerRightContainer}>
+            <TouchableOpacity
+              style={[styles.headerSearchButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={toggleSearch}
+              activeOpacity={0.7}
+            >
+              <Search size={22} color={colors.textSecondary} strokeWidth={2} />
+            </TouchableOpacity>
+            <MenuButton />
+          </View>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={Platform.OS === 'web' ? [styles.content, styles.webContent] : styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile Header - Matches Brand/Business Details Structure */}
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={Platform.OS === 'web' ? [styles.content, styles.webContent] : styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Profile Header - Matches Brand/Business Details Structure */}
         <View style={[styles.profileHeaderSection, { backgroundColor: colors.backgroundSecondary }]}>
           <View style={styles.profileHeader}>
             {/* Profile Image */}
@@ -686,7 +716,8 @@ export default function ProfileScreen() {
             />
           )}
         </View>
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* Followers/Following Modal */}
       <Modal
@@ -834,6 +865,18 @@ const styles = StyleSheet.create({
     height: 47,
     marginTop: 8,
     alignSelf: 'flex-start',
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerSearchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Profile Header Section (Matches Brand/Business Details)

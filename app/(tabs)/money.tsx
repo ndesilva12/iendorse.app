@@ -20,7 +20,9 @@ import BusinessesAcceptingDiscounts from '@/components/BusinessesAcceptingDiscou
 import BusinessPayment from '@/components/BusinessPayment';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { ChevronDown, ChevronRight, Users, Receipt, TrendingUp, DollarSign, Percent, Link } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Users, Receipt, TrendingUp, DollarSign, Percent, Link, Search } from 'lucide-react-native';
+import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 import { aggregateBusinessTransactions } from '@/services/firebase/userService';
 import { PieChart } from 'react-native-chart-kit';
 import { Dimensions } from 'react-native';
@@ -28,6 +30,7 @@ import { Dimensions } from 'react-native';
 export default function DiscountScreen() {
   const router = useRouter();
   const { profile, isDarkMode, refreshTransactionTotals, clerkUser } = useUser();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const isBusiness = profile.accountType === 'business';
@@ -250,16 +253,29 @@ export default function DiscountScreen() {
             style={styles.headerLogo}
             resizeMode="contain"
           />
-          <MenuButton />
+          <View style={styles.headerRightContainer}>
+            <TouchableOpacity
+              style={[styles.headerSearchButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={toggleSearch}
+              activeOpacity={0.7}
+            >
+              <Search size={22} color={colors.textSecondary} strokeWidth={2} />
+            </TouchableOpacity>
+            <MenuButton />
+          </View>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingBottom: 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {isBusiness ? (
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.content, { paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {isBusiness ? (
           /* Business View */
           <>
             {/* Tab Headers */}
@@ -794,7 +810,8 @@ export default function DiscountScreen() {
           </>
         )}
 
-      </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -828,6 +845,18 @@ const styles = StyleSheet.create({
     height: 47,
     marginTop: 8,
     alignSelf: 'flex-start',
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerSearchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   // Tab Selector Styles
   tabSelector: {

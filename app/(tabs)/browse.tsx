@@ -35,6 +35,8 @@ import { appendReferralTracking } from '@/services/firebase/referralService';
 import { searchPlaces, PlaceSearchResult, formatCategory } from '@/services/firebase/placesService';
 import { getAllUsers } from '@/services/firebase/userService';
 import { searchProducts } from '@/mocks/products';
+import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 
 // ===== Types =====
 type BrowseSection = 'global' | 'local' | 'values' | 'users' | 'following' | 'search';
@@ -118,6 +120,7 @@ export default function BrowseScreen() {
   const { profile, isDarkMode, clerkUser } = useUser();
   const { brands, valuesMatrix, values: firebaseValues } = useData();
   const library = useLibrary();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const { referralCode } = useReferralCode();
 
@@ -228,7 +231,21 @@ export default function BrowseScreen() {
     const fetchPublicUsers = async () => {
       setLoadingUsers(true);
       try {
-        const users = await getAllUsers(50);
+        // Fetch ALL users with no limit - ensures everyone is searchable regardless of followers
+        const users = await getAllUsers();
+        console.log('[Browse] Received', users.length, 'users from getAllUsers (no limit)');
+
+        // Log users with and without names for debugging
+        const usersWithNames = users.filter(u => u.profile.userDetails?.name);
+        const usersWithoutNames = users.filter(u => !u.profile.userDetails?.name);
+        console.log('[Browse] Users with names:', usersWithNames.length);
+        console.log('[Browse] Users without names:', usersWithoutNames.length);
+
+        // Log first few users for debugging
+        users.slice(0, 5).forEach((u, i) => {
+          console.log(`[Browse] User ${i}: id=${u.id}, name=${u.profile.userDetails?.name || 'NONE'}`);
+        });
+
         setAllUsers(users);
       } catch (error) {
         console.error('[Browse] Error fetching public users:', error);
@@ -351,7 +368,9 @@ export default function BrowseScreen() {
             isFirebaseBusiness: true,
           } as Product & { firebaseId: string; isFirebaseBusiness: boolean }));
 
-        // Search users
+        // Search users - log for debugging
+        console.log(`[Search] Searching ${allUsers.length} users for "${text}"`);
+
         const userResults = allUsers
           .filter(user => {
             const searchLower = text.toLowerCase();
@@ -359,11 +378,18 @@ export default function BrowseScreen() {
             const userLocation = user.profile.userDetails?.location || '';
             const userBio = user.profile.userDetails?.description || '';
 
-            return (
+            const matches = (
               userName.toLowerCase().includes(searchLower) ||
               userLocation.toLowerCase().includes(searchLower) ||
               userBio.toLowerCase().includes(searchLower)
             );
+
+            // Log matches for debugging
+            if (matches) {
+              console.log(`[Search] Found user match: ${userName || user.id}`);
+            }
+
+            return matches;
           })
           .map(user => ({
             id: `user-${user.id}`,
@@ -410,7 +436,9 @@ export default function BrowseScreen() {
           } as Product & { brandId: string; isFirebaseBrand: boolean }));
 
         // Combine product, business, brand, and user results
-        const combinedResults = [...(productResults || []), ...businessResults, ...brandResults, ...userResults];
+        // Put users FIRST so they're visible at the top of search results
+        console.log(`[Search] Results: ${productResults?.length || 0} products, ${businessResults.length} businesses, ${brandResults.length} brands, ${userResults.length} users`);
+        const combinedResults = [...userResults, ...businessResults, ...(productResults || []), ...brandResults];
         setSearchResults(combinedResults);
 
         // Also search Google Places with debouncing
@@ -1234,7 +1262,10 @@ export default function BrowseScreen() {
       );
     }
 
-    if (allUsers.length === 0) {
+    // Filter to only show users with names (useful display info)
+    const usersWithNames = allUsers.filter(u => u.profile.userDetails?.name);
+
+    if (usersWithNames.length === 0) {
       return (
         <View style={styles.emptySection}>
           <Users size={48} color={colors.textSecondary} strokeWidth={1.5} />
@@ -1248,7 +1279,7 @@ export default function BrowseScreen() {
 
     return (
       <View style={styles.usersList}>
-        {allUsers.slice(0, usersDisplayCount).map((user) => (
+        {usersWithNames.slice(0, usersDisplayCount).map((user) => (
           <TouchableOpacity
             key={user.id}
             style={styles.userCard}
@@ -1289,14 +1320,14 @@ export default function BrowseScreen() {
           </TouchableOpacity>
         ))}
 
-        {allUsers.length > usersDisplayCount && (
+        {usersWithNames.length > usersDisplayCount && (
           <TouchableOpacity
             style={[styles.loadMoreButton, { borderColor: colors.border }]}
             onPress={() => setUsersDisplayCount(usersDisplayCount + 10)}
             activeOpacity={0.7}
           >
             <Text style={[styles.loadMoreText, { color: colors.primary }]}>
-              Show More ({allUsers.length - usersDisplayCount} remaining)
+              Show More ({usersWithNames.length - usersDisplayCount} remaining)
             </Text>
           </TouchableOpacity>
         )}
@@ -1588,31 +1619,36 @@ export default function BrowseScreen() {
           <View style={styles.headerRightContainer}>
             <TouchableOpacity
               style={[styles.headerSearchButton, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={() => setSelectedSection('search')}
+              onPress={toggleSearch}
               activeOpacity={0.7}
             >
-              <Search size={22} color={selectedSection === 'search' ? colors.primary : colors.textSecondary} strokeWidth={2} />
+              <Search size={22} color={colors.textSecondary} strokeWidth={2} />
             </TouchableOpacity>
             <MenuButton />
           </View>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingBottom: 100 }]}
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
-      >
-        {/* Section blocks */}
-        {renderSectionBlocks()}
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.content, { paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={[1]}
+        >
+          {/* Section blocks */}
+          {renderSectionBlocks()}
 
-        {/* Sticky section header */}
-        {renderSectionHeader()}
+          {/* Sticky section header */}
+          {renderSectionHeader()}
 
-        {/* Section content */}
-        {renderSectionContent()}
-      </ScrollView>
+          {/* Section content */}
+          {renderSectionContent()}
+        </ScrollView>
+      )}
 
       {/* Item Options Modal */}
       {selectedBrandForOptions && (
