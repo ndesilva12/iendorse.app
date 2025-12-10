@@ -228,9 +228,9 @@ export default function BrowseScreen() {
     const fetchPublicUsers = async () => {
       setLoadingUsers(true);
       try {
-        // Fetch up to 200 users to include more regular users beyond just celebrities
-        const users = await getAllUsers(200);
-        console.log('[Browse] Received', users.length, 'users from getAllUsers');
+        // Fetch ALL users with no limit - ensures everyone is searchable regardless of followers
+        const users = await getAllUsers();
+        console.log('[Browse] Received', users.length, 'users from getAllUsers (no limit)');
 
         // Log users with and without names for debugging
         const usersWithNames = users.filter(u => u.profile.userDetails?.name);
