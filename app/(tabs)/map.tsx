@@ -37,6 +37,7 @@ import { followEntity, unfollowEntity, isFollowing as checkIsFollowing } from '@
 import { getLogoUrl } from '@/lib/logo';
 import { ListEntry, BrandListEntry, BusinessListEntry, PlaceListEntry } from '@/types/library';
 import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 
 
 // Map marker data interface
@@ -87,7 +88,7 @@ export default function MapScreen() {
   const { profile, isDarkMode, clerkUser } = useUser();
   const { brands } = useData();
   const library = useLibrary();
-  const { toggleSearch } = useGlobalSearch();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const { width, height } = useWindowDimensions();
 
@@ -1054,15 +1055,23 @@ export default function MapScreen() {
       />
 
       {renderHeader()}
-      {renderFilters()}
 
-      <View style={[
-        styles.mapWrapper,
-        isTabletOrLarger && styles.mapWrapperDesktop
-      ]}>
-        {renderMap()}
-        {renderEmptyState()}
-      </View>
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <>
+          {renderFilters()}
+
+          <View style={[
+            styles.mapWrapper,
+            isTabletOrLarger && styles.mapWrapperDesktop
+          ]}>
+            {renderMap()}
+            {renderEmptyState()}
+          </View>
+        </>
+      )}
     </View>
   );
 }

@@ -22,6 +22,7 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 import { db } from '@/firebase';
 import { ChevronDown, ChevronRight, Users, Receipt, TrendingUp, DollarSign, Percent, Link, Search } from 'lucide-react-native';
 import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 import { aggregateBusinessTransactions } from '@/services/firebase/userService';
 import { PieChart } from 'react-native-chart-kit';
 import { Dimensions } from 'react-native';
@@ -29,7 +30,7 @@ import { Dimensions } from 'react-native';
 export default function DiscountScreen() {
   const router = useRouter();
   const { profile, isDarkMode, refreshTransactionTotals, clerkUser } = useUser();
-  const { toggleSearch } = useGlobalSearch();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const isBusiness = profile.accountType === 'business';
@@ -265,12 +266,16 @@ export default function DiscountScreen() {
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingBottom: 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {isBusiness ? (
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.content, { paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {isBusiness ? (
           /* Business View */
           <>
             {/* Tab Headers */}
@@ -805,7 +810,8 @@ export default function DiscountScreen() {
           </>
         )}
 
-      </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 }

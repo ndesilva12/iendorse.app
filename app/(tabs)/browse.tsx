@@ -36,6 +36,7 @@ import { searchPlaces, PlaceSearchResult, formatCategory } from '@/services/fire
 import { getAllUsers } from '@/services/firebase/userService';
 import { searchProducts } from '@/mocks/products';
 import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 
 // ===== Types =====
 type BrowseSection = 'global' | 'local' | 'values' | 'users' | 'following' | 'search';
@@ -119,7 +120,7 @@ export default function BrowseScreen() {
   const { profile, isDarkMode, clerkUser } = useUser();
   const { brands, valuesMatrix, values: firebaseValues } = useData();
   const library = useLibrary();
-  const { toggleSearch } = useGlobalSearch();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const { referralCode } = useReferralCode();
 
@@ -1628,21 +1629,26 @@ export default function BrowseScreen() {
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingBottom: 100 }]}
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
-      >
-        {/* Section blocks */}
-        {renderSectionBlocks()}
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.content, { paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={[1]}
+        >
+          {/* Section blocks */}
+          {renderSectionBlocks()}
 
-        {/* Sticky section header */}
-        {renderSectionHeader()}
+          {/* Sticky section header */}
+          {renderSectionHeader()}
 
-        {/* Section content */}
-        {renderSectionContent()}
-      </ScrollView>
+          {/* Section content */}
+          {renderSectionContent()}
+        </ScrollView>
+      )}
 
       {/* Item Options Modal */}
       {selectedBrandForOptions && (

@@ -109,6 +109,7 @@ import { db } from '@/firebase';
 import { UnifiedLibrary } from '@/components/Library';
 import { useLibrary } from '@/contexts/LibraryContext';
 import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 
 type MainView = 'forYou' | 'myLibrary' | 'local';
 type ForYouSubsection = 'userList' | 'aligned' | 'unaligned';
@@ -140,7 +141,7 @@ export default function HomeScreen() {
   const params = useLocalSearchParams();
   const { profile, isDarkMode, clerkUser, markIntroAsSeen, isLoading: isProfileLoading } = useUser();
   const library = useLibrary();
-  const { toggleSearch } = useGlobalSearch();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const insets = useSafeAreaInsets();
   const { referralCode } = useReferralCode();
@@ -2965,16 +2966,22 @@ export default function HomeScreen() {
           </View>
         </View>
       </View>
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollView}
-        contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webContent, { paddingBottom: 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {mainView === 'forYou' && renderForYouView()}
-        {mainView === 'myLibrary' && renderMyLibraryView()}
 
-      </ScrollView>
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webContent, { paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {mainView === 'forYou' && renderForYouView()}
+          {mainView === 'myLibrary' && renderMyLibraryView()}
+
+        </ScrollView>
+      )}
 
       {/* Invisible overlay to close dropdown when clicking outside */}
       {/* Library Card Options Modal */}

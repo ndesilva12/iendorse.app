@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,12 +16,14 @@ import { lightColors, darkColors } from '@/constants/colors';
 import { useUser } from '@/contexts/UserContext';
 import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
 import { formatCategory } from '@/services/firebase/placesService';
-import MenuButton from '@/components/MenuButton';
 
+// This component renders the search input and results as content (not an overlay)
+// It's meant to be rendered inside a tab's content area, replacing normal content when search is active
 export default function GlobalSearchOverlay() {
   const router = useRouter();
   const { isDarkMode } = useUser();
   const colors = isDarkMode ? darkColors : lightColors;
+  const inputRef = useRef<TextInput>(null);
   const {
     isSearchActive,
     searchQuery,
@@ -33,11 +35,21 @@ export default function GlobalSearchOverlay() {
     clearSearch,
   } = useGlobalSearch();
 
+  // Auto-focus the input when search becomes active
+  useEffect(() => {
+    if (isSearchActive && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [isSearchActive]);
+
   if (!isSearchActive) {
     return null;
   }
 
   const handleItemPress = (item: any) => {
+    clearSearch(); // Close search when navigating
     if (item.resultType === 'user') {
       router.push(`/user/${item.id}`);
     } else if (item.resultType === 'business') {
@@ -48,51 +60,43 @@ export default function GlobalSearchOverlay() {
   };
 
   const handlePlacePress = (placeId: string) => {
+    clearSearch(); // Close search when navigating
     router.push(`/place/${placeId}`);
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Search Header with input bar */}
-      <View style={[styles.searchHeader, { backgroundColor: colors.background, borderBottomColor: 'rgba(0, 0, 0, 0.05)' }]}>
-        <View style={styles.searchHeaderContent}>
-          <Image
-            source={require('@/assets/images/yendorse.png')}
-            style={styles.headerLogo}
-            resizeMode="contain"
+      {/* Search Input Bar */}
+      <View style={[styles.searchBarContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundSecondary }]}>
+          <Search size={20} color={colors.primary} strokeWidth={2} />
+          <TextInput
+            ref={inputRef}
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search users, brands, places..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={handleSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
-          <View style={styles.headerRightContainer}>
-            <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundSecondary }]}>
-              <Search size={20} color={colors.primary} strokeWidth={2} />
-              <TextInput
-                style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Search users, brands, places..."
-                placeholderTextColor={colors.textSecondary}
-                value={searchQuery}
-                onChangeText={handleSearch}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => handleSearch('')}
-                  style={styles.clearButton}
-                  activeOpacity={0.7}
-                >
-                  <X size={18} color={colors.textSecondary} strokeWidth={2} />
-                </TouchableOpacity>
-              )}
-            </View>
+          {searchQuery.length > 0 && (
             <TouchableOpacity
-              style={[styles.cancelButton]}
-              onPress={clearSearch}
+              onPress={() => handleSearch('')}
+              style={styles.clearButton}
               activeOpacity={0.7}
             >
-              <Text style={[styles.cancelText, { color: colors.primary }]}>Cancel</Text>
+              <X size={18} color={colors.textSecondary} strokeWidth={2} />
             </TouchableOpacity>
-          </View>
+          )}
         </View>
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={clearSearch}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.cancelText, { color: colors.primary }]}>Cancel</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Search Results Content */}
@@ -240,33 +244,14 @@ export default function GlobalSearchOverlay() {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
-  searchHeader: {
-    borderBottomWidth: 1,
-  },
-  searchHeaderContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'web' ? 8 : 56,
-    paddingBottom: 12,
-  },
-  headerLogo: {
-    width: 100,
-    height: 35,
-  },
-  headerRightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
-    marginLeft: 12,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
     gap: 8,
   },
   searchInputContainer: {

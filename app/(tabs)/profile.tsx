@@ -28,6 +28,7 @@ import { useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Globe, MapPin, Facebook, Instagram, Twitter, Linkedin, ExternalLink, Camera, Eye, EyeOff, ChevronDown, ChevronRight, MoreVertical, Plus, Edit, Trash2, Lock, X, Search } from 'lucide-react-native';
 import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
+import GlobalSearchOverlay from '@/components/GlobalSearchOverlay';
 import { pickAndUploadImage } from '@/lib/imageUpload';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -45,7 +46,7 @@ import { Gift, Copy, Share2 as ShareIcon } from 'lucide-react-native';
 export default function ProfileScreen() {
   const { profile, isDarkMode, clerkUser, setUserDetails } = useUser();
   const { brands, valuesMatrix } = useData();
-  const { toggleSearch } = useGlobalSearch();
+  const { toggleSearch, isSearchActive } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const router = useRouter();
 
@@ -341,13 +342,18 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={Platform.OS === 'web' ? [styles.content, styles.webContent] : styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          <BusinessProfileEditor />
-        </ScrollView>
+        {/* Show search content when search is active, otherwise show normal content */}
+        {isSearchActive ? (
+          <GlobalSearchOverlay />
+        ) : (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={Platform.OS === 'web' ? [styles.content, styles.webContent] : styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            <BusinessProfileEditor />
+          </ScrollView>
+        )}
       </View>
     );
   }
@@ -379,12 +385,16 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={Platform.OS === 'web' ? [styles.content, styles.webContent] : styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile Header - Matches Brand/Business Details Structure */}
+      {/* Show search content when search is active, otherwise show normal content */}
+      {isSearchActive ? (
+        <GlobalSearchOverlay />
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={Platform.OS === 'web' ? [styles.content, styles.webContent] : styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Profile Header - Matches Brand/Business Details Structure */}
         <View style={[styles.profileHeaderSection, { backgroundColor: colors.backgroundSecondary }]}>
           <View style={styles.profileHeader}>
             {/* Profile Image */}
@@ -706,7 +716,8 @@ export default function ProfileScreen() {
             />
           )}
         </View>
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* Followers/Following Modal */}
       <Modal
