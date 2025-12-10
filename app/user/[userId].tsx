@@ -453,59 +453,47 @@ export default function UserProfileScreen() {
               )}
             </View>
 
-            {/* Action menu button in header - only when viewing another user's profile */}
+            {/* Follow and Share buttons - only when viewing another user's profile */}
             {!isOwnProfile && (
-              <View style={styles.headerActionMenuContainer}>
+              <View style={styles.headerActionButtonsContainer}>
                 <TouchableOpacity
-                  style={[styles.profileActionButton, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={() => setShowActionMenu(!showActionMenu)}
+                  style={[
+                    styles.followButton,
+                    {
+                      backgroundColor: isFollowingUser ? colors.backgroundSecondary : colors.primary,
+                      borderColor: isFollowingUser ? colors.border : colors.primary,
+                    }
+                  ]}
+                  onPress={handleFollowUser}
                   activeOpacity={0.7}
                 >
-                  <View style={{ transform: [{ rotate: '90deg' }] }}>
-                    <MoreVertical size={18} color={colors.text} strokeWidth={2} />
-                  </View>
+                  {isFollowingUser ? (
+                    <UserMinus size={16} color={colors.text} strokeWidth={2} />
+                  ) : (
+                    <UserPlus size={16} color={colors.white} strokeWidth={2} />
+                  )}
+                  <Text style={[
+                    styles.followButtonText,
+                    { color: isFollowingUser ? colors.text : colors.white }
+                  ]}>
+                    {isFollowingUser ? 'Unfollow' : 'Follow'}
+                  </Text>
                 </TouchableOpacity>
-
-                {/* Action Menu Dropdown */}
-                {showActionMenu && (
-                  <View style={[styles.profileActionDropdown, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                    <TouchableOpacity
-                      style={styles.profileActionItem}
-                      onPress={() => {
-                        setShowActionMenu(false);
-                        handleFollowUser();
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      {isFollowingUser ? (
-                        <UserMinus size={16} color={colors.text} strokeWidth={2} />
-                      ) : (
-                        <UserPlus size={16} color={colors.text} strokeWidth={2} />
-                      )}
-                      <Text style={[styles.profileActionText, { color: colors.text }]}>
-                        {isFollowingUser ? 'Unfollow' : 'Follow'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.profileActionItem}
-                      onPress={() => {
-                        setShowActionMenu(false);
-                        const shareUrl = `${Platform.OS === 'web' ? window.location.origin : 'https://iendorse.app'}/user/${userId}`;
-                        if (Platform.OS === 'web') {
-                          navigator.clipboard.writeText(shareUrl);
-                          Alert.alert('Link Copied', 'Profile link copied to clipboard');
-                        } else {
-                          Alert.alert('Share', `Share ${userName}'s profile at ${shareUrl}`);
-                        }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Share2 size={16} color={colors.text} strokeWidth={2} />
-                      <Text style={[styles.profileActionText, { color: colors.text }]}>Share</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                <TouchableOpacity
+                  style={[styles.shareButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                  onPress={() => {
+                    const shareUrl = `${Platform.OS === 'web' ? window.location.origin : 'https://iendorse.app'}/user/${userId}`;
+                    if (Platform.OS === 'web') {
+                      navigator.clipboard.writeText(shareUrl);
+                      Alert.alert('Link Copied', 'Profile link copied to clipboard');
+                    } else {
+                      Alert.alert('Share', `Share ${userName}'s profile at ${shareUrl}`);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Share2 size={16} color={colors.text} strokeWidth={2} />
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -779,9 +767,32 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 12,
   },
-  headerActionMenuContainer: {
-    position: 'relative' as const,
+  headerActionButtonsContainer: {
+    flexDirection: 'column' as const,
+    alignItems: 'flex-end' as const,
     marginLeft: 'auto' as const,
+    gap: 8,
+  },
+  followButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
+  },
+  followButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  shareButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderWidth: 1,
   },
   privacyBadge: {
     width: 64,

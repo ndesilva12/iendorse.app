@@ -157,6 +157,9 @@ export default function BrowseScreen() {
   const [allUsers, setAllUsers] = useState<{ id: string; profile: UserProfile }[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [usersDisplayCount, setUsersDisplayCount] = useState(10);
+  const [selectedUserForOptions, setSelectedUserForOptions] = useState<{ id: string; profile: UserProfile } | null>(null);
+  const [showUserOptionsModal, setShowUserOptionsModal] = useState(false);
+  const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set());
 
   // Following section state
   const [followingItems, setFollowingItems] = useState<FollowingItem[]>([]);
@@ -634,6 +637,63 @@ export default function BrowseScreen() {
       Alert.alert('Share', 'Share functionality coming soon');
     }
   };
+
+  // User action handlers
+  const handleFollowUser = async (userId: string, userName: string) => {
+    if (!clerkUser?.id) return;
+    if (userId === clerkUser.id) {
+      Alert.alert('Info', 'You cannot follow yourself');
+      return;
+    }
+
+    const isCurrentlyFollowing = followedUsers.has(userId);
+
+    try {
+      if (isCurrentlyFollowing) {
+        await unfollowEntity(clerkUser.id, userId, 'user');
+        setFollowedUsers(prev => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+        Alert.alert('Success', `Unfollowed ${userName}`);
+      } else {
+        await followEntity(clerkUser.id, userId, 'user');
+        setFollowedUsers(prev => new Set(prev).add(userId));
+        Alert.alert('Success', `Now following ${userName}`);
+      }
+    } catch (error) {
+      console.error('[Browse] Error following/unfollowing user:', error);
+      Alert.alert('Error', 'Could not follow user. Please try again.');
+    }
+  };
+
+  const handleShareUser = (userId: string, userName: string) => {
+    const baseUrl = `https://iendorse.app/user/${userId}`;
+    const shareUrl = appendReferralTracking(baseUrl, referralCode);
+    if (Platform.OS === 'web') {
+      navigator.clipboard.writeText(shareUrl);
+      Alert.alert('Success', 'Link copied to clipboard');
+    } else {
+      Alert.alert('Share', 'Share functionality coming soon');
+    }
+  };
+
+  // Check follow status when a user is selected for options
+  useEffect(() => {
+    const checkUserFollowStatus = async () => {
+      if (!selectedUserForOptions || !clerkUser?.id) return;
+      try {
+        const following = await checkIsFollowing(clerkUser.id, selectedUserForOptions.id, 'user');
+        if (following) {
+          setFollowedUsers(prev => new Set(prev).add(selectedUserForOptions.id));
+        }
+      } catch (error) {
+        console.error('[Browse] Error checking user follow status:', error);
+      }
+    };
+    checkUserFollowStatus();
+  }, [selectedUserForOptions, clerkUser?.id]);
 
   // Handle local search
   const handleLocalSearch = useCallback((text: string) => {
@@ -1268,7 +1328,22 @@ export default function BrowseScreen() {
                   </Text>
                 )}
               </View>
-              <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+              {/* Action Menu Button - only show if not own profile */}
+              {user.id !== clerkUser?.id ? (
+                <TouchableOpacity
+                  style={styles.userCardActionButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedUserForOptions(user);
+                    setShowUserOptionsModal(true);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <MoreVertical size={20} color={colors.textSecondary} strokeWidth={2} />
+                </TouchableOpacity>
+              ) : (
+                <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2} />
+              )}
             </View>
           </TouchableOpacity>
         ))}
@@ -1638,6 +1713,41 @@ export default function BrowseScreen() {
               label: 'Share',
               onPress: () => {
                 handleShareBrand(selectedBrandForOptions.id, selectedBrandForOptions.name);
+              },
+            },
+          ]}
+        />
+      )}
+
+      {/* User Options Modal */}
+      {selectedUserForOptions && (
+        <ItemOptionsModal
+          visible={showUserOptionsModal}
+          onClose={() => {
+            setShowUserOptionsModal(false);
+            setSelectedUserForOptions(null);
+          }}
+          itemName={selectedUserForOptions.profile.userDetails?.name || 'User'}
+          isDarkMode={isDarkMode}
+          options={[
+            {
+              icon: followedUsers.has(selectedUserForOptions.id) ? UserMinus : UserPlus,
+              label: followedUsers.has(selectedUserForOptions.id) ? 'Unfollow' : 'Follow',
+              onPress: () => {
+                handleFollowUser(
+                  selectedUserForOptions.id,
+                  selectedUserForOptions.profile.userDetails?.name || 'User'
+                );
+              },
+            },
+            {
+              icon: Share2,
+              label: 'Share',
+              onPress: () => {
+                handleShareUser(
+                  selectedUserForOptions.id,
+                  selectedUserForOptions.profile.userDetails?.name || 'User'
+                );
               },
             },
           ]}
@@ -2153,6 +2263,13 @@ const styles = StyleSheet.create({
   userCardBio: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  userCardActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
 
   // Search section styles
