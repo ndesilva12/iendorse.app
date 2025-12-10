@@ -39,18 +39,15 @@ export default function ItemOptionsModal({
   const colors = isDarkMode ? darkColors : lightColors;
 
   const handleOptionPress = (option: ItemOption) => {
-    console.log('[ItemOptionsModal] Option pressed:', option.label);
     option.onPress();
     onClose();
   };
 
   const handleOverlayPress = () => {
-    console.log('[ItemOptionsModal] Overlay pressed, closing modal');
     onClose();
   };
 
   const handleContainerPress = (e: any) => {
-    console.log('[ItemOptionsModal] Container pressed, stopping propagation');
     e.stopPropagation();
   };
 
