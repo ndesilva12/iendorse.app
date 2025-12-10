@@ -108,6 +108,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { UnifiedLibrary } from '@/components/Library';
 import { useLibrary } from '@/contexts/LibraryContext';
+import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
 
 type MainView = 'forYou' | 'myLibrary' | 'local';
 type ForYouSubsection = 'userList' | 'aligned' | 'unaligned';
@@ -139,6 +140,7 @@ export default function HomeScreen() {
   const params = useLocalSearchParams();
   const { profile, isDarkMode, clerkUser, markIntroAsSeen, isLoading: isProfileLoading } = useUser();
   const library = useLibrary();
+  const { toggleSearch } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const insets = useSafeAreaInsets();
   const { referralCode } = useReferralCode();
@@ -2951,17 +2953,16 @@ export default function HomeScreen() {
             style={styles.headerLogo}
             resizeMode="contain"
           />
-          <View style={styles.headerCounters}>
-            <TouchableOpacity style={styles.headerCounterButton} onPress={() => openFollowersModal('following')} activeOpacity={0.7}>
-              <Text style={[styles.headerCounterNumber, { color: colors.text }]}>{followingCount}</Text>
-              <Text style={[styles.headerCounterLabel, { color: colors.textSecondary }]}>Following</Text>
+          <View style={styles.headerRightContainer}>
+            <TouchableOpacity
+              style={[styles.headerSearchButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={toggleSearch}
+              activeOpacity={0.7}
+            >
+              <Search size={22} color={colors.textSecondary} strokeWidth={2} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerCounterButton} onPress={() => openFollowersModal('followers')} activeOpacity={0.7}>
-              <Text style={[styles.headerCounterNumber, { color: colors.text }]}>{followersCount}</Text>
-              <Text style={[styles.headerCounterLabel, { color: colors.textSecondary }]}>Followers</Text>
-            </TouchableOpacity>
+            <MenuButton />
           </View>
-          <MenuButton />
         </View>
       </View>
       <ScrollView
@@ -5155,6 +5156,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerSearchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitleRow: {
     flex: 1,

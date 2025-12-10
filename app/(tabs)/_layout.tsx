@@ -6,6 +6,8 @@ import { lightColors, darkColors } from "@/constants/colors";
 import { useUser } from "@/contexts/UserContext";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsStandalone } from "@/hooks/useIsStandalone";
+import GlobalSearchOverlay from "@/components/GlobalSearchOverlay";
+import { useGlobalSearch } from "@/contexts/GlobalSearchContext";
 
 export default function TabLayout() {
   const router = useRouter();
@@ -14,6 +16,7 @@ export default function TabLayout() {
   const colors = isDarkMode ? darkColors : lightColors;
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { isSearchActive } = useGlobalSearch();
 
   const isTabletOrLarger = Platform.OS === 'web' && width >= 768;
   const tabBarHeight = isTabletOrLarger ? 64 : 64;
@@ -75,6 +78,8 @@ export default function TabLayout() {
       <View style={{ flex: 1, alignItems: 'center', backgroundColor: colors.background }}>
         {/* Ensure this inner container fills vertical space so Tabs layout behaves correctly */}
         <View style={{ width: '100%', maxWidth: isTabletOrLarger ? '50%' : 768, flex: 1, backgroundColor: colors.background }}>
+          {/* Global Search Overlay */}
+          {isSearchActive && <GlobalSearchOverlay />}
           <Tabs
             screenOptions={{
               tabBarActiveTintColor: colors.primary,

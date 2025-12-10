@@ -35,6 +35,7 @@ import { appendReferralTracking } from '@/services/firebase/referralService';
 import { searchPlaces, PlaceSearchResult, formatCategory } from '@/services/firebase/placesService';
 import { getAllUsers } from '@/services/firebase/userService';
 import { searchProducts } from '@/mocks/products';
+import { useGlobalSearch } from '@/contexts/GlobalSearchContext';
 
 // ===== Types =====
 type BrowseSection = 'global' | 'local' | 'values' | 'users' | 'following' | 'search';
@@ -118,6 +119,7 @@ export default function BrowseScreen() {
   const { profile, isDarkMode, clerkUser } = useUser();
   const { brands, valuesMatrix, values: firebaseValues } = useData();
   const library = useLibrary();
+  const { toggleSearch } = useGlobalSearch();
   const colors = isDarkMode ? darkColors : lightColors;
   const { referralCode } = useReferralCode();
 
@@ -1616,10 +1618,10 @@ export default function BrowseScreen() {
           <View style={styles.headerRightContainer}>
             <TouchableOpacity
               style={[styles.headerSearchButton, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={() => setSelectedSection('search')}
+              onPress={toggleSearch}
               activeOpacity={0.7}
             >
-              <Search size={22} color={selectedSection === 'search' ? colors.primary : colors.textSecondary} strokeWidth={2} />
+              <Search size={22} color={colors.textSecondary} strokeWidth={2} />
             </TouchableOpacity>
             <MenuButton />
           </View>
