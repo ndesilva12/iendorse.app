@@ -466,6 +466,12 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
     // Exclude business accounts (accountType === 'business')
     const usersWithFollowers: Array<{ id: string; data: any; followerCount: number }> = [];
 
+    // Track users by their data state for debugging
+    let usersWithAccountType = 0;
+    let usersWithoutAccountType = 0;
+    let usersWithUserDetails = 0;
+    let usersWithName = 0;
+
     for (const userDoc of queryDocs) {
       const data = userDoc.data();
       const userId = userDoc.id;
@@ -479,9 +485,18 @@ export async function getAllUsers(limitCount?: number): Promise<Array<{ id: stri
         continue;
       }
 
+      // Track data state for debugging
+      if (data.accountType) usersWithAccountType++;
+      else usersWithoutAccountType++;
+      if (data.userDetails) usersWithUserDetails++;
+      if (data.userDetails?.name || data.fullName || data.name) usersWithName++;
+
       const followerCount = followerCountMap.get(userId) || 0;
       usersWithFollowers.push({ id: userId, data, followerCount });
     }
+
+    console.log(`[Firebase] User data stats: ${usersWithAccountType} with accountType, ${usersWithoutAccountType} without accountType`);
+    console.log(`[Firebase] User data stats: ${usersWithUserDetails} with userDetails, ${usersWithName} with any name field`);
 
     console.log(`[Firebase] After filtering business accounts: ${usersWithFollowers.length} individual users from users collection`);
 
