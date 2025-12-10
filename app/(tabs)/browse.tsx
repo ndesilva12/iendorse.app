@@ -433,8 +433,9 @@ export default function BrowseScreen() {
           } as Product & { brandId: string; isFirebaseBrand: boolean }));
 
         // Combine product, business, brand, and user results
+        // Put users FIRST so they're visible at the top of search results
         console.log(`[Search] Results: ${productResults?.length || 0} products, ${businessResults.length} businesses, ${brandResults.length} brands, ${userResults.length} users`);
-        const combinedResults = [...(productResults || []), ...businessResults, ...brandResults, ...userResults];
+        const combinedResults = [...userResults, ...businessResults, ...(productResults || []), ...brandResults];
         setSearchResults(combinedResults);
 
         // Also search Google Places with debouncing
