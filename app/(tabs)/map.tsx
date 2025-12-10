@@ -1060,7 +1060,7 @@ export default function MapScreen() {
       {isSearchActive ? (
         <GlobalSearchOverlay />
       ) : (
-        <>
+        <View style={styles.contentContainer}>
           {renderFilters()}
 
           <View style={[
@@ -1070,7 +1070,7 @@ export default function MapScreen() {
             {renderMap()}
             {renderEmptyState()}
           </View>
-        </>
+        </View>
       )}
     </View>
   );
@@ -1078,6 +1078,9 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  contentContainer: {
     flex: 1,
   },
   mainHeaderContainer: {

@@ -231,21 +231,7 @@ export default function BrowseScreen() {
     const fetchPublicUsers = async () => {
       setLoadingUsers(true);
       try {
-        // Fetch ALL users with no limit - ensures everyone is searchable regardless of followers
         const users = await getAllUsers();
-        console.log('[Browse] Received', users.length, 'users from getAllUsers (no limit)');
-
-        // Log users with and without names for debugging
-        const usersWithNames = users.filter(u => u.profile.userDetails?.name);
-        const usersWithoutNames = users.filter(u => !u.profile.userDetails?.name);
-        console.log('[Browse] Users with names:', usersWithNames.length);
-        console.log('[Browse] Users without names:', usersWithoutNames.length);
-
-        // Log first few users for debugging
-        users.slice(0, 5).forEach((u, i) => {
-          console.log(`[Browse] User ${i}: id=${u.id}, name=${u.profile.userDetails?.name || 'NONE'}`);
-        });
-
         setAllUsers(users);
       } catch (error) {
         console.error('[Browse] Error fetching public users:', error);
@@ -368,9 +354,7 @@ export default function BrowseScreen() {
             isFirebaseBusiness: true,
           } as Product & { firebaseId: string; isFirebaseBusiness: boolean }));
 
-        // Search users - log for debugging
-        console.log(`[Search] Searching ${allUsers.length} users for "${text}"`);
-
+        // Search users
         const userResults = allUsers
           .filter(user => {
             const searchLower = text.toLowerCase();
@@ -378,18 +362,11 @@ export default function BrowseScreen() {
             const userLocation = user.profile.userDetails?.location || '';
             const userBio = user.profile.userDetails?.description || '';
 
-            const matches = (
+            return (
               userName.toLowerCase().includes(searchLower) ||
               userLocation.toLowerCase().includes(searchLower) ||
               userBio.toLowerCase().includes(searchLower)
             );
-
-            // Log matches for debugging
-            if (matches) {
-              console.log(`[Search] Found user match: ${userName || user.id}`);
-            }
-
-            return matches;
           })
           .map(user => ({
             id: `user-${user.id}`,
@@ -437,7 +414,6 @@ export default function BrowseScreen() {
 
         // Combine product, business, brand, and user results
         // Put users FIRST so they're visible at the top of search results
-        console.log(`[Search] Results: ${productResults?.length || 0} products, ${businessResults.length} businesses, ${brandResults.length} brands, ${userResults.length} users`);
         const combinedResults = [...userResults, ...businessResults, ...(productResults || []), ...brandResults];
         setSearchResults(combinedResults);
 
@@ -508,16 +484,14 @@ export default function BrowseScreen() {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status === 'granted' && !userLocation) {
-          console.log('[Browse] Location permission already granted, fetching location...');
           const location = await Location.getCurrentPositionAsync({});
           setUserLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           });
-          console.log('[Browse] ✅ Auto-fetched location');
         }
       } catch (error) {
-        console.error('[Browse] Error auto-fetching location:', error);
+        // Location error - silently handle
       }
     };
     checkAndFetchLocation();
@@ -525,25 +499,15 @@ export default function BrowseScreen() {
 
   // Brand action handlers
   const handleEndorseBrand = async (brandId: string, brandName: string) => {
-    console.log('[Browse] handleEndorseBrand called:', brandId, brandName);
-    console.log('[Browse] clerkUser?.id:', clerkUser?.id);
-    if (!clerkUser?.id) {
-      console.log('[Browse] No clerkUser.id - returning early');
-      return;
-    }
+    if (!clerkUser?.id) return;
 
     try {
-      // Find the endorsement list
-      console.log('[Browse] library?.state?.userLists:', library?.state?.userLists?.length, 'lists');
       if (!library?.state?.userLists) {
-        console.log('[Browse] No userLists - showing alert');
         Alert.alert('Error', 'Library not loaded yet. Please try again.');
         return;
       }
       const endorsementList = library.state.userLists.find(list => list.isEndorsed);
-      console.log('[Browse] endorsementList:', endorsementList?.id);
       if (!endorsementList) {
-        console.log('[Browse] No endorsement list found');
         Alert.alert('Error', 'Could not find endorsement list');
         return;
       }
@@ -552,20 +516,16 @@ export default function BrowseScreen() {
       const existingEntry = endorsementList.entries.find(
         (e: any) => e.type === 'brand' && e.brandId === brandId
       );
-      console.log('[Browse] existingEntry:', existingEntry);
 
       if (existingEntry) {
-        console.log('[Browse] Already endorsed');
         Alert.alert('Already Endorsed', `${brandName} is already in your endorsements`);
         return;
       }
 
       // Find the brand to get all info
       const brand = brands?.find(b => b.id === brandId);
-      console.log('[Browse] Found brand:', brand?.name);
 
       // Add to endorsement list with all relevant data
-      console.log('[Browse] Calling addEntryToList...');
       await addEntryToList(endorsementList.id, {
         type: 'brand',
         brandId: brandId,
@@ -574,15 +534,11 @@ export default function BrowseScreen() {
         website: brand?.website || '',
         logoUrl: brand?.exampleImageUrl || getLogoUrl(brand?.website || ''),
       });
-      console.log('[Browse] addEntryToList completed');
 
       // Reload the library to reflect changes (force refresh)
-      console.log('[Browse] Reloading library...');
       await library.loadUserLists(clerkUser.id, true);
-      console.log('[Browse] Library reloaded');
 
       Alert.alert('Success', `${brandName} added to endorsements`);
-      console.log('[Browse] Success alert shown');
     } catch (error) {
       console.error('[Browse] Error endorsing brand:', error);
       Alert.alert('Error', 'Failed to endorse brand');
@@ -628,7 +584,6 @@ export default function BrowseScreen() {
   };
 
   const handleFollowBrand = async (brandId: string, brandName: string) => {
-    console.log('[Browse] handleFollowBrand called:', brandId, brandName);
     if (!clerkUser?.id) return;
 
     const isCurrentlyFollowing = followedBrands.has(brandId);
@@ -670,7 +625,6 @@ export default function BrowseScreen() {
   }, [selectedBrandForOptions, clerkUser?.id]);
 
   const handleShareBrand = (brandId: string, brandName: string) => {
-    console.log('[Browse] handleShareBrand called:', brandId, brandName);
     const baseUrl = `https://iendorse.app/brand/${brandId}`;
     const shareUrl = appendReferralTracking(baseUrl, referralCode);
     if (Platform.OS === 'web') {
@@ -971,7 +925,6 @@ export default function BrowseScreen() {
               style={styles.actionMenuButton}
               onPress={(e) => {
                 e.stopPropagation();
-                console.log('[Browse] Opening options modal for brand:', brand.name);
                 setSelectedBrandForOptions(brand);
                 setShowItemOptionsModal(true);
               }}
@@ -1665,7 +1618,6 @@ export default function BrowseScreen() {
               icon: Heart,
               label: isBrandEndorsed(selectedBrandForOptions.id) ? 'Unendorse' : 'Endorse',
               onPress: () => {
-                console.log('[Browse] Endorse option pressed');
                 const brand = selectedBrandForOptions;
                 if (isBrandEndorsed(brand.id)) {
                   handleUnendorseBrand(brand.id, brand.name);
@@ -1678,7 +1630,6 @@ export default function BrowseScreen() {
               icon: followedBrands.has(selectedBrandForOptions.id) ? UserMinus : UserPlus,
               label: followedBrands.has(selectedBrandForOptions.id) ? 'Unfollow' : 'Follow',
               onPress: () => {
-                console.log('[Browse] Follow option pressed');
                 handleFollowBrand(selectedBrandForOptions.id, selectedBrandForOptions.name);
               },
             },
@@ -1686,7 +1637,6 @@ export default function BrowseScreen() {
               icon: Share2,
               label: 'Share',
               onPress: () => {
-                console.log('[Browse] Share option pressed');
                 handleShareBrand(selectedBrandForOptions.id, selectedBrandForOptions.name);
               },
             },
